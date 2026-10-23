@@ -1,0 +1,20 @@
+# Byte-compiled / optimized / DLL files
+__pycache__/
+*.py[cod]
+*$py.class
+
+# Caches and checkpoints
+.ipynb_checkpoints/
+.pytest_cache/
+
+# OS generated files
+Thumbs.db
+Desktop.ini
+.DS_Store
+
+# Raw archive folders from initial setup
+Agriculture crops.v1i.folder/
+Mask RCNN.v8i.yolov11/
+soil.v1i.folder (1)/
+Soil.v3i.folder/
+*.zip

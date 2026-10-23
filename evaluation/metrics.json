@@ -1,0 +1,10 @@
+{
+    "precision": 0.876,
+    "recall": 0.3056,
+    "mAP50": 0.2731,
+    "mAP50-95": 0.1589,
+    "accuracy": 0.9783,
+    "total_test_images": 3,
+    "total_test_instances": 46,
+    "correct_predictions": 45
+}

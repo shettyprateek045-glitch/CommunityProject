@@ -1,0 +1,14 @@
+path: .
+train: train/images
+val: valid/images
+test: test/images
+
+nc: 3
+names: ['Early_blight', 'Late_blight', 'Leaf']
+
+roboflow:
+  workspace: potato-blight
+  project: mask-rcnn-zgho6
+  version: 8
+  license: CC BY 4.0
+  url: https://universe.roboflow.com/potato-blight/mask-rcnn-zgho6/dataset/8
