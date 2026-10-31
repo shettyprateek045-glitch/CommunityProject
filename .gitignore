@@ -18,3 +18,12 @@ Mask RCNN.v8i.yolov11/
 soil.v1i.folder (1)/
 Soil.v3i.folder/
 *.zip
+
+# Internal review documents (do not push to GitHub)
+review.pdf
+reveiw.pdf
+
+# Duplicate files from unrelated Roboflow dataset imports
+"README.dataset (2).txt"
+"README.roboflow (2).txt"
+"data (2).yaml"

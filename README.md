@@ -89,7 +89,8 @@ CommunityProject/
     ├── predict.py               # Test image inference script
     ├── evaluate.py              # Quantitative benchmark & test matching
     ├── recommend.py             # Crop & disease recommendation engine
-    └── make_pdfs.py             # ReportLab automated PDF generator
+    ├── make_pdfs.py             # ReportLab automated PDF generator
+    └── generate_review_pdf.py   # Comprehensive project review PDF generator
 ```
 
 ---
