@@ -253,4 +253,4 @@ Tracked checkpoint files:
 - `runs/detect/train/last.pt` (~40.5 MB trained final weights)
 
 ---
-*Created as part of the Community / Societal Engineering Project (Multi-Domain Tech Forge).*
+
