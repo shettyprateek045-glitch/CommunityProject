@@ -1,0 +1,21 @@
+{
+  "dataset": "irri 2 (datasets - datasets.csv)",
+  "task": "binary_classification",
+  "epochs": 40,
+  "classes": [
+    "No Irrigation (0)",
+    "Irrigate (1)"
+  ],
+  "train_samples": 400,
+  "test_samples": 101,
+  "nn_metrics": {
+    "accuracy": 0.9603960396039604,
+    "precision": 0.95,
+    "recall": 0.95,
+    "f1": 0.95
+  },
+  "rf_metrics": {
+    "accuracy": 0.9405940594059405,
+    "f1": 0.9230769230769231
+  }
+}

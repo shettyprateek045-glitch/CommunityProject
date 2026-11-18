@@ -1,0 +1,17 @@
+{
+  "dataset": "price 2 (crop_price_dataset.csv)",
+  "task": "regression",
+  "epochs": 40,
+  "train_samples": 2248,
+  "test_samples": 562,
+  "nn_metrics": {
+    "R2": 0.9898966550827026,
+    "RMSE": 539.6757707179377,
+    "MAE": 336.7738037109375
+  },
+  "rf_metrics": {
+    "R2": 0.9977673211193364,
+    "RMSE": 253.69619009699784,
+    "MAE": 58.79798263088241
+  }
+}

@@ -1,0 +1,17 @@
+{
+  "dataset": "price 1 (Crop_Yield_Prediction.csv)",
+  "task": "regression",
+  "epochs": 40,
+  "train_samples": 1760,
+  "test_samples": 440,
+  "nn_metrics": {
+    "R2": 0.045960068702697754,
+    "RMSE": 2555.091583485805,
+    "MAE": 1646.3184814453125
+  },
+  "rf_metrics": {
+    "R2": -0.23679030287617908,
+    "RMSE": 2909.184297192842,
+    "MAE": 1917.9042499999998
+  }
+}
