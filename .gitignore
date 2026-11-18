@@ -14,6 +14,7 @@ Desktop.ini
 
 # Raw archive folders from initial setup
 Agriculture crops.v1i.folder/
+agriculture.v3i.folder123/
 Mask RCNN.v8i.yolov11/
 soil.v1i.folder (1)/
 Soil.v3i.folder/
@@ -24,6 +25,10 @@ review.pdf
 reveiw.pdf
 
 # Duplicate files from unrelated Roboflow dataset imports
-"README.dataset (2).txt"
-"README.roboflow (2).txt"
-"data (2).yaml"
+README.dataset (2).txt
+README.roboflow (2).txt
+data (2).yaml
+
+# User uploads
+uploads/*
+!uploads/.gitkeep
