@@ -1,0 +1,332 @@
+{
+  "rules": {
+    "gram": {
+      "display_name": "Gram / Chickpea (ಕಡಲೆ)",
+      "family": "Fabaceae (Legume)",
+      "fertility_impact": "Improved",
+      "fertility_impact_kn": "ಸುಧಾರಿಸಿದೆ (ಮಣ್ಣಿನ ಸಾರವರ್ಧಕ)",
+      "nitrogen_fixation": true,
+      "biomass_addition": "High root nodule biomass adds ~20-30 kg/ha atmospheric nitrogen",
+      "n_adjust": 25.0,
+      "p_adjust": 5.0,
+      "k_adjust": 0.0,
+      "recommended_next_crops": [
+        {"crop": "Maize", "reason": "Maize is a heavy nitrogen consumer and thrives on residual legume nitrogen."},
+        {"crop": "Wheat", "reason": "Excellent post-kharif/rabi cereal rotation with reduced fertilizer requirement."},
+        {"crop": "Cotton", "reason": "Breaks soil-borne pest cycles and restores topsoil structure for deep roots."}
+      ],
+      "crops_to_avoid": [
+        {"crop": "Pigeonpeas / Lentil", "reason": "Repeated pulse cultivation can build up Fusarium wilt and root rot pathogens in soil."}
+      ],
+      "soil_health_tips": [
+        "Incorporate pulse crop residues directly into soil to accelerate microbial humification.",
+        "Residual soil moisture after gram is ideal for early rabi or zaid sowing."
+      ],
+      "soil_health_tips_kn": [
+        "ಕಡಲೆಯ ಉಳಿಕೆಗಳನ್ನು ಮಣ್ಣಿನಲ್ಲಿ ಬೆರೆಸುವುದರಿಂದ ಜೈವಿಕ ಇಂಗಾಲ ಮತ್ತು ಸಾರಜನಕ ಹೆಚ್ಚುತ್ತದೆ.",
+        "ಕಡಲೆಯ ನಂತರ ಮುಸುಕಿನ ಜೋಳ ಅಥವಾ ಗೋಧಿ ಬೆಳೆಯುವುದು ಅತ್ಯಂತ ಲಾಭದಾಯಕ."
+      ]
+    },
+    "soyabean": {
+      "display_name": "Soybean (ಸೋಯಾಬೀನ್)",
+      "family": "Fabaceae (Legume)",
+      "fertility_impact": "Improved",
+      "fertility_impact_kn": "ಸುಧಾರಿಸಿದೆ (ಸಾರಜನಕ ಸ್ಥಿರೀಕರಣ)",
+      "nitrogen_fixation": true,
+      "biomass_addition": "Dense foliage drop enriches organic carbon and fixes 30-40 kg N/ha",
+      "n_adjust": 20.0,
+      "p_adjust": 0.0,
+      "k_adjust": 0.0,
+      "recommended_next_crops": [
+        {"crop": "Wheat", "reason": "Classic soybean-wheat cropping system gives highest fertilizer efficiency."},
+        {"crop": "Gram", "reason": "Low moisture rabi legume rotation in dry tracts."},
+        {"crop": "Jowar", "reason": "Sorghum benefits from residual organic nitrogen and loose soil tilth."}
+      ],
+      "crops_to_avoid": [
+        {"crop": "Groundnut", "reason": "Continuous legume cropping invites Rhizoctonia and nematode buildup."}
+      ],
+      "soil_health_tips": [
+        "Leaf-fall prior to harvest deposits natural mulch, conserving moisture and enriching topsoil organic matter."
+      ],
+      "soil_health_tips_kn": [
+        "ಉದುರಿದ ಎಲೆಗಳು ನೈಸರ್ಗಿಕ ಮಲ್ಚಿಂಗ್ ಆಗಿ ಮಣ್ಣಿನ ತೇವಾಂಶ ಮತ್ತು ಫಲವತ್ತತೆ ಕಾಪಾಡುತ್ತವೆ."
+      ]
+    },
+    "vigna-radiati(Mung)": {
+      "display_name": "Moong / Blackgram (ಹೆಸರು / ಉದ್ದು)",
+      "family": "Fabaceae (Short Legume)",
+      "fertility_impact": "Improved",
+      "fertility_impact_kn": "ಸುಧಾರಿಸಿದೆ (ಹಸಿರು ಗೊಬ್ಬರ)",
+      "nitrogen_fixation": true,
+      "biomass_addition": "Quick 60-day crop adds fast-decomposing green manure biomass",
+      "n_adjust": 20.0,
+      "p_adjust": 0.0,
+      "k_adjust": 0.0,
+      "recommended_next_crops": [
+        {"crop": "Rice", "reason": "Moong green-manure residue before transplanted paddy cuts urea requirement by 25%."},
+        {"crop": "Wheat", "reason": "Cereal succession makes optimal use of fixed nitrogen."},
+        {"crop": "Mustard", "reason": "Moong-mustard is a premier short-season cash rotation."}
+      ],
+      "crops_to_avoid": [],
+      "soil_health_tips": [
+        "Plough under crop residues immediately after second picking for maximum green manuring benefit."
+      ],
+      "soil_health_tips_kn": [
+        "ಕಾಯಿ ಬಿಡಿಸಿದ ನಂತರ ಗಿಡಗಳನ್ನು ಮಣ್ಣಿನಲ್ಲಿ ಉತ್ತು ಹಸಿರೆಲೆ ಗೊಬ್ಬರವಾಗಿಸಿ."
+      ]
+    },
+    "maize": {
+      "display_name": "Maize / Corn (ಮುಸುಕಿನ ಜೋಳ)",
+      "family": "Poaceae (Gramineae)",
+      "fertility_impact": "Depleted",
+      "fertility_impact_kn": "ಕ್ಷೀಣಿಸಿದೆ (ಹೆಚ್ಚು ಪೋಷಕಾಂಶ ಹೀರಿಕೆ)",
+      "nitrogen_fixation": false,
+      "biomass_addition": "High stubble biomass but draws heavy N, P and K reserves",
+      "n_adjust": -20.0,
+      "p_adjust": -10.0,
+      "k_adjust": -10.0,
+      "recommended_next_crops": [
+        {"crop": "Gram", "reason": "Legume restores soil nitrogen depleted by heavy-feeding maize crop."},
+        {"crop": "Soybean", "reason": "Recovers organic matter and breaks stem-borer pest cycle."},
+        {"crop": "Groundnut", "reason": "Groundnut nodules actively replenish the nitrogen deficit."}
+      ],
+      "crops_to_avoid": [
+        {"crop": "Jowar / Sugarcane", "reason": "Consecutive heavy cereal crops exhaust soil micronutrients and foster stem borer."}
+      ],
+      "soil_health_tips": [
+        "Apply 5-8 tons of Farm Yard Manure (FYM) or vermicompost before the next crop.",
+        "Add Azotobacter bio-fertilizer with seed treatment for the incoming crop."
+      ],
+      "soil_health_tips_kn": [
+        "ಮುಸುಕಿನ ಜೋಳದ ನಂತರ ಕಡ್ಡಾಯವಾಗಿ ಕಡಲೆ ಅಥವಾ ದ್ವಿದಳ ಧಾನ್ಯ ಬೆಳೆಯಿರಿ.",
+        "ಮುಂದಿನ ಬೆಳೆಗೆ 5 ಟನ್ ಕೊಟ್ಟಿಗೆ ಗೊಬ್ಬರ ಸೇರಿಸಿ."
+      ]
+    },
+    "rice": {
+      "display_name": "Rice / Paddy (ಭತ್ತ)",
+      "family": "Poaceae (Gramineae)",
+      "fertility_impact": "Depleted",
+      "fertility_impact_kn": "ಕ್ಷೀಣಿಸಿದೆ (ಮಣ್ಣು ಗಟ್ಟಿಯಾಗುವುದು)",
+      "nitrogen_fixation": false,
+      "biomass_addition": "Anaerobic puddling reduces soil structure and hardens subsoil layer",
+      "n_adjust": -15.0,
+      "p_adjust": -5.0,
+      "k_adjust": -15.0,
+      "recommended_next_crops": [
+        {"crop": "Gram", "reason": "Relay pulse cropping (utera) into drying paddy field utilizes residual moisture and fixes nitrogen."},
+        {"crop": "Mustard", "reason": "Thrives in post-paddy moisture conditions with minimal tillage."},
+        {"crop": "Groundnut", "reason": "Breaks hardpan in sandy/alluvial paddy soils."}
+      ],
+      "crops_to_avoid": [
+        {"crop": "Continuous Paddy", "reason": "Monocropping paddy depletes zinc and leads to persistent methane emission and soil compaction."}
+      ],
+      "soil_health_tips": [
+        "Incorporate Zinc Sulphate (ZnSO4) at 10 kg/acre if signs of Khaira disease were noted.",
+        "Deep subsoil chiselling breaks the hard plough-pan created by continuous puddling."
+      ],
+      "soil_health_tips_kn": [
+        "ಭತ್ತದ ನಂತರ ಕಡಲೆ ಅಥವಾ ಹೆಸರು ಬೆಳೆಯುವುದರಿಂದ ಮಣ್ಣಿನ ಬಿಗಿತ ಕಡಿಮೆಯಾಗುತ್ತದೆ.",
+        "ಭತ್ತದ ಗದ್ದೆಗೆ ಜಿಂಕ್ ಸಲ್ಫೇಟ್ ನೀಡಿದರೆ ಮುಂದಿನ ಬೆಳೆಗೆ ಉತ್ತಮ."
+      ]
+    },
+    "cotton": {
+      "display_name": "Cotton (ಹತ್ತಿ)",
+      "family": "Malvaceae",
+      "fertility_impact": "Depleted",
+      "fertility_impact_kn": "ಕ್ಷೀಣಿಸಿದೆ (ದೀರ್ಘಾವಧಿ ಪೋಷಕಾಂಶ ಹೀರಿಕೆ)",
+      "nitrogen_fixation": false,
+      "biomass_addition": "Deep taproot extracts potassium and phosphorus from lower soil horizons",
+      "n_adjust": -15.0,
+      "p_adjust": -5.0,
+      "k_adjust": -20.0,
+      "recommended_next_crops": [
+        {"crop": "Soybean", "reason": "Legume restores biological activity and replenishes depleted nitrogen."},
+        {"crop": "Wheat", "reason": "Fast shallow-rooted cereal prevents nutrient leaching."},
+        {"crop": "Gram", "reason": "Chickpea taproot works well in deep black cotton soils after cotton stalks are shredded."}
+      ],
+      "crops_to_avoid": [
+        {"crop": "Tomato / Chilli / Bhendi", "reason": "Shares common bollworm, whitefly and verticillium wilt pests with cotton."}
+      ],
+      "soil_health_tips": [
+        "Shred cotton stalks into mulch rather than burning them to replenish 1.5 tons of organic carbon per acre.",
+        "Top-dress potash (MOP) if consecutive deep-rooted crops are planted."
+      ],
+      "soil_health_tips_kn": [
+        "ಹತ್ತಿ ಗಿಡಗಳನ್ನು ಸುಡದೆ ಪುಡಿಮಾಡಿ ಮಣ್ಣಿಗೆ ಸೇರಿಸಿ, ಇಂಗಾಲ ಹೆಚ್ಚುತ್ತದೆ.",
+        "ಹತ್ತಿಯ ನಂತರ ಮೆಣಸಿನಕಾಯಿ ಅಥವಾ ಟೊಮೆಟೊ ಬೆಳೆಯಬೇಡಿ (ಕೀಟ ರೋಗಗಳ ಬಾಧೆ ಹೆಚ್ಚು)."
+      ]
+    },
+    "wheat": {
+      "display_name": "Wheat (ಗೋಧಿ)",
+      "family": "Poaceae (Cereal)",
+      "fertility_impact": "Neutral",
+      "fertility_impact_kn": "ತಟಸ್ಥ (ಮಧ್ಯಮ ಪೋಷಕಾಂಶ ಬಳಕೆ)",
+      "nitrogen_fixation": false,
+      "biomass_addition": "Fibrous root system maintains soil aggregation and tilth",
+      "n_adjust": -5.0,
+      "p_adjust": 0.0,
+      "k_adjust": -5.0,
+      "recommended_next_crops": [
+        {"crop": "Mungbean / Moong", "reason": "Summer moong utilizes the 65-day gap before kharif, fixing 30kg N."},
+        {"crop": "Maize", "reason": "Standard kharif cereal following rabi wheat."},
+        {"crop": "Soybean", "reason": "Soybean in kharif balances the carbon-nitrogen ratio perfectly."}
+      ],
+      "crops_to_avoid": [],
+      "soil_health_tips": [
+        "Do not burn wheat straw; decompose with bio-decomposer or incorporate as mulch."
+      ],
+      "soil_health_tips_kn": [
+        "ಗೋಧಿ ಕೊಯ್ಲಿನ ನಂತರ ಬೇಸಿಗೆ ಹೆಸರು ಅಥವಾ ಉದ್ದು ಬೆಳೆಯಿರಿ."
+      ]
+    },
+    "sugarcane": {
+      "display_name": "Sugarcane (ಕಬ್ಬು)",
+      "family": "Poaceae (High Biomass)",
+      "fertility_impact": "Depleted",
+      "fertility_impact_kn": "ತೀವ್ರ ಕ್ಷೀಣಿಸಿದೆ (ಅಧಿಕ ಪೋಷಕಾಂಶ ಮತ್ತು ನೀರು ಬಳಕೆ)",
+      "nitrogen_fixation": false,
+      "biomass_addition": "Enormous biomass extraction over 12-14 months heavily exhausts soil K and N",
+      "n_adjust": -25.0,
+      "p_adjust": -10.0,
+      "k_adjust": -25.0,
+      "recommended_next_crops": [
+        {"crop": "Sunn Hemp / Dhaincha (Green Manure)", "reason": "Crucial green manure crop required to restore soil organic microbial biology."},
+        {"crop": "Gram", "reason": "Restores nitrogen and loosens compacted subsoil."},
+        {"crop": "Soybean", "reason": "Fast legume recovery crop."}
+      ],
+      "crops_to_avoid": [
+        {"crop": "Continuous Sugarcane Ratoon (>2 years)", "reason": "Severe root knot nematode and red rot accumulation."}
+      ],
+      "soil_health_tips": [
+        "Trash mulching between rows saves 30% water and replenishes organic carbon.",
+        "Apply 10 tons of FYM or pressmud compost before rotating to next crop."
+      ],
+      "soil_health_tips_kn": [
+        "ಕಬ್ಬಿನ ನಂತರ ಸೆಣಬು ಅಥವಾ ಡೈಂಚಾ ಬೆಳೆದು ಹಸಿರೆಲೆ ಗೊಬ್ಬರ ಮಾಡುವುದು ಕಡ್ಡಾಯ.",
+        "ಕಬ್ಬಿನ ರವದೆಯನ್ನು ಸುಡದೆ ಮುಚ್ಚಿಗೆ (ಮಲ್ಚಿಂಗ್) ಮಾಡಿ."
+      ]
+    },
+    "tomato": {
+      "display_name": "Tomato (ಟೊಮೆಟೊ)",
+      "family": "Solanaceae (Nightshade)",
+      "fertility_impact": "Depleted",
+      "fertility_impact_kn": "ಕ್ಷೀಣಿಸಿದೆ (ರೋಗಕಾರಕಗಳ ಸಂಗ್ರಹ ಅಪಾಯ)",
+      "nitrogen_fixation": false,
+      "biomass_addition": "Susceptible to bacterial wilt, early blight, and root-knot nematodes",
+      "n_adjust": -10.0,
+      "p_adjust": -5.0,
+      "k_adjust": -15.0,
+      "recommended_next_crops": [
+        {"crop": "Maize", "reason": "Gramineae non-host cereal starves solanaceous bacterial wilt and nematodes."},
+        {"crop": "Gram", "reason": "Legume restores soil fertility and alters root microbial ecosystem."},
+        {"crop": "Marigold", "reason": "Marigold roots secrete alpha-terthienyl which actively kills root-knot nematodes."}
+      ],
+      "crops_to_avoid": [
+        {"crop": "Chilli / Brinjal / Potato", "reason": "Strictly avoid Solanaceae crops consecutively to prevent catastrophic bacterial wilt and viral epidemics."}
+      ],
+      "soil_health_tips": [
+        "Solarize soil during summer months with transparent polythene sheets to destroy soil-borne fungal spores.",
+        "Apply Trichoderma viride and Pseudomonas fluorescens enriched in neem cake."
+      ],
+      "soil_health_tips_kn": [
+        "ಟೊಮೆಟೊ ನಂತರ ಮೆಣಸಿನಕಾಯಿ ಅಥವಾ ಬದನೆ ಬೆಳೆಯಬೇಡಿ (ರೋಗಗಳ ಅಪಾಯ).",
+        "ಟೊಮೆಟೊ ನಂತರ ಮುಸುಕಿನ ಜೋಳ ಅಥವಾ ಚೆಂಡುಹೂ ಬೆಳೆದರೆ ಜಂತುಹುಳು (ನೆಮಟೋಡ್) ನಾಶವಾಗುತ್ತದೆ."
+      ]
+    },
+    "chilli": {
+      "display_name": "Chilli (ಮೆಣಸಿನಕಾಯಿ)",
+      "family": "Solanaceae (Nightshade)",
+      "fertility_impact": "Depleted",
+      "fertility_impact_kn": "ಕ್ಷೀಣಿಸಿದೆ (ನಂಜು ರೋಗ ಮತ್ತು ಬೇರು ಕೊಳೆತ ಅಪಾಯ)",
+      "nitrogen_fixation": false,
+      "biomass_addition": "High nutrient feeder with intensive micronutrient requirements",
+      "n_adjust": -10.0,
+      "p_adjust": -5.0,
+      "k_adjust": -15.0,
+      "recommended_next_crops": [
+        {"crop": "Gram", "reason": "Fixes nitrogen and breaks thrips and mite pupation cycles in soil."},
+        {"crop": "Maize", "reason": "Tall cereal crop breaks the viral vector chain (thrips/whiteflies)."},
+        {"crop": "Groundnut", "reason": "Leguminous rotation that improves topsoil porosity."}
+      ],
+      "crops_to_avoid": [
+        {"crop": "Tomato / Tobacco-plant", "reason": "Cross-host for leaf curl virus, anthracnose and root wilt."}
+      ],
+      "soil_health_tips": [
+        "Drench soil with neem cake extract to suppress soil pupating thrips and mites.",
+        "Add micro-nutrient mixture (Zinc, Boron, Iron) at land preparation."
+      ],
+      "soil_health_tips_kn": [
+        "ಮೆಣಸಿನಕಾಯಿ ನಂತರ ಕಡಲೆ ಅಥವಾ ಜೋಳ ಬೆಳೆಯಿರಿ.",
+        "ಟೊಮೆಟೊ ಅಥವಾ ತಂಬಾಕು ಬೆಳೆಯುವುದನ್ನು ತಪ್ಪಿಸಿ."
+      ]
+    },
+    "jowar": {
+      "display_name": "Jowar / Sorghum (ಜೋಳ)",
+      "family": "Poaceae (Gramineae)",
+      "fertility_impact": "Neutral",
+      "fertility_impact_kn": "ತಟಸ್ಥ (ಬರ ನಿರೋಧಕ)",
+      "nitrogen_fixation": false,
+      "biomass_addition": "Deep fibrous root system loosens heavy clay; slight allelopathic root exudates",
+      "n_adjust": -5.0,
+      "p_adjust": 0.0,
+      "k_adjust": -5.0,
+      "recommended_next_crops": [
+        {"crop": "Gram", "reason": "Sorghum-chickpea is the most resilient dryland rainfed cropping system."},
+        {"crop": "Soybean", "reason": "Overcomes sorghum allelopathy and replenishes nitrate nitrogen."},
+        {"crop": "Sunflower", "reason": "Deep-rooting rotation with different nutrient zone absorption."}
+      ],
+      "crops_to_avoid": [],
+      "soil_health_tips": [
+        "Allow a 15-day fallow or decomposition window after sorghum harvest before sowing sensitive vegetables."
+      ],
+      "soil_health_tips_kn": [
+        "ಜೋಳದ ನಂತರ ಕಡಲೆ ಬೆಳೆಯುವುದು ಒಣಬೇಸಾಯಕ್ಕೆ ಅತ್ಯುತ್ತಮ."
+      ]
+    },
+    "sunflower": {
+      "display_name": "Sunflower (ಸೂರ್ಯಕಾಂತಿ)",
+      "family": "Asteraceae",
+      "fertility_impact": "Neutral",
+      "fertility_impact_kn": "ತಟಸ್ಥ (ಆಳ ಬೇರಿನ ಬೆಳೆ)",
+      "nitrogen_fixation": false,
+      "biomass_addition": "Deep taproot extracts subsoil moisture and breaks hard subsoil layers",
+      "n_adjust": -5.0,
+      "p_adjust": -5.0,
+      "k_adjust": -10.0,
+      "recommended_next_crops": [
+        {"crop": "Gram", "reason": "Recharges soil nitrogen and benefits from loose soil structure."},
+        {"crop": "Wheat", "reason": "Cereal after oilseed balances nutrient consumption."},
+        {"crop": "Moong", "reason": "Short duration green manure restores active microbial biomass."}
+      ],
+      "crops_to_avoid": [],
+      "soil_health_tips": [
+        "Sunflower taproots open aeration channels in dense black soils, aiding water infiltration for subsequent crops."
+      ],
+      "soil_health_tips_kn": [
+        "ಸೂರ್ಯಕಾಂತಿಯ ಆಳವಾದ ಬೇರುಗಳು ಮಣ್ಣನ್ನು ಸಡಿಲಗೊಳಿಸಿ ಗಾಳಿಯಾಡುವಂತೆ ಮಾಡುತ್ತವೆ."
+      ]
+    }
+  },
+  "default_rule": {
+    "display_name": "General Field Crop (ಸಾಮಾನ್ಯ ಬೆಳೆ)",
+    "family": "Mixed Agriculture",
+    "fertility_impact": "Neutral",
+    "fertility_impact_kn": "ತಟಸ್ಥ",
+    "nitrogen_fixation": false,
+    "biomass_addition": "Moderate organic matter contribution",
+    "n_adjust": 0.0,
+    "p_adjust": 0.0,
+    "k_adjust": 0.0,
+    "recommended_next_crops": [
+      {"crop": "Gram", "reason": "Pulses naturally enhance soil nitrogen and break pathogen cycles."},
+      {"crop": "Maize", "reason": "Productive cereal crop with wide soil adaptability."}
+    ],
+    "crops_to_avoid": [],
+    "soil_health_tips": [
+      "Incorporate well-rotted compost or FYM at 4-5 tonnes/acre to maintain soil fertility and microbial vigor."
+    ],
+    "soil_health_tips_kn": [
+      "ಮಣ್ಣಿನ ಫಲವತ್ತತೆ ಕಾಪಾಡಲು ಎಕರೆಗೆ 4-5 ಟನ್ ಕೊಟ್ಟಿಗೆ ಗೊಬ್ಬರ ಸೇರಿಸಿ."
+    ]
+  }
+}

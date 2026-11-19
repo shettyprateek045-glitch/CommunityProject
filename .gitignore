@@ -32,3 +32,11 @@ data (2).yaml
 # User uploads
 uploads/*
 !uploads/.gitkeep
+
+# SQLite database files
+*.db
+data/*.db
+
+# Node dependencies
+node_modules/
+dist/

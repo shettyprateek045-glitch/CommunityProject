@@ -1,0 +1,22 @@
+{
+  "compilerOptions": {
+    "target": "ES2022",
+    "module": "CommonJS",
+    "moduleResolution": "node",
+    "lib": ["DOM", "ES2022"],
+    "strict": false,
+    "noImplicitAny": false,
+    "esModuleInterop": true,
+    "skipLibCheck": true,
+    "forceConsistentCasingInFileNames": true,
+    "outDir": "./dist"
+  },
+  "include": [
+    "static/ts/**/*",
+    "node_backend/**/*"
+  ],
+  "exclude": [
+    "node_modules",
+    "dist"
+  ]
+}
