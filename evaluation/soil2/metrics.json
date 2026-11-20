@@ -1,0 +1,57 @@
+{
+  "epochs": 50,
+  "best_val_accuracy": 89.3617,
+  "test_accuracy": 87.234,
+  "classes": [
+    "Black Soil",
+    "Cinder Soil",
+    "Laterite Soil",
+    "Peat Soil",
+    "Yellow Soil"
+  ],
+  "per_class_report": {
+    "Black Soil": {
+      "precision": 0.7857142857142857,
+      "recall": 1.0,
+      "f1-score": 0.88,
+      "support": 11.0
+    },
+    "Cinder Soil": {
+      "precision": 0.8888888888888888,
+      "recall": 0.8888888888888888,
+      "f1-score": 0.8888888888888888,
+      "support": 9.0
+    },
+    "Laterite Soil": {
+      "precision": 0.875,
+      "recall": 0.7777777777777778,
+      "f1-score": 0.8235294117647058,
+      "support": 9.0
+    },
+    "Peat Soil": {
+      "precision": 0.875,
+      "recall": 0.7777777777777778,
+      "f1-score": 0.8235294117647058,
+      "support": 9.0
+    },
+    "Yellow Soil": {
+      "precision": 1.0,
+      "recall": 0.8888888888888888,
+      "f1-score": 0.9411764705882353,
+      "support": 9.0
+    },
+    "accuracy": 0.8723404255319149,
+    "macro avg": {
+      "precision": 0.8849206349206348,
+      "recall": 0.8666666666666666,
+      "f1-score": 0.8714248366013072,
+      "support": 47.0
+    },
+    "weighted avg": {
+      "precision": 0.8806990881458966,
+      "recall": 0.8723404255319149,
+      "f1-score": 0.8717897371714642,
+      "support": 47.0
+    }
+  }
+}
