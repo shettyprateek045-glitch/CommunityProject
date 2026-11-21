@@ -3,7 +3,7 @@ Pydantic Schemas for Request & Response Data Validation
 """
 
 from typing import List, Dict, Any, Optional
-from pydantic import BaseModel, Field
+from pydantic import BaseModel, Field, model_validator
 
 # -----------------------------------------------------------------------------
 # Location & IP Schemas
@@ -108,21 +108,54 @@ class RecommendRequest(BaseModel):
     lng: Optional[float] = 75.0078
     lon: Optional[float] = None
     location_name: Optional[str] = "Karnataka Farm Plot"
-    land_acres: float = Field(default=3.0, ge=0.1, le=500.0)
-    budget_inr: float = Field(default=65000.0, ge=1000.0)
-    irrigation: str = Field(default="drip")
-    soil_n: float = Field(default=85.0, ge=0.0, le=300.0)
-    soil_p: float = Field(default=45.0, ge=0.0, le=250.0)
-    soil_k: float = Field(default=42.0, ge=0.0, le=300.0)
-    soil_ph: float = Field(default=6.5, ge=3.5, le=10.0)
-    soil_type: str = Field(default="Clay Loam")
+    acres: Optional[float] = None
+    land_acres: Optional[float] = Field(default=3.0, ge=0.1, le=500.0)
+    budget_inr: Optional[float] = Field(default=65000.0, ge=1000.0)
+    irrigation: Optional[str] = Field(default="drip")
+    soil_n: Optional[float] = Field(default=85.0)
+    soil_p: Optional[float] = Field(default=45.0)
+    soil_k: Optional[float] = Field(default=42.0)
+    soil_ph: Optional[float] = Field(default=6.5)
+    soil_type: Optional[str] = Field(default="Clay Loam")
     previous_crop: Optional[str] = None
+    state: Optional[str] = "Karnataka"
+    district: Optional[str] = "Bengaluru"
     temperature: Optional[float] = None
     humidity: Optional[float] = None
     rainfall: Optional[float] = None
     w_suit: Optional[float] = 0.40
     w_profit: Optional[float] = 0.40
     w_risk: Optional[float] = 0.20
+
+    @model_validator(mode="before")
+    @classmethod
+    def sanitize_null_inputs(cls, data: Any) -> Any:
+        if isinstance(data, dict):
+            defaults = {
+                "soil_n": 85.0,
+                "soil_p": 45.0,
+                "soil_k": 42.0,
+                "soil_ph": 6.5,
+                "land_acres": 3.0,
+                "acres": 3.0,
+                "budget_inr": 65000.0,
+                "irrigation": "drip",
+                "soil_type": "Clay Loam",
+                "state": "Karnataka",
+                "district": "Bengaluru",
+                "lat": 12.9716,
+                "lon": 77.5946
+            }
+            for k, def_v in defaults.items():
+                if data.get(k) is None or data.get(k) == "":
+                    data[k] = def_v
+            # Normalize acres vs land_acres
+            if data.get("acres") and (not data.get("land_acres") or data.get("land_acres") == 3.0):
+                try:
+                    data["land_acres"] = float(data["acres"])
+                except Exception:
+                    pass
+        return data
 
 class FertilizerAdviceItem(BaseModel):
     nutrient: str

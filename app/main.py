@@ -19,7 +19,7 @@ from fastapi.middleware.cors import CORSMiddleware
 
 from app.config import settings
 from app.models.loaders import preload_all_models
-from app.routers import weather, recommend, photo, soil, history, rotation, soil_inference, profile, auth
+from app.routers import weather, recommend, photo, soil, history, rotation, soil_inference, profile, auth, chat, report
 from app.models.database import engine, Base, init_db
 from app.models.user import User, Farm, RefreshToken
 from app.dependencies import get_current_user_optional
@@ -59,6 +59,8 @@ app.include_router(rotation.router)
 app.include_router(history.router)
 app.include_router(profile.router)
 app.include_router(auth.router)
+app.include_router(chat.router)
+app.include_router(report.router)
 
 @app.get("/", response_class=HTMLResponse)
 async def serve_index(user: Optional[User] = Depends(get_current_user_optional)):

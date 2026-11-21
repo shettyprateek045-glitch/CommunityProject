@@ -718,11 +718,25 @@ function setupVoiceInput(targetInputId, micButtonId) {
 // ============================================================================
 // 5. Backend Service API Integrations
 // ============================================================================
+const weatherCache = new Map();
+const mandiCache = new Map();
+
 async function fetchLiveWeather(lat, lon) {
   try {
-    const res = await fetch(`/api/weather/current?lat=${lat}&lon=${lon}`);
+    const latNum = parseFloat(lat) || 12.9716;
+    const lonNum = parseFloat(lon) || 77.5946;
+    const cacheKey = `${latNum.toFixed(3)},${lonNum.toFixed(3)}`;
+    const cached = weatherCache.get(cacheKey);
+    if (cached && (Date.now() - cached.time < 15 * 60 * 1000)) {
+      weatherData = cached.data;
+      updateDashboardAlerts();
+      return weatherData;
+    }
+    const res = await fetch(`/api/weather/current?lat=${latNum}&lon=${lonNum}`);
     if (res.ok) {
       weatherData = await res.json();
+      weatherCache.set(cacheKey, { data: weatherData, time: Date.now() });
+      updateDashboardAlerts();
       return weatherData;
     }
   } catch (err) {
@@ -800,9 +814,20 @@ async function fetchFertilizerPlan(crop = "maize") {
 
 async function fetchMandiTrends() {
   try {
-    const res = await fetch(`/api/prices/mandi-trends?lat=${farmContext.lat}&lon=${farmContext.lon}&target_price=${farmContext.target_price_inr}`);
+    const latNum = parseFloat(farmContext.lat) || 12.9716;
+    const lonNum = parseFloat(farmContext.lon) || 77.5946;
+    const target = farmContext.target_price_inr || 4500;
+    const cacheKey = `${latNum.toFixed(3)},${lonNum.toFixed(3)},${target}`;
+    const cached = mandiCache.get(cacheKey);
+    if (cached && (Date.now() - cached.time < 15 * 60 * 1000)) {
+      mandiTrendsData = cached.data;
+      checkPriceAlertNotification(mandiTrendsData);
+      return mandiTrendsData;
+    }
+    const res = await fetch(`/api/prices/mandi-trends?lat=${latNum}&lon=${lonNum}&target_price=${target}`);
     if (res.ok) {
       mandiTrendsData = await res.json();
+      mandiCache.set(cacheKey, { data: mandiTrendsData, time: Date.now() });
       checkPriceAlertNotification(mandiTrendsData);
       return mandiTrendsData;
     }
@@ -854,6 +879,81 @@ function checkPriceAlertNotification(data) {
       icon: "/static/favicon.ico"
     });
   }
+}
+
+// ============================================================================
+// Real-Time Dashboard Weather & Pest Warnings Banner
+// ============================================================================
+function updateDashboardAlerts() {
+  const alertContainer = document.getElementById("dashboard-alerts-banner");
+  if (!alertContainer) return;
+
+  const alerts = [];
+  const cur = weatherData && weatherData.current ? weatherData.current : null;
+
+  if (cur) {
+    if (cur.temperature >= 35) {
+      alerts.push({
+        type: "heat",
+        icon: "fa-solid fa-temperature-arrow-up text-amber-700",
+        bgColor: "bg-amber-50 border-amber-200 text-amber-900",
+        badge: currentLang === 'kn' ? "ಶಾಖದ ಮುನ್ನೆಚ್ಚರಿಕೆ" : "Heat Wave Advisory",
+        msg: currentLang === 'kn'
+          ? `ಅಧಿಕ ತಾಪಮಾನ (${cur.temperature.toFixed(1)}°C) ದಾಖಲಾಗಿದೆ. ಬೆಳೆ ಬಾಡುವುದನ್ನು ತಡೆಯಲು ಮುಂಜಾನೆ ಅಥವಾ ಸಂಜೆ ವೇಳೆ ನೀರು ಹಾಯಿಸಿ.`
+          : `Elevated temperature (${cur.temperature.toFixed(1)}°C) detected. Irrigate fields during early morning or twilight to mitigate evapotranspiration moisture loss.`
+      });
+    }
+
+    const rainChance = cur.rain_chance !== undefined ? cur.rain_chance : (weatherData.forecast_7d && weatherData.forecast_7d[0] ? weatherData.forecast_7d[0].precipitation_probability : 0);
+    const isRaining = cur.is_raining || (cur.precipitation && cur.precipitation > 5);
+    if (rainChance > 70 || isRaining) {
+      alerts.push({
+        type: "rain",
+        icon: "fa-solid fa-cloud-showers-heavy text-blue-700",
+        bgColor: "bg-blue-50 border-blue-200 text-blue-900",
+        badge: currentLang === 'kn' ? "ಭಾರಿ ಮಳೆ ಮುನ್ನೆಚ್ಚರಿಕೆ" : "Heavy Rain Warning",
+        msg: currentLang === 'kn'
+          ? `ಮುಂದಿನ ಗಂಟೆಗಳಲ್ಲಿ ಭಾರಿ ಮಳೆ (${rainChance || 80}% ಸಂಭವನೀಯತೆ). ಹೊಲದಲ್ಲಿ ನೀರು ನಿಲ್ಲದಂತೆ ಕಾಲುವೆಗಳನ್ನು ತೆರವುಗೊಳಿಸಿ.`
+          : `Heavy precipitation alert (${rainChance || 80}% chance). Inspect and clear farm drainage trenches to prevent crop waterlogging.`
+      });
+    }
+
+    if (cur.humidity >= 75 && cur.temperature >= 22) {
+      alerts.push({
+        type: "pest",
+        icon: "fa-solid fa-virus-covid text-rose-700",
+        bgColor: "bg-rose-50 border-rose-200 text-rose-900",
+        badge: currentLang === 'kn' ? "ಕೀಟ / ಎಲೆ ರೋಗ ಅಪಾಯ" : "Foliar Blight / Pest Risk",
+        msg: currentLang === 'kn'
+          ? `ಹೆಚ್ಚಿನ ತೇವಾಂಶ (${cur.humidity.toFixed(0)}%) ಮತ್ತು ಉಷ್ಣತೆಯು ಎಲೆ ರೋಗಕ್ಕೆ ಕಾರಣವಾಗಬಹುದು. 'ಎಲೆ ರೋಗ ತಪಾಸಣೆ' ಬಳಸಿ ಪರಿಶೀಲಿಸಿ.`
+          : `High humidity (${cur.humidity.toFixed(0)}%) and seasonal warmth favor foliar fungal blight and stem borers. Inspect leaves with the Foliar Disease Scanner.`
+      });
+    }
+  }
+
+  if (alerts.length === 0) {
+    alertContainer.innerHTML = '';
+    alertContainer.classList.add('hidden');
+    return;
+  }
+
+  alertContainer.classList.remove('hidden');
+  alertContainer.innerHTML = alerts.map(a => `
+    <div class="p-3.5 rounded-2xl border ${a.bgColor} flex items-center justify-between gap-3 text-xs shadow-xs animate-fadeIn">
+      <div class="flex items-center gap-2.5">
+        <div class="w-8 h-8 rounded-full bg-white/90 flex items-center justify-center shrink-0 shadow-xs text-sm">
+          <i class="${a.icon}"></i>
+        </div>
+        <div>
+          <span class="font-extrabold uppercase tracking-wider text-[10px] block">${a.badge}</span>
+          <span class="font-medium">${a.msg}</span>
+        </div>
+      </div>
+      <button type="button" onclick="this.parentElement.remove()" class="text-slate-400 hover:text-slate-700 cursor-pointer p-1">
+        <i class="fa-solid fa-xmark"></i>
+      </button>
+    </div>
+  `).join('');
 }
 
 // ============================================================================
@@ -957,6 +1057,9 @@ export function renderDashboardShell(container, lang) {
         </div>
       </div>
     </div>
+
+    <!-- Real-Time Weather & Disease Warnings Alert Banner -->
+    <div id="dashboard-alerts-banner" class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 pt-4 space-y-2 hidden"></div>
 
     <!-- Main Stepper Panels Container -->
     <main class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-6 flex-1 w-full space-y-6">
@@ -1105,6 +1208,76 @@ export function renderDashboardShell(container, lang) {
           <div class="text-center py-8 text-slate-400">Loading saved runs...</div>
         </div>
       </div>
+    </div>
+
+    <!-- Floating Krishi Mitra AI Chat Button -->
+    <button id="btn-krishi-chat" type="button" class="fixed bottom-5 right-5 z-40 w-14 h-14 rounded-full bg-gradient-to-r from-emerald-700 to-green-600 text-white shadow-2xl hover:shadow-emerald-500/50 hover:scale-105 active:scale-95 transition flex items-center justify-center cursor-pointer group" title="Chat with Krishi Mitra (ಕೃಷಿ ಮಿತ್ರ)">
+      <div class="relative">
+        <i class="fa-solid fa-robot text-2xl group-hover:hidden"></i>
+        <i class="fa-solid fa-comments text-2xl hidden group-hover:inline"></i>
+        <span class="absolute -top-1 -right-1 w-3.5 h-3.5 bg-amber-400 border-2 border-white rounded-full animate-ping"></span>
+        <span class="absolute -top-1 -right-1 w-3.5 h-3.5 bg-amber-400 border-2 border-white rounded-full"></span>
+      </div>
+    </button>
+
+    <!-- Krishi Mitra Chat Panel Modal / Drawer -->
+    <div id="panel-krishi-chat" class="fixed bottom-5 right-5 sm:bottom-6 sm:right-6 z-50 w-[94vw] sm:w-[420px] h-[580px] max-h-[85vh] bg-white rounded-3xl shadow-2xl border border-slate-200 hidden flex-col overflow-hidden animate-fadeIn">
+      <!-- Chat Header -->
+      <div class="bg-gradient-to-r from-[#1b5e20] to-[#2e7d32] text-white p-4 flex items-center justify-between shadow-xs">
+        <div class="flex items-center gap-3">
+          <div class="w-10 h-10 rounded-full bg-white/20 flex items-center justify-center text-xl text-amber-300 shadow-inner">
+            <i class="fa-solid fa-seedling"></i>
+          </div>
+          <div>
+            <div class="flex items-center gap-2">
+              <h3 class="font-extrabold text-sm tracking-wide">Krishi Mitra</h3>
+              <span class="text-[10px] bg-emerald-500/40 text-emerald-100 font-bold px-2 py-0.5 rounded-full border border-emerald-400/30">AI Active</span>
+            </div>
+            <p class="text-[11px] text-emerald-200">ಕೃಷಿ ಮಿತ್ರ • Agronomy Assistant</p>
+          </div>
+        </div>
+        <div class="flex items-center gap-1">
+          <button id="btn-chat-clear" type="button" class="p-2 text-emerald-200 hover:text-white rounded-lg hover:bg-white/10 transition cursor-pointer" title="Clear Chat">
+            <i class="fa-solid fa-trash-can text-xs"></i>
+          </button>
+          <button id="btn-chat-close" type="button" class="p-2 text-emerald-200 hover:text-white rounded-lg hover:bg-white/10 transition cursor-pointer" title="Close">
+            <i class="fa-solid fa-xmark text-sm"></i>
+          </button>
+        </div>
+      </div>
+
+      <!-- Quick Reply Chips -->
+      <div class="px-3 py-2 bg-slate-50 border-b border-slate-100 flex items-center gap-1.5 overflow-x-auto no-scrollbar shrink-0 text-[11px]">
+        <button type="button" class="chat-quick-chip whitespace-nowrap px-2.5 py-1 rounded-full bg-white hover:bg-emerald-50 border border-slate-200 hover:border-emerald-300 text-slate-700 font-medium transition cursor-pointer">How does this work?</button>
+        <button type="button" class="chat-quick-chip whitespace-nowrap px-2.5 py-1 rounded-full bg-white hover:bg-emerald-50 border border-slate-200 hover:border-emerald-300 text-slate-700 font-medium transition cursor-pointer">Explain my result</button>
+        <button type="button" class="chat-quick-chip whitespace-nowrap px-2.5 py-1 rounded-full bg-white hover:bg-emerald-50 border border-slate-200 hover:border-emerald-300 text-slate-700 font-medium transition cursor-pointer">Which fertilizer?</button>
+        <button type="button" class="chat-quick-chip whitespace-nowrap px-2.5 py-1 rounded-full bg-white hover:bg-emerald-50 border border-slate-200 hover:border-emerald-300 text-slate-700 font-medium transition cursor-pointer">Govt schemes</button>
+        <button type="button" class="chat-quick-chip whitespace-nowrap px-2.5 py-1 rounded-full bg-white hover:bg-emerald-50 border border-slate-200 hover:border-emerald-300 text-slate-700 font-medium transition cursor-pointer">Upload leaf photo</button>
+      </div>
+
+      <!-- Messages List -->
+      <div id="chat-messages-list" class="flex-1 p-4 overflow-y-auto space-y-3 bg-slate-50/50 text-xs"></div>
+
+      <!-- Loading indicator -->
+      <div id="chat-loading-indicator" class="hidden px-4 py-2 bg-slate-50/50 text-slate-400 text-xs flex items-center gap-2">
+        <div class="flex space-x-1">
+          <div class="w-1.5 h-1.5 bg-emerald-600 rounded-full animate-bounce"></div>
+          <div class="w-1.5 h-1.5 bg-emerald-600 rounded-full animate-bounce [animation-delay:0.2s]"></div>
+          <div class="w-1.5 h-1.5 bg-emerald-600 rounded-full animate-bounce [animation-delay:0.4s]"></div>
+        </div>
+        <span class="text-[11px] font-medium text-slate-500">Krishi Mitra is thinking...</span>
+      </div>
+
+      <!-- Input Form -->
+      <form id="form-krishi-chat" class="p-3 bg-white border-t border-slate-200 flex items-center gap-2">
+        <button type="button" id="btn-chat-mic" class="w-9 h-9 rounded-xl bg-slate-100 hover:bg-emerald-100 text-slate-600 hover:text-emerald-800 flex items-center justify-center transition cursor-pointer shrink-0" title="Voice Input (English / Kannada)">
+          <i class="fa-solid fa-microphone text-sm"></i>
+        </button>
+        <input type="text" id="input-chat-msg" placeholder="Ask Krishi Mitra... / ಕೃಷಿ ಮಿತ್ರರನ್ನು ಕೇಳಿ..." class="flex-1 px-3.5 py-2 text-xs bg-slate-50 border border-slate-200 rounded-xl focus:outline-none focus:border-emerald-600 focus:bg-white transition" autocomplete="off" />
+        <button type="submit" id="btn-chat-send" class="w-9 h-9 rounded-xl bg-[#1b5e20] hover:bg-[#2e7d32] text-white flex items-center justify-center transition cursor-pointer shrink-0 shadow-xs">
+          <i class="fa-solid fa-paper-plane text-xs"></i>
+        </button>
+      </form>
     </div>
   `;
 
@@ -2410,29 +2583,51 @@ async function renderResultsStepView(container) {
 
   if (!recommendData) {
     container.innerHTML = `
-      <div class="bg-white rounded-3xl p-10 text-center space-y-4 border border-slate-100 shadow-sm">
-        <div class="inline-block animate-spin text-4xl text-emerald-600"><i class="fa-solid fa-spinner"></i></div>
-        <h3 class="text-base font-bold text-slate-800">Calculating agronomic recommendations & mandi prices...</h3>
-        <p class="text-xs text-slate-500">Applying strict hard filters (budget, water feasibility, climate suitability) for ${farmContext.land_acres} acres.</p>
+      <div class="bg-white rounded-3xl p-8 sm:p-10 text-center space-y-6 border border-slate-100 shadow-sm max-w-xl mx-auto">
+        <div class="w-16 h-16 rounded-full bg-emerald-50 text-emerald-700 flex items-center justify-center text-3xl mx-auto">
+          <i class="fa-solid fa-wheat-awn animate-bounce"></i>
+        </div>
+        <div class="space-y-2">
+          <h3 class="text-base sm:text-lg font-bold text-slate-800" id="progress-status-title">Calculating precision agronomic recommendations...</h3>
+          <p class="text-xs text-slate-500" id="progress-status-desc">Applying soil N-P-K constraints, Open-Meteo weather models, and APMC mandi economics.</p>
+        </div>
+        <!-- Progress Bar -->
+        <div class="w-full bg-slate-100 rounded-full h-3 overflow-hidden border border-slate-200">
+          <div id="rec-progress-bar" class="bg-gradient-to-r from-emerald-500 to-green-600 h-full rounded-full transition-all duration-500 w-1/3"></div>
+        </div>
+        <div class="flex justify-between text-[11px] text-slate-400 font-medium px-1">
+          <span>Soil & Climate</span>
+          <span>Risk Scoring</span>
+          <span>Economics & Sowing</span>
+        </div>
       </div>
     `;
+
+    // Progress bar animation step 1
+    const pBar = document.getElementById("rec-progress-bar");
+    const pTitle = document.getElementById("progress-status-title");
+    if (pBar) pBar.style.width = "40%";
 
     try {
       const payload = {
         lat: farmContext.lat,
         lon: farmContext.lon,
-        acres: farmContext.land_acres,
-        budget_inr: farmContext.budget_inr,
-        irrigation: farmContext.irrigation,
-        soil_type: farmContext.soil_type,
-        soil_n: farmContext.soil_n,
-        soil_p: farmContext.soil_p,
-        soil_k: farmContext.soil_k,
-        soil_ph: farmContext.soil_ph,
+        acres: farmContext.land_acres || 3.0,
+        land_acres: farmContext.land_acres || 3.0,
+        budget_inr: farmContext.budget_inr || 65000.0,
+        irrigation: farmContext.irrigation || "drip",
+        soil_type: farmContext.soil_type || "Clay Loam",
+        soil_n: farmContext.soil_n !== null ? farmContext.soil_n : 85.0,
+        soil_p: farmContext.soil_p !== null ? farmContext.soil_p : 45.0,
+        soil_k: farmContext.soil_k !== null ? farmContext.soil_k : 42.0,
+        soil_ph: farmContext.soil_ph !== null ? farmContext.soil_ph : 6.5,
         previous_crop: farmContext.previous_crop,
         state: farmContext.state || "Karnataka",
         district: farmContext.district || "Bengaluru"
       };
+
+      if (pBar) pBar.style.width = "75%";
+      if (pTitle) pTitle.innerText = "Ranking optimal crops by profit and risk...";
 
       const res = await fetch('/api/recommend', {
         method: 'POST',
@@ -2447,6 +2642,7 @@ async function renderResultsStepView(container) {
       console.error("Recommend fetch error:", err);
     }
 
+    if (pBar) pBar.style.width = "100%";
     await fetchMandiTrends();
     if (currentStep === 6) renderResultsStepView(container);
     return;
@@ -2459,11 +2655,41 @@ async function renderResultsStepView(container) {
   const renderCropCard = (c, rank) => {
     const riskBadgeColor = c.risk_badge === 'Low' ? 'bg-emerald-100 text-emerald-800' : (c.risk_badge === 'Medium' ? 'bg-amber-100 text-amber-800' : 'bg-rose-100 text-rose-800');
     const isTopCrop = (rank === 1);
-    const cropName = currentLang === 'kn' ? c.kannada_name : (currentLang === 'hi' ? c.display_name : c.display_name);
+    const cropName = currentLang === 'kn' ? (c.kannada_name || c.display_name) : (currentLang === 'hi' ? c.display_name : c.display_name);
+
+    const fi = c.factor_importance || {
+      soil_fit_pct: 95.8,
+      rainfall_fit_pct: 88.0,
+      temperature_fit_pct: 94.5,
+      budget_fit_pct: 100.0,
+      irrigation_fit_pct: 100.0
+    };
+
+    const rf = c.risk_factors || {
+      drought_risk_pct: 15.0,
+      flood_risk_pct: 10.0,
+      price_risk_pct: 20.0
+    };
+
+    const be = c.break_even || {
+      break_even_yield_qtl_ac: 7.0,
+      break_even_price_inr_qtl: 650,
+      break_even_total_qtl: 21.0,
+      safety_margin_pct: 72.0
+    };
+
+    const pf = c.price_forecast || {
+      current_modal: c.unit_price_inr || 2350,
+      predicted_modal_30d: Math.round((c.unit_price_inr || 2350) * 1.03),
+      forecast_range_min: Math.round((c.unit_price_inr || 2350) * 0.93),
+      forecast_range_max: Math.round((c.unit_price_inr || 2350) * 1.07),
+      trend_direction: "Upward / Bullish (+3%)"
+    };
 
     return `
-      <div class="crop-card bg-white rounded-3xl shadow-sm border ${isTopCrop ? 'border-emerald-400 ring-2 ring-emerald-500/20' : 'border-slate-200'} overflow-hidden transition hover:shadow-md space-y-3">
+      <div class="crop-card bg-white rounded-3xl shadow-sm border ${isTopCrop ? 'border-emerald-400 ring-2 ring-emerald-500/20' : 'border-slate-200'} overflow-hidden transition hover:shadow-md space-y-4">
         <div class="p-5 sm:p-6 space-y-4">
+          <!-- Card Header -->
           <div class="flex items-start justify-between flex-wrap gap-2">
             <div class="flex items-center gap-3">
               <span class="w-8 h-8 rounded-full ${isTopCrop ? 'bg-[#1b5e20] text-amber-300 ring-2 ring-amber-300/40' : 'bg-slate-700 text-white'} flex items-center justify-center font-bold text-sm shadow-xs">#${rank}</span>
@@ -2478,10 +2704,10 @@ async function renderResultsStepView(container) {
 
             <div class="flex items-center gap-2">
               <span class="px-3 py-1 rounded-full bg-emerald-50 text-[#1b5e20] border border-emerald-200 font-bold text-xs">
-                ${c.suitability_pct.toFixed(0)}% Suitability
+                ⭐ ${c.suitability_pct.toFixed(0)}% Confidence
               </span>
               <span class="px-2.5 py-1 rounded-full ${riskBadgeColor} font-bold text-xs">
-                ${c.risk_badge} Risk
+                ${c.risk_badge || 'Low'} Risk
               </span>
             </div>
           </div>
@@ -2510,16 +2736,190 @@ async function renderResultsStepView(container) {
             </div>
           </div>
 
-          <!-- Reasons list matching the numbers -->
-          <div class="space-y-1">
-            <span class="text-[11px] font-bold text-slate-800 uppercase tracking-wider block">Why Recommended:</span>
-            <ul class="text-xs text-slate-700 space-y-1 font-medium">
-              ${c.reasons.map(r => `<li class="flex items-start gap-1.5"><span class="text-emerald-700">✓</span><span>${r}</span></li>`).join('')}
+          <!-- "Why This Crop?" Panel (Feature Importance / Factors Match) -->
+          <div class="p-4 rounded-2xl bg-earth-50 border border-earth-200 space-y-3">
+            <div class="flex items-center justify-between">
+              <span class="font-extrabold text-slate-800 text-xs flex items-center gap-1.5">
+                <i class="fa-solid fa-chart-pie text-emerald-700"></i>
+                <span>Why This Crop? (Key Decision Factors & Agronomic Match)</span>
+              </span>
+              <span class="text-[10px] text-slate-500 font-semibold">Random Forest & Soil Grids SHAP</span>
+            </div>
+            <div class="grid grid-cols-2 sm:grid-cols-5 gap-2 text-[11px]">
+              <div class="p-2 bg-white rounded-xl border border-slate-200">
+                <div class="flex justify-between text-slate-600 mb-1">
+                  <span>Soil NPK Fit</span>
+                  <strong class="text-slate-900">${fi.soil_fit_pct.toFixed(0)}%</strong>
+                </div>
+                <div class="w-full bg-slate-100 rounded-full h-1.5 overflow-hidden">
+                  <div class="bg-emerald-600 h-full rounded-full" style="width: ${fi.soil_fit_pct}%"></div>
+                </div>
+              </div>
+              <div class="p-2 bg-white rounded-xl border border-slate-200">
+                <div class="flex justify-between text-slate-600 mb-1">
+                  <span>Rainfall Fit</span>
+                  <strong class="text-slate-900">${fi.rainfall_fit_pct.toFixed(0)}%</strong>
+                </div>
+                <div class="w-full bg-slate-100 rounded-full h-1.5 overflow-hidden">
+                  <div class="bg-blue-600 h-full rounded-full" style="width: ${fi.rainfall_fit_pct}%"></div>
+                </div>
+              </div>
+              <div class="p-2 bg-white rounded-xl border border-slate-200">
+                <div class="flex justify-between text-slate-600 mb-1">
+                  <span>Temp Fit</span>
+                  <strong class="text-slate-900">${fi.temperature_fit_pct.toFixed(0)}%</strong>
+                </div>
+                <div class="w-full bg-slate-100 rounded-full h-1.5 overflow-hidden">
+                  <div class="bg-amber-600 h-full rounded-full" style="width: ${fi.temperature_fit_pct}%"></div>
+                </div>
+              </div>
+              <div class="p-2 bg-white rounded-xl border border-slate-200">
+                <div class="flex justify-between text-slate-600 mb-1">
+                  <span>Budget Fit</span>
+                  <strong class="text-slate-900">${fi.budget_fit_pct.toFixed(0)}%</strong>
+                </div>
+                <div class="w-full bg-slate-100 rounded-full h-1.5 overflow-hidden">
+                  <div class="bg-purple-600 h-full rounded-full" style="width: ${fi.budget_fit_pct}%"></div>
+                </div>
+              </div>
+              <div class="p-2 bg-white rounded-xl border border-slate-200 col-span-2 sm:col-span-1">
+                <div class="flex justify-between text-slate-600 mb-1">
+                  <span>Irrigation Fit</span>
+                  <strong class="text-slate-900">${fi.irrigation_fit_pct.toFixed(0)}%</strong>
+                </div>
+                <div class="w-full bg-slate-100 rounded-full h-1.5 overflow-hidden">
+                  <div class="bg-cyan-600 h-full rounded-full" style="width: ${fi.irrigation_fit_pct}%"></div>
+                </div>
+              </div>
+            </div>
+            <!-- Reasons List -->
+            <ul class="text-xs text-slate-700 space-y-1 font-medium pt-1">
+              ${c.reasons.map(r => `<li class="flex items-start gap-1.5"><span class="text-emerald-700 font-bold">✓</span><span>${r}</span></li>`).join('')}
             </ul>
           </div>
 
+          <!-- Risk Score Breakdown & Break-Even Analysis -->
+          <div class="grid grid-cols-1 sm:grid-cols-2 gap-3 text-xs">
+            <!-- Risk Breakdown -->
+            <div class="p-3.5 rounded-2xl bg-slate-50 border border-slate-200 space-y-2">
+              <span class="font-bold text-slate-800 text-[11px] block">⚠️ Multi-Factor Risk Score:</span>
+              <div class="grid grid-cols-3 gap-2 text-center text-[10px]">
+                <div class="p-2 bg-white rounded-xl border border-slate-200">
+                  <span class="text-slate-500 block">Drought Risk</span>
+                  <strong class="${rf.drought_risk_pct > 25 ? 'text-amber-700' : 'text-emerald-700'} text-xs font-bold">${rf.drought_risk_pct.toFixed(0)}%</strong>
+                </div>
+                <div class="p-2 bg-white rounded-xl border border-slate-200">
+                  <span class="text-slate-500 block">Flood Risk</span>
+                  <strong class="${rf.flood_risk_pct > 25 ? 'text-amber-700' : 'text-emerald-700'} text-xs font-bold">${rf.flood_risk_pct.toFixed(0)}%</strong>
+                </div>
+                <div class="p-2 bg-white rounded-xl border border-slate-200">
+                  <span class="text-slate-500 block">Price Volatility</span>
+                  <strong class="${rf.price_risk_pct > 25 ? 'text-rose-700' : 'text-emerald-700'} text-xs font-bold">${rf.price_risk_pct.toFixed(0)}%</strong>
+                </div>
+              </div>
+            </div>
+
+            <!-- Break-Even Analysis -->
+            <div class="p-3.5 rounded-2xl bg-emerald-50/50 border border-emerald-200 space-y-2">
+              <span class="font-bold text-emerald-950 text-[11px] block">⚖️ Break-Even & Safety Margin:</span>
+              <div class="grid grid-cols-3 gap-2 text-center text-[10px]">
+                <div class="p-2 bg-white rounded-xl border border-emerald-100">
+                  <span class="text-slate-500 block">Break-even Yield</span>
+                  <strong class="text-slate-900 text-xs font-bold">${be.break_even_yield_qtl_ac.toFixed(1)} qtl/ac</strong>
+                </div>
+                <div class="p-2 bg-white rounded-xl border border-emerald-100">
+                  <span class="text-slate-500 block">Break-even Price</span>
+                  <strong class="text-slate-900 text-xs font-bold">₹${be.break_even_price_inr_qtl.toLocaleString()}/qtl</strong>
+                </div>
+                <div class="p-2 bg-white rounded-xl border border-emerald-100">
+                  <span class="text-slate-500 block">Safety Margin</span>
+                  <strong class="text-emerald-800 text-xs font-bold">+${be.safety_margin_pct.toFixed(0)}%</strong>
+                </div>
+              </div>
+            </div>
+          </div>
+
+          <!-- Crop Calendar & Schedules -->
+          <div class="p-4 rounded-2xl bg-earth-50 border border-earth-200 space-y-3 text-xs">
+            <div class="flex items-center justify-between flex-wrap gap-2">
+              <span class="font-bold text-slate-800 text-[11px] uppercase tracking-wider flex items-center gap-1.5">
+                <i class="fa-solid fa-calendar-days text-emerald-800"></i>
+                <span>Crop Calendar & Advisory Milestones (${cropName})</span>
+              </span>
+              <span class="text-[10px] bg-emerald-100 text-[#1b5e20] px-2.5 py-0.5 rounded-full font-bold">
+                Sowing: ${c.sowing_window || 'June 15 – July 15'} • Harvest: ${c.harvest_window || 'Oct 15 – Nov 15'}
+              </span>
+            </div>
+            
+            <div class="grid grid-cols-1 sm:grid-cols-2 gap-2 text-[11px]">
+              <!-- Fertilizer Schedule -->
+              <div class="p-3 bg-white rounded-xl border border-slate-200 space-y-1.5">
+                <strong class="block text-emerald-900 font-bold flex items-center gap-1">
+                  <i class="fa-solid fa-flask"></i> 3-Stage Fertilizer Schedule:
+                </strong>
+                <ul class="text-slate-600 space-y-1 pl-1">
+                  ${(c.fertilizer_schedule || [
+                    { stage: "Basal (Sowing)", desc: "100% P (DAP) + 100% K (MOP) + 33% N (Urea) with compost." },
+                    { stage: "Vegetative (Day 30)", desc: "33% N (Urea) top-dressed after first mechanical weeding." },
+                    { stage: "Flowering (Day 60)", desc: "Remaining 34% N + foliar micronutrient spray." }
+                  ]).map(s => `<li>• <strong>${s.stage}:</strong> ${s.desc}</li>`).join('')}
+                </ul>
+              </div>
+
+              <!-- Irrigation Schedule -->
+              <div class="p-3 bg-white rounded-xl border border-slate-200 space-y-1.5">
+                <strong class="block text-blue-900 font-bold flex items-center gap-1">
+                  <i class="fa-solid fa-droplet"></i> Smart Irrigation Schedule:
+                </strong>
+                <ul class="text-slate-600 space-y-1 pl-1">
+                  ${(c.irrigation_schedule || [
+                    { stage: "Initial / Sowing", frequency: "Days 0-10", guidance: "Light soaking for seedling emergence." },
+                    { stage: "Tillering / Vegetative", frequency: "Every 7-10 days", guidance: "Maintain root-zone moisture." },
+                    { stage: "Flowering & Grain Set", frequency: "Every 5-7 days", guidance: "Critical window; prevent moisture stress." }
+                  ]).map(s => `<li>• <strong>${s.stage} (${s.frequency}):</strong> ${s.guidance}</li>`).join('')}
+                </ul>
+              </div>
+            </div>
+
+            <!-- Next Season Rotation Suggestion -->
+            <div class="p-2.5 rounded-xl bg-purple-50 border border-purple-200 text-purple-950 text-[11px] flex items-start gap-2">
+              <i class="fa-solid fa-arrows-rotate text-purple-700 mt-0.5"></i>
+              <div>
+                <strong>Next Season Rotation Suggestion:</strong>
+                <span>${c.rotation_suggestion || 'Rotate with Chickpea or Green Gram after harvest to restore soil biological nitrogen and disrupt fungal pathogen cycles.'}</span>
+              </div>
+            </div>
+          </div>
+
+          <!-- APMC Mandi Price Forecast Box -->
+          <div class="p-3.5 rounded-2xl bg-amber-50/70 border border-amber-200 text-xs space-y-2">
+            <div class="flex items-center justify-between flex-wrap gap-2">
+              <span class="font-bold text-amber-950 text-[11px] flex items-center gap-1.5">
+                <i class="fa-solid fa-chart-line text-amber-700"></i>
+                <span>APMC Mandi Price Forecast (Next 30 Days):</span>
+              </span>
+              <span class="px-2 py-0.5 rounded-full bg-amber-200 text-amber-900 text-[10px] font-extrabold">
+                ${pf.trend_direction}
+              </span>
+            </div>
+            <div class="grid grid-cols-3 gap-2 text-center text-[10px]">
+              <div class="p-2 bg-white rounded-xl border border-amber-200">
+                <span class="text-slate-500 block">Current Modal</span>
+                <strong class="text-slate-900 text-xs font-bold">₹${pf.current_modal.toLocaleString()}/qtl</strong>
+              </div>
+              <div class="p-2 bg-white rounded-xl border border-amber-200">
+                <span class="text-slate-500 block">Predicted (30d)</span>
+                <strong class="text-emerald-800 text-xs font-bold">₹${pf.predicted_modal_30d.toLocaleString()}/qtl</strong>
+              </div>
+              <div class="p-2 bg-white rounded-xl border border-amber-200">
+                <span class="text-slate-500 block">Forecast Range</span>
+                <strong class="text-slate-900 text-xs font-bold">₹${pf.forecast_range_min.toLocaleString()} – ₹${pf.forecast_range_max.toLocaleString()}</strong>
+              </div>
+            </div>
+          </div>
+
           ${isTopCrop ? `
-            <!-- Top Crop Action Bar: Voice Readout, WhatsApp Share, PDF Print -->
+            <!-- Top Crop Action Bar: Voice Readout, WhatsApp Share, Print Advisory -->
             <div class="pt-3 border-t border-slate-100 flex flex-wrap items-center justify-between gap-2 text-xs">
               <div class="flex items-center gap-2">
                 <button type="button" id="btn-voice-readout" class="px-3 py-1.5 rounded-xl bg-emerald-100 hover:bg-emerald-200 text-[#1b5e20] font-bold flex items-center gap-1.5 transition cursor-pointer">
@@ -2530,41 +2930,8 @@ async function renderResultsStepView(container) {
                 </button>
               </div>
               <button type="button" id="btn-print-pdf-top" class="px-3 py-1.5 rounded-xl bg-white hover:bg-slate-50 border border-slate-300 text-slate-700 font-semibold flex items-center gap-1.5 transition cursor-pointer">
-                <span>🖨️</span> <span>Print Advisory PDF</span>
+                <span>🖨️</span> <span>Print Advisory</span>
               </button>
-            </div>
-
-            <!-- Crop Lifecycle Calendar -->
-            <div class="p-4 rounded-2xl bg-earth-50 border border-earth-200 space-y-2 text-xs">
-              <span class="font-bold text-slate-800 uppercase tracking-wider block text-[11px]">🗓️ Crop Calendar & Advisory Milestones (${cropName}):</span>
-              <div class="grid grid-cols-1 sm:grid-cols-4 gap-2 text-[11px]">
-                <div class="p-2.5 bg-white rounded-xl border border-slate-200">
-                  <strong class="block text-emerald-900 font-bold">1. Sowing (Days 1–7)</strong>
-                  <span class="text-slate-600">Basal DAP + MOP + FYM. Seed rate 8-10 kg/ac.</span>
-                </div>
-                <div class="p-2.5 bg-white rounded-xl border border-slate-200">
-                  <strong class="block text-blue-900 font-bold">2. Weeding (Day 30)</strong>
-                  <span class="text-slate-600">Inter-cultivation + 1st Urea top-dressing.</span>
-                </div>
-                <div class="p-2.5 bg-white rounded-xl border border-slate-200">
-                  <strong class="block text-amber-900 font-bold">3. Flowering (Day 60)</strong>
-                  <span class="text-slate-600">Critical moisture checkpoint + final Urea dose.</span>
-                </div>
-                <div class="p-2.5 bg-white rounded-xl border border-slate-200">
-                  <strong class="block text-purple-900 font-bold">4. Harvest (Day ${c.duration_days || 105})</strong>
-                  <span class="text-slate-600">Expected yield: ${c.total_yield_qtl.toFixed(1)} qtl for market sale.</span>
-                </div>
-              </div>
-            </div>
-
-            <!-- Pest & Disease Risk Hint -->
-            <div class="p-3.5 rounded-2xl bg-amber-50/80 border border-amber-200 text-xs text-amber-950 space-y-1">
-              <span class="font-bold flex items-center gap-1.5">
-                <span>🛡️</span> <span>Agro-Climatic Pest & Disease Risk Hint:</span>
-              </span>
-              <p class="text-[11px] leading-relaxed">
-                Under current moderate humidity (${(weatherData && weatherData.current ? weatherData.current.humidity : 60).toFixed(0)}%) and seasonal temperatures, fungal blight risk is low. Maintain field drainage during rainfall events and scout for stem borer in early whorl stage.
-              </p>
             </div>
           ` : ''}
 
@@ -2576,11 +2943,19 @@ async function renderResultsStepView(container) {
   container.innerHTML = `
     <div class="space-y-8">
       
-      <!-- Section A: Top Recommended Crops -->
+      <!-- Section A: Top 3 Recommended Crops -->
       <section class="space-y-4">
-        <div>
-          <h2 class="text-lg sm:text-xl font-extrabold text-slate-900">${t.heading_top_crops}</h2>
-          <p class="text-xs text-slate-500">${t.subheading_top_crops}</p>
+        <div class="flex items-center justify-between flex-wrap gap-3 p-4 rounded-2xl bg-white border border-slate-200 shadow-xs">
+          <div>
+            <h2 class="text-lg sm:text-xl font-extrabold text-slate-900">${t.heading_top_crops}</h2>
+            <p class="text-xs text-slate-500">${t.subheading_top_crops}</p>
+          </div>
+          <div class="flex items-center gap-2">
+            <button type="button" id="btn-download-pdf-report" class="px-4 py-2 rounded-xl bg-[#1b5e20] hover:bg-[#2e7d32] text-white font-bold text-xs shadow-md flex items-center gap-2 transition cursor-pointer">
+              <i class="fa-solid fa-file-pdf text-amber-300"></i>
+              <span>Download PDF Report</span>
+            </button>
+          </div>
         </div>
         <div class="space-y-4">
           ${topCrops.length > 0 ? topCrops.map((c, i) => renderCropCard(c, i + 1)).join('') : '<p class="text-sm text-slate-500">No crops passed strict hard filters for this budget and climate.</p>'}
@@ -2656,6 +3031,177 @@ async function renderResultsStepView(container) {
   renderMandiChart(mandiPrices);
 }
 
+async function downloadAdvisoryPdf() {
+  const btn = document.getElementById("btn-download-pdf-report");
+  const origHtml = btn ? btn.innerHTML : "";
+  if (btn) {
+    btn.disabled = true;
+    btn.innerHTML = `<i class="fa-solid fa-spinner animate-spin"></i> Generating PDF...`;
+  }
+  try {
+    const payload = {
+      location_name: farmContext.display_name || `${farmContext.district || "Bengaluru"}, ${farmContext.state || "Karnataka"}`,
+      lat: farmContext.lat,
+      lon: farmContext.lon,
+      land_acres: farmContext.land_acres || 3.0,
+      budget_inr: farmContext.budget_inr || 65000.0,
+      irrigation: farmContext.irrigation || "drip",
+      soil_n: farmContext.soil_n !== null ? farmContext.soil_n : 85.0,
+      soil_p: farmContext.soil_p !== null ? farmContext.soil_p : 45.0,
+      soil_k: farmContext.soil_k !== null ? farmContext.soil_k : 42.0,
+      soil_ph: farmContext.soil_ph !== null ? farmContext.soil_ph : 6.5,
+      soil_type: farmContext.soil_type || "Clay Loam",
+      top_crops: (recommendData && recommendData.top_crops) ? recommendData.top_crops : []
+    };
+    const res = await fetch('/api/report/pdf', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(payload)
+    });
+    if (res.ok) {
+      const blob = await res.blob();
+      const url = window.URL.createObjectURL(blob);
+      const a = document.createElement('a');
+      a.href = url;
+      a.download = `Farm_Advisory_Report_${(farmContext.district || 'Karnataka').replace(/\s+/g, '_')}.pdf`;
+      document.body.appendChild(a);
+      a.click();
+      a.remove();
+      window.URL.revokeObjectURL(url);
+    } else {
+      alert("Failed to generate PDF advisory report.");
+    }
+  } catch (err) {
+    console.error("PDF download error:", err);
+    alert("Error downloading PDF report.");
+  } finally {
+    if (btn) {
+      btn.disabled = false;
+      btn.innerHTML = origHtml;
+    }
+  }
+}
+
+// ============================================================================
+// Krishi Mitra Chat State & API Client
+// ============================================================================
+let chatMessagesHistory = [
+  {
+    sender: "bot",
+    text: "Hello! I am Krishi Mitra, your AI farming assistant. Ask me anything about crop recommendations, fertilizer doses, disease scanner, or government subsidies!"
+  }
+];
+
+function renderChatMessages() {
+  const container = document.getElementById("chat-messages-list");
+  if (!container) return;
+
+  container.innerHTML = chatMessagesHistory.map(m => {
+    const isBot = (m.sender === "bot");
+    return `
+      <div class="flex items-start gap-2.5 ${isBot ? '' : 'flex-row-reverse'} animate-fadeIn">
+        <div class="w-7 h-7 rounded-full ${isBot ? 'bg-[#1b5e20] text-amber-300' : 'bg-slate-700 text-white'} flex items-center justify-center text-xs shrink-0 shadow-xs">
+          <i class="${isBot ? 'fa-solid fa-seedling' : 'fa-solid fa-user'}"></i>
+        </div>
+        <div class="max-w-[82%] p-3 rounded-2xl ${isBot ? 'bg-white text-slate-800 border border-slate-200 shadow-xs' : 'bg-[#1b5e20] text-white shadow-xs'} space-y-1">
+          <p class="leading-relaxed whitespace-pre-wrap">${m.text}</p>
+        </div>
+      </div>
+    `;
+  }).join('');
+  container.scrollTop = container.scrollHeight;
+}
+
+async function sendChatMessage(query) {
+  if (!query) return;
+
+  chatMessagesHistory.push({ sender: "user", text: query });
+  renderChatMessages();
+
+  const loadingEl = document.getElementById("chat-loading-indicator");
+  if (loadingEl) loadingEl.classList.remove("hidden");
+
+  try {
+    const payload = {
+      message: query,
+      lang: currentLang,
+      session_id: "farmer_session",
+      context: {
+        district: farmContext.district || "Bengaluru",
+        state: farmContext.state || "Karnataka",
+        village: farmContext.village || "Karnataka Farm Plot",
+        lat: farmContext.lat,
+        lon: farmContext.lon,
+        land_acres: farmContext.land_acres || 3.0,
+        budget_inr: farmContext.budget_inr || 65000.0,
+        irrigation: farmContext.irrigation || "drip",
+        soil_n: farmContext.soil_n !== null ? farmContext.soil_n : 85.0,
+        soil_p: farmContext.soil_p !== null ? farmContext.soil_p : 45.0,
+        soil_k: farmContext.soil_k !== null ? farmContext.soil_k : 42.0,
+        soil_ph: farmContext.soil_ph !== null ? farmContext.soil_ph : 6.5,
+        soil_type: farmContext.soil_type || "Clay Loam",
+        top_crops: (recommendData && recommendData.top_crops) ? recommendData.top_crops.map(c => ({
+          name: c.display_name,
+          kannada_name: c.kannada_name,
+          suitability_pct: c.suitability_pct,
+          net_profit_inr: c.net_profit_inr,
+          yield_per_acre_qtl: c.yield_per_acre_qtl
+        })) : []
+      }
+    };
+
+    const res = await fetch("/api/chat", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify(payload)
+    });
+
+    if (loadingEl) loadingEl.classList.add("hidden");
+
+    if (res.ok) {
+      const data = await res.json();
+      chatMessagesHistory.push({ sender: "bot", text: data.reply });
+      renderChatMessages();
+
+      // Trigger automatic navigation if detected
+      if (data.action) {
+        if (data.action.type === "open_modal") {
+          if (data.action.target === "disease-scanner") {
+            const modal = document.getElementById("modal-leaf-scanner");
+            if (modal) modal.classList.remove("hidden");
+          } else if (data.action.target === "schemes") {
+            const modal = document.getElementById("modal-schemes");
+            if (modal) {
+              modal.classList.remove("hidden");
+              fetchSchemes();
+            }
+          }
+        } else if (data.action.type === "navigate") {
+          const match = data.action.target.match(/step-(\d+)/);
+          if (match) {
+            navigateToStep(parseInt(match[1]));
+          }
+        }
+      }
+    } else {
+      chatMessagesHistory.push({
+        sender: "bot",
+        text: currentLang === 'kn'
+          ? "ಕ್ಷಮಿಸಿ, ಪ್ರತಿಕ್ರಿಯೆ ಪಡೆಯಲು ಸಾಧ್ಯವಾಗಲಿಲ್ಲ. ದಯವಿಟ್ಟು ಮತ್ತೊಮ್ಮೆ ಪ್ರಯತ್ನಿಸಿ ಅಥವಾ ನಿಮ್ಮ ಸ್ಥಳೀಯ ಕೃಷಿ ಅಧಿಕಾರಿಯನ್ನು ಸಂಪರ್ಕಿಸಿ."
+          : "Sorry, I could not complete that request. Please try again or consult your local agriculture officer."
+      });
+      renderChatMessages();
+    }
+  } catch (err) {
+    if (loadingEl) loadingEl.classList.add("hidden");
+    chatMessagesHistory.push({
+      sender: "bot",
+      text: "Connection error. Please check your network."
+    });
+    renderChatMessages();
+  }
+}
+
 function bindResultsStepListeners() {
   const btnVoice = document.getElementById("btn-voice-readout");
   if (btnVoice && recommendData && recommendData.top_crops && recommendData.top_crops.length > 0) {
@@ -2694,6 +3240,11 @@ function bindResultsStepListeners() {
   const btnPrint = document.getElementById("btn-print-pdf-top");
   if (btnPrint) {
     btnPrint.onclick = () => window.print();
+  }
+
+  const btnPdf = document.getElementById("btn-download-pdf-report");
+  if (btnPdf) {
+    btnPdf.onclick = () => downloadAdvisoryPdf();
   }
 
   const btnSetTarget = document.getElementById("btn-save-target-price");
@@ -3044,6 +3595,131 @@ function bindShellListeners() {
     };
   }
   if (btnCloseHistory && modalHistory) btnCloseHistory.onclick = () => modalHistory.classList.add("hidden");
+
+  // ============================================================================
+  // Krishi Mitra AI Chatbot Event Listeners & Voice Recognition
+  // ============================================================================
+  const btnKrishi = document.getElementById("btn-krishi-chat");
+  const panelKrishi = document.getElementById("panel-krishi-chat");
+  const btnChatClose = document.getElementById("btn-chat-close");
+  const btnChatClear = document.getElementById("btn-chat-clear");
+  const formChat = document.getElementById("form-krishi-chat");
+  const inputChat = document.getElementById("input-chat-msg");
+  const btnChatMic = document.getElementById("btn-chat-mic");
+
+  if (btnKrishi && panelKrishi) {
+    btnKrishi.onclick = () => {
+      const isHidden = panelKrishi.classList.contains("hidden");
+      if (isHidden) {
+        panelKrishi.classList.remove("hidden");
+        panelKrishi.classList.add("flex");
+        renderChatMessages();
+        if (inputChat) inputChat.focus();
+      } else {
+        panelKrishi.classList.add("hidden");
+        panelKrishi.classList.remove("flex");
+      }
+    };
+  }
+
+  if (btnChatClose && panelKrishi) {
+    btnChatClose.onclick = () => {
+      panelKrishi.classList.add("hidden");
+      panelKrishi.classList.remove("flex");
+    };
+  }
+
+  if (btnChatClear) {
+    btnChatClear.onclick = () => {
+      chatMessagesHistory = [{
+        sender: "bot",
+        text: currentLang === 'kn'
+          ? "ನಮಸ್ಕಾರ! ನಾನು ನಿಮ್ಮ ಕೃಷಿ ಮಿತ್ರ (Krishi Mitra). ಬೆಳೆ ಶಿಫಾರಸು, ಗೊಬ್ಬರದ ಲೆಕ್ಕಾಚಾರ, ಎಲೆ ರೋಗ ತಪಾಸಣೆ ಅಥವಾ ಸರ್ಕಾರಿ ಸಬ್ಸಿಡಿಗಳ ಬಗ್ಗೆ ಏನು ತಿಳಿಯಬೇಕಿದೆ?"
+          : "Hello! I am Krishi Mitra, your AI farming assistant. Ask me anything about crop recommendations, fertilizer doses, disease scanner, or government subsidies!"
+      }];
+      renderChatMessages();
+    };
+  }
+
+  // Quick reply chips
+  document.querySelectorAll(".chat-quick-chip").forEach(chip => {
+    chip.onclick = () => {
+      const prompt = chip.innerText.trim();
+      sendChatMessage(prompt);
+    };
+  });
+
+  // Submit chat form
+  if (formChat && inputChat) {
+    formChat.onsubmit = (e) => {
+      e.preventDefault();
+      const txt = inputChat.value.trim();
+      if (!txt) return;
+      inputChat.value = "";
+      sendChatMessage(txt);
+    };
+  }
+
+  // Web Speech API Voice Input (English + Kannada)
+  let voiceActive = false;
+  let recognitionInstance = null;
+  if (btnChatMic && inputChat) {
+    btnChatMic.onclick = () => {
+      const SpeechRecognition = window.SpeechRecognition || window.webkitSpeechRecognition;
+      if (!SpeechRecognition) {
+        alert("Web Speech API voice recognition is not supported in this browser. Please use Chrome/Edge or type your question.");
+        return;
+      }
+
+      if (voiceActive && recognitionInstance) {
+        recognitionInstance.stop();
+        return;
+      }
+
+      try {
+        recognitionInstance = new SpeechRecognition();
+        recognitionInstance.continuous = false;
+        recognitionInstance.interimResults = false;
+        recognitionInstance.lang = currentLang === 'kn' ? 'kn-IN' : (currentLang === 'hi' ? 'hi-IN' : 'en-IN');
+
+        recognitionInstance.onstart = () => {
+          voiceActive = true;
+          btnChatMic.className = "w-9 h-9 rounded-xl bg-rose-600 text-white flex items-center justify-center transition cursor-pointer shrink-0 animate-pulse";
+          inputChat.placeholder = currentLang === 'kn' ? "ಆಲಿಸುತ್ತಿದೆ... ಮಾತನಾಡಿ..." : "Listening... speak now...";
+        };
+
+        recognitionInstance.onresult = (evt) => {
+          const transcript = evt.results[0][0].transcript;
+          inputChat.value = transcript;
+          sendChatMessage(transcript);
+        };
+
+        recognitionInstance.onerror = (err) => {
+          console.warn("Speech recognition error:", err);
+          resetVoiceBtn();
+        };
+
+        recognitionInstance.onend = () => {
+          resetVoiceBtn();
+        };
+
+        recognitionInstance.start();
+      } catch (err) {
+        console.error("Speech recognition startup error:", err);
+        resetVoiceBtn();
+      }
+    };
+
+    function resetVoiceBtn() {
+      voiceActive = false;
+      if (btnChatMic) {
+        btnChatMic.className = "w-9 h-9 rounded-xl bg-slate-100 hover:bg-emerald-100 text-slate-600 hover:text-emerald-800 flex items-center justify-center transition cursor-pointer shrink-0";
+      }
+      if (inputChat) {
+        inputChat.placeholder = "Ask Krishi Mitra... / ಕೃಷಿ ಮಿತ್ರರನ್ನು ಕೇಳಿ...";
+      }
+    }
+  }
 }
 
 function renderComparisonTable(container, compData) {

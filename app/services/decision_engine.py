@@ -229,6 +229,50 @@ def compute_farmer_recommendations(
             risk_badge = "High"
             risk_color = "rose"
 
+        # Feature Importance / Factor Contribution (%) for "Why this crop?"
+        rain_diff = abs(rainfall_annual - water_need_mm)
+        rain_fit = max(0.20, 1.0 - (rain_diff / max(600.0, water_need_mm)))
+        temp_ideal = 26.0
+        temp_fit = max(0.25, 1.0 - (abs(temp_c - temp_ideal) / 18.0))
+        budget_ratio = min(1.0, float(budget_inr) / max(1.0, total_cost_inr))
+        irr_alignment = min(1.0, 1.0 - (water_deficit_ratio * (1.0 - irr_efficiency)))
+
+        factor_importance = {
+            "soil_fit_pct": round(float(agro_fit * 100), 1),
+            "rainfall_fit_pct": round(float(rain_fit * 100), 1),
+            "temperature_fit_pct": round(float(temp_fit * 100), 1),
+            "budget_fit_pct": round(float(budget_ratio * 100), 1),
+            "irrigation_fit_pct": round(float(irr_alignment * 100), 1)
+        }
+
+        # Multi-factor Risk Scores
+        drought_risk_pct = round(float(np.clip(water_deficit_ratio * (1.0 - irr_efficiency * 0.7) * 100, 8.0, 92.0)), 1)
+        flood_risk_pct = round(float(np.clip(max(0.0, (rainfall_annual - 1100.0) / 750.0) * 100, 5.0, 85.0)), 1)
+        price_risk_pct = round(float(np.clip(price_vol_ratio * 100, 10.0, 90.0)), 1)
+
+        # Break-even estimations
+        be_yield_qtl_ac = round(cost_per_acre / max(1.0, unit_price), 1)
+        be_price_qtl = round(cost_per_acre / max(0.1, yield_per_acre), 0)
+        be_total_qtl = round(total_cost_inr / max(1.0, unit_price), 1)
+        safety_margin_pct = round(max(0.0, (yield_per_acre - be_yield_qtl_ac) / max(0.1, yield_per_acre) * 100), 1)
+        break_even_data = {
+            "break_even_yield_qtl_ac": be_yield_qtl_ac,
+            "break_even_price_inr_qtl": be_price_qtl,
+            "break_even_total_qtl": be_total_qtl,
+            "safety_margin_pct": safety_margin_pct
+        }
+
+        # Price forecast (30 days)
+        trend_up = trend_raw[-1] >= trend_raw[0] if len(trend_raw) > 1 else True
+        forecast_modal = round(unit_price * (1.03 if trend_up else 0.98), 0)
+        price_forecast = {
+            "current_modal": round(unit_price, 0),
+            "predicted_modal_30d": forecast_modal,
+            "forecast_range_min": round(unit_price * 0.93, 0),
+            "forecast_range_max": round(unit_price * 1.07, 0),
+            "trend_direction": "Upward / Bullish (+3%)" if trend_up else "Stable / Flat"
+        }
+
         # Why this crop reasons (exact numbers matching the card metrics)
         reasons = [
             f"Projected net profit of ₹{int(net_profit_inr):,} across {land_acres:.1f} acres (Revenue: ₹{int(total_revenue_inr):,} at Mandi modal price ₹{unit_price:,.0f}/qtl minus cultivation cost: ₹{int(total_cost_inr):,}).",
@@ -312,6 +356,28 @@ def compute_farmer_recommendations(
 
         # Calendar
         dur = int(eco["duration_days"])
+        crop_season_name = str(eco.get("season", "Kharif"))
+        if "kharif" in crop_season_name.lower():
+            sowing_window = "Kharif: June 15 – July 25 (Monsoon onset)"
+            sowing_window_kn = "ಖಾರೀಫ್: ಜೂನ್ 15 – ಜುಲೈ 25 (ಮುಂಗಾರು ಆರಂಭ)"
+        elif "rabi" in crop_season_name.lower():
+            sowing_window = "Rabi: Oct 15 – Nov 20 (Post-monsoon cool)"
+            sowing_window_kn = "ರಬಿ: ಅಕ್ಟೋಬರ್ 15 – ನವೆಂಬರ್ 20 (ಹಿಂಗಾರು)"
+        else:
+            sowing_window = f"{crop_season_name}: Feb 15 – Mar 25 (Summer/Zaid)"
+            sowing_window_kn = f"{crop_season_name}: ಫೆಬ್ರವರಿ 15 – ಮಾರ್ಚ್ 25 (ಬೇಸಿಗೆ)"
+
+        rotation_suggest = (
+            "Follow with a nitrogen-fixing pulse (Chickpea/Gram or Moong) to regenerate soil fertility and break monoculture pest cycles."
+            if crop_id not in ["chickpea", "lentil", "blackgram", "mungbean"]
+            else "Follow with a heavy feeder cereal (Maize or Wheat) to leverage residual nitrogen fixed by legumes."
+        )
+        rotation_suggest_kn = (
+            "ಮುಂದಿನ ಋತುವಿನಲ್ಲಿ ಮಣ್ಣಿನ ಫಲವತ್ತತೆ ಹೆಚ್ಚಿಸಲು ದ್ವಿದಳ ಧಾನ್ಯಗಳನ್ನು (ಕಡಲೆ ಅಥವಾ ಹೆಸರು) ಬೆಳೆಯಿರಿ."
+            if crop_id not in ["chickpea", "lentil", "blackgram", "mungbean"]
+            else "ದ್ವಿದಳ ಧಾನ್ಯಗಳಿಂದ ಸ್ಥಿರಗೊಂಡ ಸಾರಜನಕವನ್ನು ಬಳಸಿಕೊಳ್ಳಲು ಮೆಕ್ಕೆಜೋಳ ಅಥವಾ ಗೋಧಿ ಬೆಳೆಯಿರಿ."
+        )
+
         calendar = [
             {"stage": "Sowing & Basal Nutrients", "days": f"Days 0 - {int(dur*0.15)}", "action": "Seed treatment, basal DAP/compost application"},
             {"stage": "Vegetative & Weeding", "days": f"Days {int(dur*0.15)} - {int(dur*0.45)}", "action": "First split Urea application, weed suppression"},
@@ -352,10 +418,33 @@ def compute_farmer_recommendations(
             "risk_level": risk_badge,
             "risk_color": risk_color,
             "risk_factors": {
+                "drought_risk_pct": drought_risk_pct,
+                "flood_risk_pct": flood_risk_pct,
+                "price_risk_pct": price_risk_pct,
                 "water_deficit_pct": round(water_deficit_ratio * 100, 1),
                 "price_volatility_pct": round(price_vol_ratio * 100, 1),
                 "weather_alert_penalty": round(alert_penalty * 100, 1)
             },
+            "factor_importance": factor_importance,
+            "break_even": break_even_data,
+            "break_even_yield_qtl_ac": be_yield_qtl_ac,
+            "break_even_price_inr_qtl": be_price_qtl,
+            "break_even_total_qtl": be_total_qtl,
+            "price_forecast": price_forecast,
+            "sowing_window": sowing_window,
+            "sowing_window_kn": sowing_window_kn,
+            "rotation_suggestion": rotation_suggest,
+            "rotation_suggestion_kn": rotation_suggest_kn,
+            "fertilizer_schedule": [
+                {"stage": "Basal Application", "days": "Day 0 (Sowing)", "desc": "100% P & K + 33% N applied at land preparation"},
+                {"stage": "Vegetative Growth", "days": "Day 30", "desc": "33% N top-dressed after first manual or mechanical weeding"},
+                {"stage": "Flowering & Grain Set", "days": "Day 60", "desc": "Remaining 34% N + micronutrient foliar spray (Zinc/Boron)"}
+            ],
+            "irrigation_schedule": [
+                {"stage": "Initial / Sowing", "frequency": "Days 0-10", "guidance": "Light soaking to ensure optimal seedling emergence"},
+                {"stage": "Vegetative Tillering", "frequency": "Every 7-10 days", "guidance": "Moderate irrigation maintaining root-zone moisture"},
+                {"stage": "Critical Flowering & Fill", "frequency": "Every 5-7 days", "guidance": "Critical watering window; moisture stress causes yield drop"}
+            ],
             "season": str(eco["season"]),
             "duration_days": dur,
             "water_need_level": str(eco["water_need_level"]),

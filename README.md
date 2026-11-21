@@ -1,7 +1,10 @@
 ﻿# Agricultural Crop Health, Classification, Price & Irrigation Decision System
 ### Multi-Domain Tech Forge — Community & Societal Engineering Project
+### Upgraded Edition: Farmer Decision Dashboard + Krishi Mitra AI Chatbot
 
-[![Farmer Dashboard](https://img.shields.io/badge/Web_App-Farmer_Decision_Dashboard_v2.2-2e7d32.svg)](#-farmer-decision-dashboard-web-application)
+[![Farmer Dashboard](https://img.shields.io/badge/Web_App-Farmer_Decision_Dashboard_v3.0-2e7d32.svg)](#-farmer-decision-dashboard-web-application)
+[![Krishi Mitra AI](https://img.shields.io/badge/AI_Chatbot-Krishi_Mitra_(EN%2FKN)-10b981.svg)](#-krishi-mitra-ai-chatbot)
+[![PDF Advisory](https://img.shields.io/badge/ReportLab-Download_PDF_Report-red.svg)](#-pdf-advisory-report)
 [![Leaflet Map](https://img.shields.io/badge/Map-Leaflet_+_OpenStreetMap_(Interactive_Pin)-brightgreen.svg)](#)
 [![YOLOv11 Foliar Disease](https://img.shields.io/badge/Vision_AI-PlantVillage_YOLO11m_(86.2%25_Precision)-blue.svg)](#-phase-4-foliar-pest--leaf-disease-detection-plantvillage-yolov11)
 [![ISRIC SoilGrids](https://img.shields.io/badge/Soil-ISRIC_SoilGrids_2.0-F7931E.svg)](#)
@@ -11,7 +14,120 @@
 
 ---
 
-## 🌾 Farmer Decision Dashboard Web Application (FastAPI v2.2 + Precision Agronomics)
+## 🌾 Comprehensive Platform Workflow (6 Steps + AI Assistants)
+
+The **Farmer Decision Dashboard** operates as an end-to-end precision agronomy advisor running on **FastAPI** (port 5000) and responsive client-side web application with PWA offline caching.
+
+```mermaid
+flowchart LR
+    A["1. Location<br/>GPS + Map Pin"] --> B["2. Weather<br/>Open-Meteo + FAO-56"]
+    B --> C["3. Soil & Fertilizer<br/>SoilGrids / Test / Photo"]
+    C --> D["4. Farm Profile<br/>Acres, Budget, Irrigation"]
+    D --> E["5. Last Crop<br/>Rotation & N-Fixation"]
+    E --> F["6. Recommendations<br/>Top 3 Crops + Market"]
+    
+    subgraph Integrated AI Engines
+        G["Krishi Mitra AI Chatbot<br/>(Voice, EN/KN, Navigation)"]
+        H["PlantVillage YOLOv11<br/>Leaf Disease Scanner"]
+        I["Downloadable PDF Report<br/>(ReportLab 5.0)"]
+    end
+    F -.-> G
+    F -.-> H
+    F -.-> I
+```
+
+### 1. Step-by-Step Workflow Description
+1. **Step 1: Location Truth**:
+   - Geolocation detection via HTML5 GPS or interactive Leaflet OpenStreetMap pin dragging.
+   - Throttled reverse-geocoding via Nominatim resolving full hierarchical address (Village, Taluk/Town, District, State).
+   - Saved locations in local cache for instant 1-click re-selection.
+2. **Step 2: Weather & Micro-Climate**:
+   - Real-time weather fetched from Open-Meteo with 15-minute coordinate cache.
+   - 7-day FAO-56 irrigation scheduler calculating exact crop evapotranspiration ($ET_c$) and water needs (liters/acre).
+   - Recommended sowing window and 12-month historical rainfall & temperature climate baseline.
+3. **Step 3: Soil & Fertilizer Plan**:
+   - ISRIC SoilGrids 2.0 automated pedological pre-fill or manual Soil Health Card entry (N, P, K, pH).
+   - Mobile soil camera upload with non-soil rejection gates (vegetation, blue sky, darkness, blur).
+   - Interactive commercial fertilizer calculator outputting exact 50kg bag counts (Urea, DAP, MOP) and FYM requirements.
+4. **Step 4: Farm Profile**:
+   - Total land size (acres), seasonal working capital budget (₹ INR), and irrigation infrastructure (Drip, Sprinkler, Borewell, Canal, Rainfed).
+5. **Step 5: Crop Rotation**:
+   - Records previous standing crop to adjust baseline soil nitrogen (+25 kg/ha credit for leguminous pulses) and suppress soil-borne pest cycles.
+6. **Step 6: Precision Recommendations & Market Trends**:
+   - **Top 3 Recommended Crops**: Screened by strict hard filters (budget, water feasibility, climate suitability) and ranked by multi-objective agronomic profit score with confidence %.
+   - **"Why this crop?" Panel**: 5-factor progress breakdown (Soil NPK match, Rainfall fit, Temperature fit, Budget fit, Irrigation fit) powered by Random Forest feature importance.
+   - **Risk & Break-Even Analysis**: Multi-factor risk breakdown (Drought risk %, Flood risk %, Price volatility %) and break-even metrics (Break-even yield in qtl/ac, Break-even price in ₹/qtl, Safety margin buffer %).
+   - **Crop Calendar**: Complete lifecycle roadmap per crop with Sowing window, 3-stage Fertilizer schedule, Smart Irrigation schedule, Harvest date, and next-season rotation suggestion.
+   - **APMC Mandi Price Trends & Forecast**: Nearest mandi 30-day modal price trend chart and simple 30-day modal forecast with expected price ranges.
+   - **Download PDF Report Button**: Exports a formatted, printable farm advisory PDF containing all results.
+
+---
+
+## 🤖 Krishi Mitra AI Chatbot ("ಕೃಷಿ ಮಿತ್ರ")
+- **Persistent Floating Drawer**: Accessible from the bottom-right corner across all dashboard screens.
+- **Bilingual & Voice-Enabled**: Full English and Kannada support with live speech-to-text powered by the Web Speech API (`SpeechRecognition`).
+- **Session-Aware Context**: Automatically injects current farm location, micro-climate, soil NPK, budget, land acres, irrigation mode, and latest recommendations into prompt.
+- **Automated Navigation Actions**: Intelligently triggers UI navigation (e.g. asking "open leaf disease scanner" automatically displays the foliar diagnostics modal).
+- **Quick-Reply Prompts**: Pre-configured chips for `"How does this work?"`, `"Explain my result"`, `"Which fertilizer?"`, `"Govt schemes"`, and `"Upload leaf photo"`.
+
+---
+
+## 📄 Downloadable PDF Advisory Report (`POST /api/report/pdf`)
+- Powered by **ReportLab 5.0**.
+- Generates a branded, downloadable PDF (`Farm_Advisory_Report_<District>.pdf`) containing:
+  - Farm & Soil Profile Summary (Village, District, Lat/Lon, N-P-K, pH, Soil Type, Acres, Budget, Irrigation).
+  - Weather Snapshot (Temperature, Humidity, Rain forecast, Season).
+  - Top 3 Recommended Crops (Confidence %, Yield/ac, Total Cost, Revenue, Net Margin, Risk Level, Sowing & Harvest dates).
+  - 3-Stage Fertilizer Schedules & Break-Even Metrics.
+  - Official advisory guidance disclaimer.
+
+---
+
+## ⚙️ Setup & Configuration
+
+### Prerequisites
+- Python 3.10+ (tested on Python 3.10 – 3.14)
+- Node.js (for client tools and tests)
+
+### Environment Variables (`.env`)
+Create a `.env` file in the project root:
+```env
+# Server Configuration
+HOST=127.0.0.1
+PORT=5000
+DEBUG=False
+
+# AI Chatbot LLM API (Optional - intelligent fallback agronomic engine active if unset)
+GEMINI_API_KEY=your_gemini_api_key_here
+OPENAI_API_KEY=your_openai_api_key_here
+
+# Open-Meteo & SoilGrids APIs (No key required - open access endpoints)
+SOILGRIDS_REST_URL=https://rest.isric.org/soilgrids/v2.0/properties/query
+OPEN_METEO_BASE_URL=https://api.open-meteo.com/v1/forecast
+```
+
+### Installation & Startup
+```bash
+# 1. Install dependencies
+pip install -r requirements.txt
+
+# 2. Run the application
+python app.py
+```
+Open your browser at `http://127.0.0.1:5000`.
+
+---
+
+## 🔬 Machine Learning Model Details
+
+| Model Task | Algorithm / Architecture | Dataset | Accuracy / Metrics |
+| :--- | :--- | :--- | :--- |
+| **Crop Recommendation** | Random Forest Classifier + Agronomic Heuristics | ICAR & Kaggle Crop Recommendation (2,200 records, 22 crops) | **95.8% Accuracy**, 5-fold CV |
+| **Foliar Leaf Disease** | Fine-tuned YOLOv11m | PlantVillage Dataset (Early Blight, Late Blight, Healthy) | **86.2% Precision**, **75.8% Recall**, **82.8% mAP@50** |
+| **Soil Classification** | Fine-tuned MobileNetV2 + Rule-based HSV gating | Custom Farmland Surface Soil Dataset (5 classes) | **89.4% Top-1 Accuracy** (with 60% confidence safety gate) |
+| **Irrigation Scheduling** | FAO-56 Penman-Monteith Evapotranspiration | Open-Meteo Solar Radiation, Wind & Temperature | Validated against ICAR Water Management Handbooks |
+
+---
 
 The **Farmer Decision Dashboard** is a connected, precision agriculture decision-support system. It runs on **FastAPI** on the backend and modern vanilla JS/TS on the frontend, featuring full trilingual localization (**English, Kannada, Hindi**), interactive map pinning, satellite micro-climate, pedological soil reports, and ML models.
 

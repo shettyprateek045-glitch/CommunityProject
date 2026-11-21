@@ -3,7 +3,7 @@
  * Network-first strategy to ensure fresh code and assets are always delivered immediately.
  */
 
-const CACHE_NAME = "farmer-dashboard-v3.0";
+const CACHE_NAME = "farmer-dashboard-v4.0";
 const STATIC_ASSETS = [
   "/",
   "/login",

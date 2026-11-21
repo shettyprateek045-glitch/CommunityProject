@@ -30,15 +30,26 @@ async def api_recommend(req: RecommendRequest):
         lon_val = req.lng if req.lng is not None else (req.lon if req.lon is not None else 77.5946)
         lat_val = req.lat if req.lat is not None else 12.9716
 
+        acres_cand = getattr(req, "acres", None)
+        land_acres_cand = getattr(req, "land_acres", None)
+        acres_val = acres_cand if acres_cand is not None and acres_cand > 0 else (land_acres_cand if land_acres_cand is not None and land_acres_cand > 0 else 3.0)
+        soil_n = req.soil_n if req.soil_n is not None else 85.0
+        soil_p = req.soil_p if req.soil_p is not None else 45.0
+        soil_k = req.soil_k if req.soil_k is not None else 42.0
+        soil_ph = req.soil_ph if req.soil_ph is not None else 6.5
+        soil_type = req.soil_type if req.soil_type else "Clay Loam"
+        irrigation = req.irrigation if req.irrigation else "drip"
+        budget = req.budget_inr if req.budget_inr is not None else 65000.0
+
         results = compute_farmer_recommendations(
-            land_acres=req.land_acres,
-            soil_n=req.soil_n,
-            soil_p=req.soil_p,
-            soil_k=req.soil_k,
-            soil_ph=req.soil_ph,
-            soil_type=req.soil_type,
-            irrigation=req.irrigation,
-            budget_inr=req.budget_inr,
+            land_acres=acres_val,
+            soil_n=soil_n,
+            soil_p=soil_p,
+            soil_k=soil_k,
+            soil_ph=soil_ph,
+            soil_type=soil_type,
+            irrigation=irrigation,
+            budget_inr=budget,
             previous_crop=req.previous_crop,
             temp_c=temp_c,
             humidity=humidity,
@@ -48,8 +59,8 @@ async def api_recommend(req: RecommendRequest):
             w_risk=req.w_risk or 0.20,
             lat=lat_val,
             lon=lon_val,
-            state=req.state or "Karnataka",
-            district=req.district or "Bengaluru"
+            state=getattr(req, "state", "Karnataka") or "Karnataka",
+            district=getattr(req, "district", "Bengaluru") or "Bengaluru"
         )
 
         # Save to SQLite history
@@ -82,15 +93,26 @@ async def api_whatif(req: RecommendRequest):
         lon_val = req.lng if req.lng is not None else (req.lon if req.lon is not None else 77.5946)
         lat_val = req.lat if req.lat is not None else 12.9716
 
+        acres_cand = getattr(req, "acres", None)
+        land_acres_cand = getattr(req, "land_acres", None)
+        acres_val = acres_cand if acres_cand is not None and acres_cand > 0 else (land_acres_cand if land_acres_cand is not None and land_acres_cand > 0 else 3.0)
+        soil_n = req.soil_n if req.soil_n is not None else 85.0
+        soil_p = req.soil_p if req.soil_p is not None else 45.0
+        soil_k = req.soil_k if req.soil_k is not None else 42.0
+        soil_ph = req.soil_ph if req.soil_ph is not None else 6.5
+        soil_type = req.soil_type if req.soil_type else "Clay Loam"
+        irrigation = req.irrigation if req.irrigation else "drip"
+        budget = req.budget_inr if req.budget_inr is not None else 65000.0
+
         results = compute_farmer_recommendations(
-            land_acres=req.land_acres,
-            soil_n=req.soil_n,
-            soil_p=req.soil_p,
-            soil_k=req.soil_k,
-            soil_ph=req.soil_ph,
-            soil_type=req.soil_type,
-            irrigation=req.irrigation,
-            budget_inr=req.budget_inr,
+            land_acres=acres_val,
+            soil_n=soil_n,
+            soil_p=soil_p,
+            soil_k=soil_k,
+            soil_ph=soil_ph,
+            soil_type=soil_type,
+            irrigation=irrigation,
+            budget_inr=budget,
             previous_crop=req.previous_crop,
             temp_c=temp_c,
             humidity=humidity,
@@ -100,8 +122,8 @@ async def api_whatif(req: RecommendRequest):
             w_risk=req.w_risk or 0.20,
             lat=lat_val,
             lon=lon_val,
-            state=req.state or "Karnataka",
-            district=req.district or "Bengaluru"
+            state=getattr(req, "state", "Karnataka") or "Karnataka",
+            district=getattr(req, "district", "Bengaluru") or "Bengaluru"
         )
         return {
             "status": "success",
