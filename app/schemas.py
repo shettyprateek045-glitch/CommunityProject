@@ -44,6 +44,7 @@ class CurrentWeatherModel(BaseModel):
     weather_code: int = 0
     icon: str = "⛅"
     description: str = "Partly Cloudy"
+    is_day: Optional[int] = 1
     season: str = "Kharif"
     season_name_kn: str = "ಖಾರೀಫ್"
     farming_note: str = "Favorable conditions for field preparation and crop growth."
@@ -56,6 +57,7 @@ class DailyForecastItem(BaseModel):
     min_temp: float
     rain_sum_mm: float
     rain_chance_pct: float = 0.0
+    et0: Optional[float] = 0.0
     icon: str = "🌤️"
     condition: str = "Clear"
 
@@ -77,9 +79,11 @@ class WeatherResponse(BaseModel):
     temperature: float
     apparent_temperature: float = 0.0
     humidity: float
-    rainfall_mm: float
+    rainfall: Optional[float] = 0.0
+    rainfall_mm: Optional[float] = 0.0
     rain_now_mm: float = 0.0
     is_raining: bool = False
+    is_day: Optional[int] = 1
     rain_chance_today: float = 0.0
     rainfall_7d_total: float
     annual_rainfall_estimate: float
@@ -87,6 +91,7 @@ class WeatherResponse(BaseModel):
     season_name_kn: str = "ಖಾರೀಫ್"
     farming_note: str = ""
     farming_note_kn: str = ""
+    last_updated: Optional[str] = None
     current: CurrentWeatherModel
     daily_7d: List[DailyForecastItem]
     hourly_rain_24h: Dict[str, Any]

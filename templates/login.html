@@ -1,0 +1,301 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Sign In | Farmer Decision Dashboard</title>
+  
+  <!-- Tailwind CSS CDN -->
+  <script src="https://cdn.tailwindcss.com"></script>
+  <script>
+    tailwind.config = {
+      theme: {
+        extend: {
+          colors: {
+            forest: {
+              50: '#f1f8e9', 100: '#dcedc8', 200: '#c5e1a5', 300: '#aed581',
+              400: '#9ccc65', 500: '#7cb342', 600: '#558b2f', 700: '#33691e',
+              800: '#2e7d32', 900: '#1b5e20', 950: '#0d3810',
+            },
+            earth: {
+              50: '#fdfbf7', 100: '#f7f2ea', 200: '#ebdccb', 300: '#dec2a7',
+              400: '#cca280', 500: '#b8855d', 600: '#9e6945', 700: '#7e4f35',
+              800: '#643f2d', 900: '#4e3226',
+            }
+          }
+        }
+      }
+    }
+  </script>
+
+  <!-- FontAwesome Icons CDN -->
+  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.1/css/all.min.css" />
+</head>
+<body class="bg-earth-50 text-slate-800 min-h-screen flex flex-col items-center justify-center p-4 antialiased">
+
+  <div class="w-full max-w-md bg-white rounded-2xl shadow-xl border border-earth-200 overflow-hidden">
+    
+    <!-- Header banner -->
+    <div class="bg-[#1b5e20] text-white p-6 text-center">
+      <div class="w-14 h-14 mx-auto rounded-full bg-[#2e7d32] flex items-center justify-center text-amber-300 text-2xl shadow-inner mb-3">
+        <i class="fa-solid fa-seedling"></i>
+      </div>
+      <h1 class="text-xl font-bold tracking-tight">Farmer Decision Dashboard</h1>
+      <p class="text-xs text-emerald-100 mt-1">Precision Agronomic Planning & Crop Recommendation</p>
+    </div>
+
+    <!-- Content area -->
+    <div class="p-6 sm:p-8 space-y-6">
+      
+      <!-- Notifications / Alert Banners -->
+      <div id="alert-error" class="hidden p-3.5 rounded-lg bg-red-50 border border-red-200 text-red-700 text-sm flex items-start gap-2.5">
+        <i class="fa-solid fa-circle-exclamation text-red-500 mt-0.5"></i>
+        <span id="alert-error-text" class="flex-1"></span>
+      </div>
+
+      <div id="alert-info" class="hidden p-3.5 rounded-lg bg-emerald-50 border border-emerald-200 text-emerald-800 text-sm flex items-start gap-2.5">
+        <i class="fa-solid fa-circle-check text-emerald-600 mt-0.5"></i>
+        <span id="alert-info-text" class="flex-1"></span>
+      </div>
+
+      <!-- Google OAuth Button -->
+      <div>
+        <button id="btn-google-login" type="button" class="w-full py-3 px-4 border border-slate-300 rounded-xl font-semibold text-slate-700 bg-white hover:bg-slate-50 transition shadow-sm flex items-center justify-center gap-3 active:scale-[0.99] focus:outline-none focus:ring-2 focus:ring-forest-600">
+          <!-- Google G Logo -->
+          <svg class="w-5 h-5" viewBox="0 0 24 24">
+            <path fill="#4285F4" d="M22.56 12.25c0-.78-.07-1.53-.2-2.25H12v4.26h5.92c-.26 1.37-1.04 2.53-2.21 3.31v2.77h3.57c2.08-1.92 3.28-4.74 3.28-8.09z"/>
+            <path fill="#34A853" d="M12 23c2.97 0 5.46-.98 7.28-2.66l-3.57-2.77c-.98.66-2.23 1.06-3.71 1.06-2.86 0-5.29-1.93-6.16-4.53H2.18v2.84C3.99 20.53 7.7 23 12 23z"/>
+            <path fill="#FBBC05" d="M5.84 14.09c-.22-.66-.35-1.36-.35-2.09s.13-1.43.35-2.09V7.06H2.18C1.43 8.55 1 10.22 1 12s.43 3.45 1.18 4.94l2.85-2.22.81-.63z"/>
+            <path fill="#EA4335" d="M12 5.38c1.62 0 3.06.56 4.21 1.64l3.15-3.15C17.45 2.09 14.97 1 12 1 7.7 1 3.99 3.47 2.18 7.06l3.66 2.84c.87-2.6 3.3-4.52 6.16-4.52z"/>
+          </svg>
+          <span>Continue with Google</span>
+        </button>
+        <p class="text-[11px] text-center text-slate-500 mt-1.5 flex items-center justify-center gap-1">
+          <i class="fa-regular fa-envelope text-slate-400"></i>
+          <span>Only verified Gmail addresses (<strong>@gmail.com</strong>) are accepted.</span>
+        </p>
+      </div>
+
+      <!-- Divider -->
+      <div class="relative flex items-center justify-center">
+        <div class="border-t border-slate-200 w-full"></div>
+        <span class="bg-white px-3 text-xs font-medium text-slate-400 uppercase tracking-wider">or sign in with email</span>
+      </div>
+
+      <!-- Mode Toggle (Login vs Register) -->
+      <div class="flex rounded-xl bg-slate-100 p-1 text-sm font-medium">
+        <button id="tab-login" type="button" class="w-1/2 py-2 text-center rounded-lg bg-white shadow-sm text-forest-900 font-semibold transition">
+          Sign In
+        </button>
+        <button id="tab-register" type="button" class="w-1/2 py-2 text-center rounded-lg text-slate-600 hover:text-slate-900 transition">
+          Create Account
+        </button>
+      </div>
+
+      <!-- Login Form -->
+      <form id="form-login" class="space-y-4">
+        <div>
+          <label class="block text-xs font-semibold text-slate-700 mb-1" for="login-email">Email Address</label>
+          <div class="relative">
+            <span class="absolute inset-y-0 left-0 pl-3 flex items-center text-slate-400 pointer-events-none">
+              <i class="fa-solid fa-at text-xs"></i>
+            </span>
+            <input id="login-email" type="email" required placeholder="farmer@gmail.com"
+                   class="w-full pl-9 pr-3 py-2.5 border border-slate-300 rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-forest-600 focus:border-forest-600 transition" />
+          </div>
+        </div>
+
+        <div>
+          <label class="block text-xs font-semibold text-slate-700 mb-1" for="login-password">Password</label>
+          <div class="relative">
+            <span class="absolute inset-y-0 left-0 pl-3 flex items-center text-slate-400 pointer-events-none">
+              <i class="fa-solid fa-lock text-xs"></i>
+            </span>
+            <input id="login-password" type="password" required placeholder="••••••••"
+                   class="w-full pl-9 pr-3 py-2.5 border border-slate-300 rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-forest-600 focus:border-forest-600 transition" />
+          </div>
+        </div>
+
+        <button id="btn-submit-login" type="submit"
+                class="w-full py-3 px-4 bg-[#2e7d32] hover:bg-[#1b5e20] text-white font-semibold rounded-xl text-sm shadow-md transition active:scale-[0.99] flex items-center justify-center gap-2">
+          <span>Sign In</span>
+          <i class="fa-solid fa-arrow-right text-xs"></i>
+        </button>
+      </form>
+
+      <!-- Register Form -->
+      <form id="form-register" class="space-y-4 hidden">
+        <div>
+          <label class="block text-xs font-semibold text-slate-700 mb-1" for="reg-name">Full Name</label>
+          <div class="relative">
+            <span class="absolute inset-y-0 left-0 pl-3 flex items-center text-slate-400 pointer-events-none">
+              <i class="fa-solid fa-user text-xs"></i>
+            </span>
+            <input id="reg-name" type="text" placeholder="Farmer Ramesh"
+                   class="w-full pl-9 pr-3 py-2.5 border border-slate-300 rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-forest-600 focus:border-forest-600 transition" />
+          </div>
+        </div>
+
+        <div>
+          <label class="block text-xs font-semibold text-slate-700 mb-1" for="reg-email">Email Address <span class="text-red-500">*</span></label>
+          <div class="relative">
+            <span class="absolute inset-y-0 left-0 pl-3 flex items-center text-slate-400 pointer-events-none">
+              <i class="fa-solid fa-at text-xs"></i>
+            </span>
+            <input id="reg-email" type="email" required placeholder="farmer@gmail.com"
+                   class="w-full pl-9 pr-3 py-2.5 border border-slate-300 rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-forest-600 focus:border-forest-600 transition" />
+          </div>
+        </div>
+
+        <div>
+          <label class="block text-xs font-semibold text-slate-700 mb-1" for="reg-phone">Phone Number (Optional)</label>
+          <div class="relative">
+            <span class="absolute inset-y-0 left-0 pl-3 flex items-center text-slate-400 pointer-events-none">
+              <i class="fa-solid fa-phone text-xs"></i>
+            </span>
+            <input id="reg-phone" type="tel" placeholder="9876543210"
+                   class="w-full pl-9 pr-3 py-2.5 border border-slate-300 rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-forest-600 focus:border-forest-600 transition" />
+          </div>
+        </div>
+
+        <div>
+          <label class="block text-xs font-semibold text-slate-700 mb-1" for="reg-password">Password (min 6 chars) <span class="text-red-500">*</span></label>
+          <div class="relative">
+            <span class="absolute inset-y-0 left-0 pl-3 flex items-center text-slate-400 pointer-events-none">
+              <i class="fa-solid fa-lock text-xs"></i>
+            </span>
+            <input id="reg-password" type="password" required minlength="6" placeholder="••••••••"
+                   class="w-full pl-9 pr-3 py-2.5 border border-slate-300 rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-forest-600 focus:border-forest-600 transition" />
+          </div>
+        </div>
+
+        <button id="btn-submit-register" type="submit"
+                class="w-full py-3 px-4 bg-[#2e7d32] hover:bg-[#1b5e20] text-white font-semibold rounded-xl text-sm shadow-md transition active:scale-[0.99] flex items-center justify-center gap-2">
+          <span>Create Account</span>
+          <i class="fa-solid fa-user-plus text-xs"></i>
+        </button>
+      </form>
+
+    </div>
+
+    <!-- Footer info -->
+    <div class="bg-slate-50 px-6 py-4 border-t border-slate-100 text-center text-xs text-slate-500">
+      Protected with OAuth 2.0 / PKCE & Secure HttpOnly Sessions
+    </div>
+  </div>
+
+  <script>
+    const urlParams = new URLSearchParams(window.location.search);
+    const errorParam = urlParams.get('error');
+    const msgParam = urlParams.get('msg');
+    const nextParam = urlParams.get('next') || '/';
+
+    const alertError = document.getElementById('alert-error');
+    const alertErrorText = document.getElementById('alert-error-text');
+    const alertInfo = document.getElementById('alert-info');
+    const alertInfoText = document.getElementById('alert-info-text');
+
+    function showError(msg) {
+      if (!msg) return;
+      alertErrorText.textContent = msg;
+      alertError.classList.remove('hidden');
+      alertInfo.classList.add('hidden');
+    }
+
+    function showInfo(msg) {
+      if (!msg) return;
+      alertInfoText.textContent = msg;
+      alertInfo.classList.remove('hidden');
+      alertError.classList.add('hidden');
+    }
+
+    if (errorParam) {
+      showError(errorParam);
+    } else if (msgParam) {
+      showInfo(msgParam);
+    }
+
+    // Google Sign-In button
+    document.getElementById('btn-google-login').onclick = () => {
+      // Direct redirect to initiate OAuth with state and PKCE
+      const target = `/api/auth/google/login?next=${encodeURIComponent(nextParam)}`;
+      window.location.href = target;
+    };
+
+    // Tabs toggle
+    const tabLogin = document.getElementById('tab-login');
+    const tabRegister = document.getElementById('tab-register');
+    const formLogin = document.getElementById('form-login');
+    const formRegister = document.getElementById('form-register');
+
+    tabLogin.onclick = () => {
+      tabLogin.className = 'w-1/2 py-2 text-center rounded-lg bg-white shadow-sm text-forest-900 font-semibold transition';
+      tabRegister.className = 'w-1/2 py-2 text-center rounded-lg text-slate-600 hover:text-slate-900 transition';
+      formLogin.classList.remove('hidden');
+      formRegister.classList.add('hidden');
+      alertError.classList.add('hidden');
+    };
+
+    tabRegister.onclick = () => {
+      tabRegister.className = 'w-1/2 py-2 text-center rounded-lg bg-white shadow-sm text-forest-900 font-semibold transition';
+      tabLogin.className = 'w-1/2 py-2 text-center rounded-lg text-slate-600 hover:text-slate-900 transition';
+      formRegister.classList.remove('hidden');
+      formLogin.classList.add('hidden');
+      alertError.classList.add('hidden');
+    };
+
+    // Form submit handlers
+    formLogin.onsubmit = async (e) => {
+      e.preventDefault();
+      alertError.classList.add('hidden');
+      const email = document.getElementById('login-email').value.trim();
+      const password = document.getElementById('login-password').value;
+
+      try {
+        const res = await fetch('/api/auth/login', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ email, password })
+        });
+        const data = await res.json();
+        if (!res.ok) {
+          throw new Error(data.detail || 'Invalid email or password.');
+        }
+        if (data.access_token) {
+          localStorage.setItem('access_token', data.access_token);
+        }
+        window.location.href = nextParam;
+      } catch (err) {
+        showError(err.message);
+      }
+    };
+
+    formRegister.onsubmit = async (e) => {
+      e.preventDefault();
+      alertError.classList.add('hidden');
+      const name = document.getElementById('reg-name').value.trim();
+      const email = document.getElementById('reg-email').value.trim();
+      const phone = document.getElementById('reg-phone').value.trim() || null;
+      const password = document.getElementById('reg-password').value;
+
+      try {
+        const res = await fetch('/api/auth/register', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ name, email, phone, password })
+        });
+        const data = await res.json();
+        if (!res.ok) {
+          throw new Error(data.detail || 'Registration failed.');
+        }
+        if (data.access_token) {
+          localStorage.setItem('access_token', data.access_token);
+        }
+        window.location.href = nextParam;
+      } catch (err) {
+        showError(err.message);
+      }
+    };
+  </script>
+</body>
+</html>

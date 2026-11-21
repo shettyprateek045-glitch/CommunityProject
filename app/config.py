@@ -33,6 +33,9 @@ class Settings(BaseModel):
     upload_folder: str = "uploads"
     models_dir: str = "models"
     data_dir: str = "data"
+    google_client_id: str = os.getenv("GOOGLE_CLIENT_ID", "")
+    google_client_secret: str = os.getenv("GOOGLE_CLIENT_SECRET", "")
+    google_redirect_uri: str = os.getenv("GOOGLE_REDIRECT_URI", "http://localhost:5000/api/auth/google/callback")
 
 settings = Settings()
 

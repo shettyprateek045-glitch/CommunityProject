@@ -1,3 +1,8 @@
+# Environment variables and secrets
+.env
+.env.local
+*.env
+
 # Byte-compiled / optimized / DLL files
 __pycache__/
 *.py[cod]
@@ -18,7 +23,10 @@ agriculture.v3i.folder123/
 Mask RCNN.v8i.yolov11/
 soil.v1i.folder (1)/
 Soil.v3i.folder/
+soil1/
+soil2/
 *.zip
+*.bak
 
 # Internal review documents (do not push to GitHub)
 review.pdf

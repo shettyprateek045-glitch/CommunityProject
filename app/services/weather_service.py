@@ -212,9 +212,9 @@ async def fetch_open_meteo_weather(lat: float, lon: float) -> Dict[str, Any]:
     forecast_url = (
         f"https://api.open-meteo.com/v1/forecast?"
         f"latitude={lat}&longitude={lon}"
-        f"&current=temperature_2m,relative_humidity_2m,apparent_temperature,precipitation,rain,weather_code,wind_speed_10m"
-        f"&hourly=precipitation,temperature_2m,relative_humidity_2m"
-        f"&daily=temperature_2m_max,temperature_2m_min,precipitation_sum,precipitation_probability_max,weather_code"
+        f"&current=temperature_2m,relative_humidity_2m,apparent_temperature,precipitation,rain,weather_code,wind_speed_10m,is_day"
+        f"&hourly=precipitation,temperature_2m,relative_humidity_2m,et0_fao_evapotranspiration,soil_moisture_0_to_1cm"
+        f"&daily=temperature_2m_max,temperature_2m_min,precipitation_sum,precipitation_probability_max,weather_code,et0_fao_evapotranspiration"
         f"&forecast_days=7&timezone=auto"
     )
 
@@ -264,7 +264,15 @@ async def fetch_open_meteo_weather(lat: float, lon: float) -> Dict[str, Any]:
         cur_rain = float(cur.get("precipitation", cur.get("rain", 0.0)))
         cur_wind = float(cur.get("wind_speed_10m", 8.0))
         cur_wcode = int(cur.get("weather_code", 0))
+        cur_is_day = int(cur.get("is_day", 1))
         desc, icon = WMO_CODES.get(cur_wcode, ("Partly Cloudy", "⛅"))
+        if cur_is_day == 0:
+            if cur_wcode in [0, 1]:
+                icon = "🌙"
+            elif cur_wcode in [2, 3]:
+                icon = "☁️"
+            elif cur_wcode in [45, 48]:
+                icon = "🌫️"
 
         is_raining = bool(cur_rain > 0.1)
 
@@ -276,6 +284,7 @@ async def fetch_open_meteo_weather(lat: float, lon: float) -> Dict[str, Any]:
         d_rain = daily.get("precipitation_sum", [])
         d_prob = daily.get("precipitation_probability_max", [])
         d_code = daily.get("weather_code", [])
+        d_et0 = daily.get("et0_fao_evapotranspiration", [])
 
         alerts = []
         for i in range(len(d_times)):
@@ -287,6 +296,7 @@ async def fetch_open_meteo_weather(lat: float, lon: float) -> Dict[str, Any]:
             t_min = float(d_tmin[i]) if i < len(d_tmin) else 19.0
             r_sum = float(d_rain[i]) if i < len(d_rain) else 0.0
             r_prob = float(d_prob[i]) if i < len(d_prob) else 0.0
+            et0_val = float(d_et0[i]) if i < len(d_et0) and d_et0[i] is not None else 4.2
 
             daily_items.append({
                 "date": d_times[i],
@@ -295,6 +305,7 @@ async def fetch_open_meteo_weather(lat: float, lon: float) -> Dict[str, Any]:
                 "min_temp": t_min,
                 "rain_sum_mm": r_sum,
                 "rain_chance_pct": r_prob,
+                "et0": round(et0_val, 1),
                 "icon": d_icon,
                 "condition": d_desc
             })
@@ -405,6 +416,8 @@ async def fetch_open_meteo_weather(lat: float, lon: float) -> Dict[str, Any]:
             "rainfall_mm": cur_rain,
             "rain_now_mm": cur_rain,
             "is_raining": is_raining,
+            "is_day": cur_is_day,
+            "last_updated": datetime.now().strftime("%Y-%m-%d %H:%M:%S"),
             "rain_chance_today": rain_chance_today,
             "rainfall_7d_total": round(total_7d_rain, 1),
             "annual_rainfall_estimate": round(annual_rainfall_est, 1),
@@ -421,6 +434,7 @@ async def fetch_open_meteo_weather(lat: float, lon: float) -> Dict[str, Any]:
                 "precipitation": cur_rain,
                 "rain_now_mm": cur_rain,
                 "is_raining": is_raining,
+                "is_day": cur_is_day,
                 "rain_chance": rain_chance_today,
                 "rain_chance_today": rain_chance_today,
                 "weather_code": cur_wcode,
@@ -521,4 +535,180 @@ async def fetch_open_meteo_weather(lat: float, lon: float) -> Dict[str, Any]:
         }],
         "cached": True,
         "source": "Regional Agro-Climatic Baseline"
+    }
+
+# -----------------------------------------------------------------------------
+# Phase 1: Irrigation & Sowing Advice (FAO-56 Dual Crop Water Requirement)
+# -----------------------------------------------------------------------------
+STAGE_KC = {
+    "initial": 0.45,
+    "vegetative": 0.85,
+    "flowering": 1.15,
+    "fruit_set": 1.15,
+    "maturity": 0.70
+}
+
+CROP_BASE_KC = {
+    "rice": {"initial": 1.05, "vegetative": 1.15, "flowering": 1.20, "maturity": 0.90},
+    "sugarcane": {"initial": 0.40, "vegetative": 1.00, "flowering": 1.25, "maturity": 0.75},
+    "banana": {"initial": 0.50, "vegetative": 0.90, "flowering": 1.10, "maturity": 1.00},
+    "cotton": {"initial": 0.35, "vegetative": 0.75, "flowering": 1.15, "maturity": 0.65},
+    "maize": {"initial": 0.40, "vegetative": 0.85, "flowering": 1.15, "maturity": 0.60},
+    "wheat": {"initial": 0.35, "vegetative": 0.75, "flowering": 1.15, "maturity": 0.40},
+    "chickpea": {"initial": 0.40, "vegetative": 0.70, "flowering": 1.00, "maturity": 0.35},
+    "tomato": {"initial": 0.45, "vegetative": 0.80, "flowering": 1.15, "maturity": 0.80}
+}
+
+IRRIGATION_EFFICIENCY = {
+    "drip": 0.90,
+    "sprinkler": 0.75,
+    "borewell": 0.65,
+    "canal": 0.60,
+    "flood": 0.55,
+    "rainfed": 0.35,
+    "none": 0.30
+}
+
+async def calculate_irrigation_and_sowing_advice(
+    lat: float,
+    lon: float,
+    crop: str = "maize",
+    stage: str = "vegetative",
+    soil_type: str = "Clay Loam",
+    irrigation: str = "drip",
+    acres: float = 1.0
+) -> Dict[str, Any]:
+    """
+    Computes 7-day crop-specific irrigation schedule using FAO-56 Penman-Monteith ET0
+    and suggests an agronomic sowing window based on rainfall and soil moisture.
+    """
+    weather = await fetch_open_meteo_weather(lat, lon)
+    daily_items = weather.get("daily_7d", [])
+    
+    crop_clean = crop.lower().strip()
+    stage_clean = stage.lower().strip()
+    irr_clean = irrigation.lower().strip()
+    
+    crop_kcs = CROP_BASE_KC.get(crop_clean, {})
+    kc = crop_kcs.get(stage_clean, STAGE_KC.get(stage_clean, 0.85))
+    eff = IRRIGATION_EFFICIENCY.get(irr_clean, 0.75)
+    
+    schedule = []
+    total_water_demand_mm = 0.0
+    total_irr_needed_mm = 0.0
+    total_rain_mm = 0.0
+    
+    for day in daily_items:
+        et0 = float(day.get("et0", 4.0))
+        rain = float(day.get("rain_sum_mm", 0.0))
+        total_rain_mm += rain
+        
+        # Crop evapotranspiration demand (ETc = ET0 * Kc)
+        etc = round(et0 * kc, 1)
+        total_water_demand_mm += etc
+        
+        # Effective rainfall (USDA SCS method)
+        eff_rain = max(0.0, (rain - 2.0) * 0.8) if rain > 2.0 else 0.0
+        
+        # Irrigation requirement
+        deficit_mm = max(0.0, etc - eff_rain)
+        irr_needed_mm = round(deficit_mm / eff, 1) if irr_clean != "rainfed" else 0.0
+        total_irr_needed_mm += irr_needed_mm
+        
+        # Conversion: 1 mm depth across 1 acre = 4,046.86 Liters
+        irr_liters = round(irr_needed_mm * 4046.86 * max(0.1, acres), 0)
+        
+        # Run-time duration in hours
+        if irr_clean == "drip":
+            runtime_hrs = round(irr_liters / (2500.0 * max(0.1, acres)), 1)
+        elif irr_clean == "sprinkler":
+            runtime_hrs = round(irr_needed_mm / 6.0, 1)
+        else:
+            runtime_hrs = round(irr_needed_mm / 10.0, 1)
+            
+        if rain >= 12.0:
+            action = f"🌧️ Rain expected ({rain:.1f} mm). Suspend irrigation; inspect furrow drainage."
+            action_kn = f"🌧️ ಮಳೆ ನಿರೀಕ್ಷಿತ ({rain:.1f} ಮಿ.ಮೀ). ನೀರಾವರಿ ನಿಲ್ಲಿಸಿ; ನೀರು ಹರಿದುಹೋಗಲು ಕಾಲುವೆ ತೆರೆಯಿರಿ."
+            action_hi = f"🌧️ बारिश की संभावना ({rain:.1f} मिमी)। सिंचाई बंद करें और जल निकासी सुनिश्चित करें।"
+        elif irr_needed_mm <= 0.8:
+            action = "🌱 Soil moisture sufficient; no irrigation required today."
+            action_kn = "🌱 ಮಣ್ಣಿನಲ್ಲಿ ಸಾಕಷ್ಟು ತೇವಾಂಶವಿದೆ; ಇಂದು ನೀರು ಹಾಯಿಸುವ ಅಗತ್ಯವಿಲ್ಲ."
+            action_hi = "🌱 मिट्टी में पर्याप्त नमी है; आज सिंचाई की आवश्यकता नहीं है।"
+        else:
+            action = f"💧 Apply {irr_needed_mm:.1f} mm (~{int(irr_liters):,} L for {acres:.1f} acres). Runtime: ~{runtime_hrs} hrs."
+            action_kn = f"💧 {irr_needed_mm:.1f} ಮಿ.ಮೀ ನೀರು ಹಾಯಿಸಿ (~{int(irr_liters):,} ಲೀಟರ್). ಅಂದಾಜು ಸಮಯ: ~{runtime_hrs} ಗಂಟೆ."
+            action_hi = f"💧 {irr_needed_mm:.1f} मिमी पानी दें (~{int(irr_liters):,} लीटर)। अनुमानित समय: ~{runtime_hrs} घंटे।"
+            
+        schedule.append({
+            "date": day.get("date"),
+            "day_name": day.get("day_name"),
+            "et0_mm": et0,
+            "crop_demand_etc_mm": etc,
+            "forecast_rain_mm": rain,
+            "effective_rain_mm": round(eff_rain, 1),
+            "irrigation_needed_mm": irr_needed_mm,
+            "irrigation_liters": int(irr_liters),
+            "duration_hours": runtime_hrs,
+            "recommendation": action,
+            "recommendation_kn": action_kn,
+            "recommendation_hi": action_hi
+        })
+        
+    # Sowing Window Determination
+    heavy_rain_days = [d["day_name"] for d in schedule if d["forecast_rain_mm"] >= 25.0]
+    dates = [d["date"] for d in schedule]
+    first_date = dates[0] if dates else "Now"
+    last_date = dates[-1] if dates else "Next 7 Days"
+    
+    if heavy_rain_days:
+        sowing_status = "Postpone / Caution"
+        sowing_title = "Postpone Sowing - Heavy Rain In Forecast"
+        sowing_advice = f"Heavy rainfall forecast on {', '.join(heavy_rain_days)}. Sowing now risks seed displacement, seed rot, and soil crusting. Delay sowing until soil drains."
+        sowing_advice_kn = f"{', '.join(heavy_rain_days)} ರಂದು ಭಾರಿ ಮಳೆಯಾಗುವ ಸಾಧ್ಯತೆ ಇದೆ. ಬೀಜ ಕೊಳೆಯುವ ಸಾಧ್ಯತೆಯಿರುವುದರಿಂದ ಮಳೆ ಮುಗಿದ ನಂತರ ಬಿತ್ತನೆ ಮಾಡಿ."
+        sowing_advice_hi = f"{', '.join(heavy_rain_days)} को भारी बारिश का अनुमान है। बीज बहने या सड़ने के जोखिम से बचने के लिए बारिश के बाद बुवाई करें।"
+    elif total_rain_mm >= 20.0 and total_rain_mm <= 60.0:
+        sowing_status = "Optimal"
+        sowing_title = f"Optimal Sowing Window: {first_date} to {last_date}"
+        sowing_advice = f"Cumulative forecast rainfall of {total_rain_mm:.1f} mm provides excellent topsoil moisture (vapsa condition) for seed germination and root emergence."
+        sowing_advice_kn = f"ಮುಂದಿನ 7 ದಿನಗಳಲ್ಲಿ {total_rain_mm:.1f} ಮಿ.ಮೀ ಮಳೆ ನಿರೀಕ್ಷೆಯಿದ್ದು, ಹದವಾದ ತೇವಾಂಶದಿಂದ ಬೀಜ ಮೊಳಕೆಯೊಡೆಯಲು ಇದು ಅತ್ಯಂತ ಸೂಕ್ತ ಸಮಯ."
+        sowing_advice_hi = f"अगले 7 दिनों में {total_rain_mm:.1f} मिमी बारिश की संभावना है, जो अंकुरण के लिए अनुकूल नमी (वापसा स्थिति) प्रदान करेगी।"
+    elif irr_clean in ["drip", "sprinkler", "borewell", "canal"]:
+        sowing_status = "Favorable with Pre-Sowing Irrigation"
+        sowing_title = "Sowing Window Open (Pre-Sowing Irrigation Recommended)"
+        sowing_advice = f"Rainfall is light ({total_rain_mm:.1f} mm). Apply a pre-sowing soaking dose (25-35 mm) using your {irrigation} system 2-3 days before drilling seeds."
+        sowing_advice_kn = f"ಕಡಿಮೆ ಮಳೆ ನಿರೀಕ್ಷೆಯಿದೆ ({total_rain_mm:.1f} ಮಿ.ಮೀ). ನಿಮ್ಮ {irrigation} ಮೂಲಕ ಬಿತ್ತನೆಗೆ 2-3 ದಿನ ಮುಂಚಿತವಾಗಿ ಹದವರಿತು ನೀರು ಹಾಯಿಸಿ ಬಿತ್ತನೆ ಮಾಡಿ."
+        sowing_advice_hi = f"हल्की बारिश ({total_rain_mm:.1f} मिमी)। बुवाई से 2-3 दिन पहले {irrigation} प्रणाली से पलेवा (हल्की सिंचाई) देकर बुवाई करें।"
+    else:
+        sowing_status = "Wait for Moisture"
+        sowing_title = "Wait for Adequate Pre-Monsoon Showers"
+        sowing_advice = f"Rainfed plot has minimal forecast rain ({total_rain_mm:.1f} mm). Dry sowing risks poor seedling emergence. Wait for a steady 25mm wetting shower."
+        sowing_advice_kn = f"ಮಳೆಯಾಶ್ರಿತ ಜಮೀನಿನಲ್ಲಿ ತೇವಾಂಶ ಕಡಿಮೆಯಿದೆ. ಒಣ ಮಣ್ಣಿನಲ್ಲಿ ಬಿತ್ತನೆ ಮಾಡಬೇಡಿ; ಕನಿಷ್ಠ 25 ಮಿ.ಮೀ ಮಳೆಯಾಗುವವರೆಗೆ ಕಾಯಿರಿ."
+        sowing_advice_hi = f"वर्षा आधारित खेत में कम बारिश ({total_rain_mm:.1f} मिमी)। शुष्क बुवाई से बचें और पर्याप्त बारिश (25 मिमी) का इंतजार करें।"
+
+    return {
+        "status": "success",
+        "crop": crop,
+        "crop_stage": stage,
+        "soil_type": soil_type,
+        "irrigation_method": irrigation,
+        "land_acres": acres,
+        "crop_coefficient_kc": kc,
+        "irrigation_efficiency_pct": round(eff * 100, 1),
+        "total_water_demand_mm": round(total_water_demand_mm, 1),
+        "total_forecast_rain_mm": round(total_rain_mm, 1),
+        "total_irrigation_needed_mm": round(total_irr_needed_mm, 1),
+        "total_irrigation_liters": int(round(total_irr_needed_mm * 4046.86 * max(0.1, acres), 0)),
+        "schedule_7d": schedule,
+        "sowing_window": {
+            "status": sowing_status,
+            "title": sowing_title,
+            "advice": sowing_advice,
+            "advice_kn": sowing_advice_kn,
+            "advice_hi": sowing_advice_hi,
+            "start_date": first_date,
+            "end_date": last_date
+        },
+        "data_source": "Open-Meteo Satellite Forecast & FAO-56 Penman-Monteith Evapotranspiration",
+        "last_updated": datetime.now().strftime("%Y-%m-%d %H:%M:%S"),
+        "disclaimer": "Advice is guidance only. Consult your local agriculture officer or Krishi Vigyan Kendra (KVK) for field-specific water management."
     }

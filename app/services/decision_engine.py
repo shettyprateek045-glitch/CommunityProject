@@ -120,6 +120,37 @@ def compute_farmer_recommendations(
         # Suitability score from RF model or pedological heuristic
         suit_score = suitability_map.get(crop_id, 0.05)
 
+        # Agronomic tolerance score (environmental distance)
+        ideal_ph = float(eco.get("ideal_ph", 6.5))
+        ph_diff = abs(soil_ph - ideal_ph)
+        ph_fit = max(0.0, 1.0 - (ph_diff / 2.5))
+        
+        # NPK distance fit
+        ideal_n, ideal_p, ideal_k = float(eco["ideal_n"]), float(eco["ideal_p"]), float(eco["ideal_k"])
+        n_fit = max(0.0, 1.0 - abs(effective_n - ideal_n) / 120.0)
+        p_fit = max(0.0, 1.0 - abs(effective_p - ideal_p) / 80.0)
+        k_fit = max(0.0, 1.0 - abs(effective_k - ideal_k) / 80.0)
+        agro_fit = (ph_fit * 0.40) + (n_fit * 0.20) + (p_fit * 0.20) + (k_fit * 0.20)
+
+        # Max RF probability for relative scaling
+        max_prob = max(suitability_map.values()) if suitability_map else 0.05
+        rf_relative = suit_score / max(0.01, max_prob)
+
+        # Combined suitability (0 to 1)
+        final_suit_score = round(0.55 * rf_relative + 0.45 * agro_fit, 3)
+        suitability_pct = round(final_suit_score * 100.0, 1)
+
+        # Climate Mismatch Check
+        is_climate_mismatch = False
+        if crop_id == "apple" and temp_c > 25.0:
+            is_climate_mismatch = True
+        elif crop_id == "wheat" and temp_c > 33.0:
+            is_climate_mismatch = True
+        elif crop_id in ["cotton", "banana", "papaya"] and temp_c < 12.0:
+            is_climate_mismatch = True
+        elif crop_id in ["rice", "jute"] and (rainfall_annual < 400.0 and irrigation.lower() in ["none", "rainfed"]):
+            is_climate_mismatch = True
+
         # Economic computations
         yield_per_acre = float(eco.get("yield_per_acre_qtl", eco.get("yield_qtl_per_acre", 15.0)))
         total_yield_qtl = round(yield_per_acre * land_acres, 1)
@@ -173,22 +204,22 @@ def compute_farmer_recommendations(
             risk_badge = "High"
             risk_color = "rose"
 
-        # Why this crop reasons
-        reasons = []
-        if suit_score >= 0.40:
-            reasons.append(f"Top agronomic compatibility with soil pH ({soil_ph:.1f}) and macro-nutrients.")
-        else:
-            reasons.append(f"Well-adapted to {eco['preferred_soil']} soil conditions.")
-
-        if irrigation.lower() in ["drip", "borewell", "canal", "sprinkler"] and eco["water_need_level"] in ["High", "Medium"]:
-            reasons.append(f"Your {irrigation} system mitigates moisture deficits for high vegetative yields.")
-        else:
-            reasons.append(f"Low water need ({water_need_mm:.0f} mm); resilient under seasonal rainfall.")
-
-        if net_profit_inr > 35000:
-            reasons.append(f"Strong profit projection at current Mandi modal price (₹{unit_price:,.0f}/qtl).")
-        else:
-            reasons.append("Reliable commercial commodity with steady local Mandi off-take.")
+        # Why this crop reasons (exact numbers matching the card metrics)
+        reasons = [
+            f"Projected net profit of ₹{int(net_profit_inr):,} across {land_acres:.1f} acres (Revenue: ₹{int(total_revenue_inr):,} at Mandi modal price ₹{unit_price:,.0f}/qtl minus cultivation cost: ₹{int(total_cost_inr):,}).",
+            f"Estimated total harvest of {total_yield_qtl:.1f} quintals ({yield_per_acre:.1f} qtl/acre) well-adapted to {eco['preferred_soil']} soil.",
+            f"Agronomic suitability of {suitability_pct:.1f}% matching your soil pH ({soil_ph:.1f}), available NPK, and local weather."
+        ]
+        reasons_kn = [
+            f"{land_acres:.1f} ಎಕರೆಗೆ ಅಂದಾಜು ನಿವ್ವಳ ಲಾಭ ₹{int(net_profit_inr):,} (ಆದಾಯ: ₹{int(total_revenue_inr):,} - ವೆಚ್ಚ: ₹{int(total_cost_inr):,}).",
+            f"ಒಟ್ಟು ನಿರೀಕ್ಷಿತ ಇಳುವರಿ {total_yield_qtl:.1f} ಕ್ವಿಂಟಾಲ್ (ಮಾರುಕಟ್ಟೆ ಧಾರಣೆ ₹{unit_price:,.0f}/ಕ್ವಿಂಟಾಲ್).",
+            f"ಮಣ್ಣಿನ pH ({soil_ph:.1f}) ಮತ್ತು ಪೋಷಕಾಂಶಗಳಿಗೆ {suitability_pct:.1f}% ಹೊಂದಾಣಿಕೆ."
+        ]
+        reasons_hi = [
+            f"{land_acres:.1f} एकड़ के लिए अनुमानित शुद्ध लाभ ₹{int(net_profit_inr):,} (आय: ₹{int(total_revenue_inr):,} - लागत: ₹{int(total_cost_inr):,})।",
+            f"कुल अनुमानित उपज {total_yield_qtl:.1f} क्विंटल (मंडी भाव ₹{unit_price:,.0f}/क्विंटल)।",
+            f"मृदा pH ({soil_ph:.1f}) और पोषक तत्वों के साथ {suitability_pct:.1f}% उपयुक्तता स्कोर।"
+        ]
 
         # Fertilizer Advice
         ideal_n, ideal_p, ideal_k = float(eco["ideal_n"]), float(eco["ideal_p"]), float(eco["ideal_k"])
@@ -278,8 +309,9 @@ def compute_farmer_recommendations(
             "name": display_name,
             "display_name": display_name,
             "kannada_name": kannada_name,
-            "suitability_pct": round(suit_score * 100, 1),
-            "raw_suitability": suit_score,
+            "suitability_pct": suitability_pct,
+            "raw_suitability": final_suit_score,
+            "climate_mismatch": is_climate_mismatch,
             "yield_per_acre_qtl": yield_per_acre,
             "total_yield_qtl": total_yield_qtl,
             "cost_per_acre_inr": cost_per_acre,
@@ -303,7 +335,9 @@ def compute_farmer_recommendations(
             "water_need_level": str(eco["water_need_level"]),
             "water_need_mm": water_need_mm,
             "rotation_category": str(eco["rotation_category"]),
-            "reasons": reasons[:3],
+            "reasons": reasons,
+            "reasons_kn": reasons_kn,
+            "reasons_hi": reasons_hi,
             "fertilizer_advice": fert_advice,
             "calendar": calendar,
             "growth_calendar": calendar,
@@ -329,11 +363,19 @@ def compute_farmer_recommendations(
         )
         c["composite_score"] = round(composite * 100, 2)
 
-    # Hard filtering: affordable and water viable
-    viable_candidates = [c for c in all_candidates if not c["exceeds_budget"] and not c.get("is_water_infeasible", False)]
-    working_pool = viable_candidates if viable_candidates else [c for c in all_candidates if not c["exceeds_budget"]]
-    if not working_pool:
-        working_pool = all_candidates
+    # Strict Hard Filtering before ranking:
+    # 1. Drop crops with suitability < 30%
+    # 2. Drop crops exceeding farmer's budget (total_cost_inr > budget_inr)
+    # 3. Drop crops with climate mismatch
+    # 4. Drop crops with water/irrigation infeasibility
+    viable_candidates = [
+        c for c in all_candidates
+        if not c["exceeds_budget"]
+        and not c.get("is_water_infeasible", False)
+        and not c.get("climate_mismatch", False)
+        and c.get("suitability_pct", 0.0) >= 30.0
+    ]
+    working_pool = viable_candidates
 
     working_pool.sort(key=lambda x: x["composite_score"], reverse=True)
     top_5 = working_pool[:5]

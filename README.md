@@ -1,37 +1,56 @@
 ﻿# Agricultural Crop Health, Classification, Price & Irrigation Decision System
 ### Multi-Domain Tech Forge — Community & Societal Engineering Project
 
-[![Farmer Dashboard](https://img.shields.io/badge/Web_App-Farmer_Decision_Dashboard_v2.1-2e7d32.svg)](#-farmer-decision-dashboard-web-application)
-[![No Leaflet](https://img.shields.io/badge/Map-Leaflet_Removed_(Plain_Text_Card)-red.svg)](#)
-[![Tests](https://img.shields.io/badge/Pytest-18_Passing-brightgreen.svg)](#)
-[![YOLOv11](https://img.shields.io/badge/Vision_AI-YOLO11m--cls_(30_Classes)-blue.svg)](https://github.com/ultralytics/ultralytics)
-[![PyTorch](https://img.shields.io/badge/Framework-PyTorch_2.11-EE4C2C.svg)](https://pytorch.org/)
-[![Scikit-Learn](https://img.shields.io/badge/Crop_Suitability-RandomForest_(99.55%25)-F7931E.svg)](https://scikit-learn.org/)
-[![Open-Meteo](https://img.shields.io/badge/Weather-Open--Meteo_Free_API-0288D1.svg)](https://open-meteo.com/)
-[![Bilingual](https://img.shields.io/badge/Languages-English_%7C_ಕನ್ನಡ-green.svg)](#-bilingual-support-english--kannada)
-[![Git LFS](https://img.shields.io/badge/Storage-Git_LFS-black.svg)](https://git-lfs.github.com/)
+[![Farmer Dashboard](https://img.shields.io/badge/Web_App-Farmer_Decision_Dashboard_v2.2-2e7d32.svg)](#-farmer-decision-dashboard-web-application)
+[![Leaflet Map](https://img.shields.io/badge/Map-Leaflet_+_OpenStreetMap_(Interactive_Pin)-brightgreen.svg)](#)
+[![YOLOv11 Foliar Disease](https://img.shields.io/badge/Vision_AI-PlantVillage_YOLO11m_(86.2%25_Precision)-blue.svg)](#-phase-4-foliar-pest--leaf-disease-detection-plantvillage-yolov11)
+[![ISRIC SoilGrids](https://img.shields.io/badge/Soil-ISRIC_SoilGrids_2.0-F7931E.svg)](#)
+[![Open-Meteo](https://img.shields.io/badge/Weather-Open--Meteo_+_FAO--56_Irrigation-0288D1.svg)](https://open-meteo.com/)
+[![Trilingual](https://img.shields.io/badge/Languages-English_%7C_ಕನ್ನಡ_%7C_हिंदी-green.svg)](#-trilingual-support-english--kannada--hindi)
+[![PWA](https://img.shields.io/badge/Offline-PWA_Service_Worker-purple.svg)](#)
 
 ---
 
-## 🌾 Farmer Decision Dashboard Web Application (FastAPI v2.1 + TypeScript)
+## 🌾 Farmer Decision Dashboard Web Application (FastAPI v2.2 + Precision Agronomics)
 
-The **Farmer Decision Dashboard** is an upgraded, production-grade precision agriculture platform designed for mobile and desktop web browsers. It runs on **FastAPI** on the backend and a **pure TypeScript** architecture on the frontend (dynamically constructed DOM without static HTML templates).
+The **Farmer Decision Dashboard** is a connected, precision agriculture decision-support system. It runs on **FastAPI** on the backend and modern vanilla JS/TS on the frontend, featuring full trilingual localization (**English, Kannada, Hindi**), interactive map pinning, satellite micro-climate, pedological soil reports, and ML models.
 
-### 🌟 Key Upgraded Capabilities (6-Step Precision Wizard)
+### 🌟 Implemented Phases & Feature Matrix
 
-1. **Step 1: Centered Location Modal & Plain-Text Location Card (NO Leaflet Map)**:
-   - On first entry, displays a centered, focused pop-up card in **English and ಕನ್ನಡ**:
-     - Title: *"Allow location access / ಸ್ಥಳ ಪ್ರವೇಶವನ್ನು ಅನುಮತಿಸಿ"*
-     - Text: *"We use your location to show live weather and suggest the best crops for your farm. / ನಿಮ್ಮ ಸ್ಥಳವನ್ನು ನೇರ ಹವಾಮಾನ ಮತ್ತು ಅತ್ಯುತ್ತಮ ಬೆಳೆಗಳನ್ನು ಶಿಫಾರಸು ಮಾಡಲು ಬಳಸುತ್ತೇವೆ."*
-     - Action Buttons: `[📍 Allow location]` (triggers `navigator.geolocation.getCurrentPosition` via explicit user gesture) and `[⌨️ Enter manually]`.
-   - **No Map Canvas**: Leaflet map (`L.map`, `L.marker`, `leaflet.css`, and `leaflet.js`) has been **completely removed** to guarantee lightning-fast load times and zero rendering overhead on low-bandwidth mobile connections.
-   - **Clean Text Card**: Location is shown cleanly as `📍 Village/Town, District, State` with small coordinates, a `[Change location]` button, and inline Nominatim autocomplete search.
-   - **Bulletproof Geolocation Error Handling**:
-     - `PERMISSION_DENIED`: Explains browser privacy permission steps and offers manual search.
-     - `TIMEOUT` / `POSITION_UNAVAILABLE`: Retries once, falls back to IP-based approximate location (`GET /api/ip-location`), then manual search.
-     - `window.isSecureContext === false`: Warns that mobile browsers mandate HTTPS (or localhost) for GPS.
-     - Detailed error codes logged to developer console.
-   - *Mobile HTTPS Testing Note*: Mobile browsers mandate HTTPS for geolocation (except `localhost`). When testing on phones over LAN or remote tunnels, use `ngrok http 5000` or Cloudflare Tunnel (`cloudflared tunnel --url http://localhost:5000`), or run `python app.py --ssl`.
+#### 1. Phase 1: Weather-Driven Advice & Location Truth
+- **Single Source of Truth Farm Context**: Unified reactive context (`farmContext`) synchronizing latitude, longitude, accuracy radius, soil parameters, land acres, budget, and irrigation.
+- **Leaflet + OpenStreetMap Draggable Pin**: Allows farmers to confirm their exact farm spot with GPS accuracy radius circle, manual search, and saved-locations list in `localStorage`. Reverse geocoding via Nominatim is throttled to max 1 req/sec with local caching.
+- **Day & Night Real-Time Weather (Open-Meteo)**: Real-time conditions using `timezone=auto`, with automatic day/night detection (`is_day` 1 = ☀️ Daytime, 0 = 🌙 Nighttime) and last-updated timestamp.
+- **FAO-56 7-Day Dual Crop Smart Irrigation Schedule**: Computes daily crop evapotranspiration ($ET_c = K_c \times ET_0$), effective rainfall deficit, required net irrigation depth in mm, total volume in liters per acre, and drip run-time in hours.
+- **Sowing Window Advisory**: Evaluates forecast precipitation, air temperature, and soil moisture to suggest optimal sowing dates.
+- **Side-by-Side Run Comparison**: Compare two or more past farm runs side-by-side (`POST /api/history/compare`) across land size, total cost, gross revenue, net profit, and suitability.
+
+#### 2. Phase 2: Soil, SoilGrids 2.0 & Fertilizer Plan
+- **ISRIC SoilGrids 2.0 Pedological Pre-fill**: REST API queries (`https://rest.isric.org/soilgrids/v2.0/properties/query`) fetch real physical and chemical soil estimates (pH, Sand %, Clay %, Organic Carbon) with SQLite 30-day caching. Farmers can adopt estimates into inputs with 1-click.
+- **Non-Soil Rejection Gate**: Rejects non-soil photos (foliage, screenshots, objects) and warns if confidence is below 60% without presenting an uncertain soil type as fact.
+- **Interactive Fertilizer Plan Calculator**: Computes per-acre and whole-farm NPK gaps for chosen crops. Converts gaps into commercial bag counts (Urea, DAP, MOP, FYM) using user-editable price tables, displaying step-by-step formulas.
+- **Extreme pH Alerts**: Triggers automated guidance for soil amendments — Agricultural Lime for acidic soils ($pH < 5.5$) and Gypsum for alkaline soils ($pH > 8.2$).
+
+#### 3. Phase 3: Market Prices & Alerts
+- **Nearest Mandi 30-Day Modal Trends**: Factual daily modal prices from data.gov.in / Agmarknet benchmark with date of last record clearly displayed.
+- **Target Price In-App & Browser Alert**: Farmers can set a selling target price; triggers an in-app banner and browser notification (via `Notification.requestPermission()`).
+- **Factual Observation Labeling**: Factual historical observation labeled clearly: no speculative price prediction models. SMS / WhatsApp alerts marked as "Planned" awaiting government SMS gateway.
+
+#### 4. Phase 4: Foliar Pest & Leaf Disease Detection (PlantVillage YOLOv11)
+- **Fine-Tuned YOLOv11 Model**: Weights at `runs/detect/train/weights/best.pt` fine-tuned on PlantVillage foliar dataset (`Early Blight`, `Late Blight`, `Healthy Leaf`).
+- **Held-Out Validation Benchmark**:
+  - Precision: **86.2%**
+  - Recall: **75.8%**
+  - mAP@50: **82.8%**
+  - mAP@50-95: **64.9%**
+- **Non-Leaf Rejection Gate**: Rejects non-foliage photos (documents, blue screens, bare earth) with a clear retake prompt.
+- **60% Confidence Safety Gate**: If confidence $< 0.60$, shows `"Uncertain, please retake the photo"` and does not guess a disease.
+- **Diagnosis Output**: Annotates bounding boxes, pathogen causative agent, visual symptoms, treatment guidance, and mandatory `"Consult your local agriculture officer"` note.
+
+#### 5. Phase 5: Access & Reach
+- **Government Agricultural Schemes Finder**: Official central and Karnataka state schemes (PM-Kisan, PMFBY, PMKSY, Soil Health Card Scheme, Subsidies) with eligibility notes, verification date, and official portal links.
+- **Voice Input (Web Speech API)**: Microphone input buttons for Soil N, P, K, pH, Land Acres, and Budget supporting Kannada (`kn-IN`), Hindi (`hi-IN`), and Indian English (`en-IN`). Automatically hides if browser lacks Web Speech API.
+- **Offline Mode (PWA Service Worker)**: Service worker registered at `/static/sw.js` caches static dashboard shell, Leaflet assets, and API responses for offline reliability.
 
 2. **Step 2: Real-Time Open-Meteo Weather & 12-Month Historical Climate (No API Key)**:
    - Automatic background pre-fetch via async `POST /api/weather` with 10-minute in-memory coordinate cache.
@@ -172,16 +191,82 @@ npm start
 
 Copy `.env.example` to `.env` to configure your settings:
 ```ini
-# Server Port
+# Server Port & Host
 PORT=5000
+HOST=127.0.0.1
+
+# Application Secret Key for JWT & Session Signing
+SECRET_KEY=change-this-to-a-secure-random-secret-key-in-production
+
+# Google OAuth 2.0 Credentials (Sign in with Google - Gmail only)
+# Required scopes: openid, email, profile (Do NOT request Gmail inbox access)
+GOOGLE_CLIENT_ID=your-google-client-id.apps.googleusercontent.com
+GOOGLE_CLIENT_SECRET=your-google-client-secret
+GOOGLE_REDIRECT_URI=http://localhost:5000/api/auth/google/callback
 
 # Agmarknet Mandi API Key (Optional)
 # If left blank, the system automatically uses data/prices.csv (labeled 'Sample Data' in UI)
 DATA_GOV_IN_API_KEY=
-
-# Secret key for sessions
-SECRET_KEY=farmer-decision-secret-key-2026
 ```
+
+---
+
+## 🔐 Google OAuth 2.0 ("Sign in with Google") Setup Guide
+
+This web application integrates standard **OAuth 2.0 / OpenID Connect with PKCE (S256)** and enforces **@gmail.com verified accounts only**.
+
+### Step 1: Create a Project in Google Cloud Console
+1. Navigate to the [Google Cloud Console](https://console.cloud.google.com/).
+2. Click the project dropdown at the top and select **New Project**.
+3. Name your project (e.g., `Farmer-Decision-App`) and click **Create**.
+
+### Step 2: Configure the OAuth Consent Screen
+1. In the left sidebar, navigate to **APIs & Services** > **OAuth consent screen**.
+2. Select **External** user type and click **Create**.
+3. Fill in the required application details:
+   - **App name**: `Farmer Decision Dashboard`
+   - **User support email**: Your Gmail address
+   - **Developer contact email**: Your Gmail address
+4. Click **Save and Continue**.
+5. **Scopes Configuration**:
+   - Click **Add or Remove Scopes**.
+   - Select **ONLY** the standard non-sensitive OpenID scopes:
+     - `.../auth/userinfo.email` (`email`)
+     - `.../auth/userinfo.profile` (`profile`)
+     - `openid`
+   - ⚠️ **Strict Constraint**: Do **NOT** select any sensitive Gmail inbox scopes (no `gmail.readonly`, `mail.google.com`, etc.).
+6. Click **Save and Continue**.
+7. In the **Test users** section, add your testing `@gmail.com` address.
+8. Click **Save and Continue**.
+
+### Step 3: Create OAuth 2.0 Client Credentials
+1. In the left sidebar, click **Credentials**.
+2. Click **+ Create Credentials** at the top and choose **OAuth client ID**.
+3. Select **Application type**: **Web application**.
+4. Name: `Farmer Decision Web Client`.
+5. Configure the **Authorized JavaScript origins**:
+   - Local Development:
+     - `http://localhost:5000`
+     - `http://127.0.0.1:5000`
+   - Production Domain (replace with your domain):
+     - `https://yourdomain.com`
+6. Configure the **Authorized redirect URIs**:
+   - Local Development:
+     - `http://localhost:5000/api/auth/google/callback`
+     - `http://127.0.0.1:5000/api/auth/google/callback`
+   - Production Domain:
+     - `https://yourdomain.com/api/auth/google/callback`
+7. Click **Create**.
+8. Copy your **Client ID** and **Client Secret**.
+
+### Step 4: Configure Local Environment Variables
+Add the credentials to your `.env` file:
+```ini
+GOOGLE_CLIENT_ID=your-client-id-here.apps.googleusercontent.com
+GOOGLE_CLIENT_SECRET=GOCSPX-your-client-secret-here
+GOOGLE_REDIRECT_URI=http://localhost:5000/api/auth/google/callback
+```
+*(Ensure `.env` is listed in `.gitignore` and never committed to source control).*
 
 ---
 

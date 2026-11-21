@@ -347,16 +347,22 @@ def predict_soil_image(file_bytes: bytes) -> Dict[str, Any]:
 
     is_confident = confidence_pct >= 60.0
     status = "ok" if is_confident else "uncertain"
+    reported_soil = predicted_soil if is_confident else "Uncertain"
 
     message = (
         f"Soil identified as {predicted_soil} ({confidence_pct:.1f}% confidence)."
         if is_confident
-        else f"Uncertain classification ({confidence_pct:.1f}% < 60%). Please confirm your soil type in the dropdown."
+        else f"Uncertain (<60% confidence). Please enter Soil Health Card values in the form or confirm your soil type in the dropdown."
     )
     message_kn = (
         f"ಮಣ್ಣನ್ನು {predicted_soil} ಎಂದು ಗುರುತಿಸಲಾಗಿದೆ ({confidence_pct:.1f}% ಖಚಿತತೆ)."
         if is_confident
-        else f"ಅನಿಶ್ಚಿತ ವರ್ಗೀಕರಣ ({confidence_pct:.1f}% < 60%). ದಯವಿಟ್ಟು ಡ್ರಾಪ್‌ಡೌನ್‌ನಲ್ಲಿ ನಿಮ್ಮ ಮಣ್ಣಿನ ಪ್ರಕಾರವನ್ನು ದೃಢೀಕರಿಸಿ."
+        else f"ಅನಿಶ್ಚಿತ ವರ್ಗೀಕರಣ (<60% ಖಚಿತತೆ). ದಯವಿಟ್ಟು ಮಣ್ಣು ಆರೋಗ್ಯ ಕಾರ್ಡ್ ಮೌಲ್ಯಗಳನ್ನು ನಮೂದಿಸಿ ಅಥವಾ ಡ್ರಾಪ್‌ಡೌನ್‌ನಲ್ಲಿ ದೃಢೀಕರಿಸಿ."
+    )
+    message_hi = (
+        f"मिट्टी की पहचान {predicted_soil} के रूप में हुई ({confidence_pct:.1f}% सटीकता)।"
+        if is_confident
+        else f"अनिश्चित वर्गीकरण (<60% सटीकता)। कृपया मृदा स्वास्थ्य कार्ड मान दर्ज करें या ड्रॉपडाउन से पुष्टि करें।"
     )
 
     # Fetch pedological characteristics
@@ -364,9 +370,13 @@ def predict_soil_image(file_bytes: bytes) -> Dict[str, Any]:
 
     return {
         "status": status,
-        "soil_type": predicted_soil,
+        "soil_type": reported_soil,
+        "suggested_soil_type": predicted_soil,
         "confidence": round(confidence_pct, 1),
         "is_confident": is_confident,
+        "message": message,
+        "message_kn": message_kn,
+        "message_hi": message_hi,
         "rejection_reason": None,
         "rejection_reason_kn": None,
         "gate_failed": None,
