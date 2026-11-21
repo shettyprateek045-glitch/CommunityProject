@@ -5,8 +5,8 @@
   "main": "server.js",
   "scripts": {
     "start": "node server.js",
-    "build": "echo Build completed",
-    "build:ts": "echo TypeScript build step completed"
+    "build": "node ../build.js",
+    "build:ts": "node ../build.js"
   },
   "dependencies": {
     "express": "^4.19.2",

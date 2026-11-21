@@ -1,0 +1,56 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Farmer Decision Dashboard | ರೈತ ನಿರ್ಧಾರ ಬೆಂಬಲ ವ್ಯವಸ್ಥೆ</title>
+  
+  <!-- Tailwind CSS CDN -->
+  <script src="https://cdn.tailwindcss.com"></script>
+  <script>
+    tailwind.config = {
+      theme: {
+        extend: {
+          colors: {
+            forest: {
+              50: '#f1f8e9', 100: '#dcedc8', 200: '#c5e1a5', 300: '#aed581',
+              400: '#9ccc65', 500: '#7cb342', 600: '#558b2f', 700: '#33691e',
+              800: '#2e7d32', 900: '#1b5e20', 950: '#0d3810',
+            },
+            earth: {
+              50: '#fdfbf7', 100: '#f7f2ea', 200: '#ebdccb', 300: '#dec2a7',
+              400: '#cca280', 500: '#b8855d', 600: '#9e6945', 700: '#7e4f35',
+              800: '#643f2d', 900: '#4e3226',
+            }
+          }
+        }
+      }
+    }
+  </script>
+
+  <!-- Chart.js CDN -->
+  <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.1/dist/chart.umd.min.js"></script>
+
+  <!-- Leaflet CSS & JS for OpenStreetMap Interactive Farm Pinning -->
+  <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" integrity="sha256-p4NxAoJBhIIN+hmNHrzRCf9tD/miZyoHS5obTRR9BMY=" crossorigin="" />
+  <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js" integrity="sha256-20nQCchB9co0qIjJZRGuk2/Z9VM+kNiyxNV1lvTlZBo=" crossorigin=""></script>
+
+  <!-- FontAwesome Icons CDN -->
+  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.1/css/all.min.css" />
+
+  <!-- Custom Styles & PWA Manifest -->
+  <link rel="stylesheet" href="/static/css/styles.css" />
+  <link rel="manifest" href="/static/manifest.json" />
+  <meta name="theme-color" content="#1b5e20" />
+  <meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate" />
+  <meta http-equiv="Pragma" content="no-cache" />
+  <meta http-equiv="Expires" content="0" />
+</head>
+<body class="bg-earth-50 text-slate-800 min-h-screen font-sans flex flex-col antialiased">
+  <!-- Dynamic Mount Point for Pure TypeScript Application -->
+  <div id="app"></div>
+
+  <!-- Client Application Script (Pure TypeScript/JavaScript bundle) -->
+  <script type="module" src="/static/js/app.js?v=4.0"></script>
+</body>
+</html>

@@ -1,0 +1,21 @@
+{
+  "name": "Farmer Decision Dashboard - Krishi Mitra",
+  "short_name": "AgroProfit AI",
+  "description": "Precision crop recommendation, soil nutrition, leaf disease detection, and mandi market advisory.",
+  "start_url": "/",
+  "display": "standalone",
+  "background_color": "#1b5e20",
+  "theme_color": "#1b5e20",
+  "icons": [
+    {
+      "src": "/static/icons/icon-192.png",
+      "sizes": "192x192",
+      "type": "image/png"
+    },
+    {
+      "src": "/static/icons/icon-512.png",
+      "sizes": "512x512",
+      "type": "image/png"
+    }
+  ]
+}

@@ -5,8 +5,8 @@
   "main": "node_backend/server.js",
   "scripts": {
     "start": "node node_backend/server.js",
-    "build": "echo Build completed",
-    "build:ts": "echo TypeScript check completed",
+    "build": "node build.js",
+    "build:ts": "node build.js",
     "dev": "python app.py"
   },
   "keywords": [

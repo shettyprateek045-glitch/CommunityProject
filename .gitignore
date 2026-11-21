@@ -47,4 +47,3 @@ data/*.db
 
 # Node dependencies
 node_modules/
-dist/
