@@ -174,13 +174,59 @@ def get_google_auth_url(next: str = "/", req: Request = None, response: Response
     )
     return res
 
+@router.get("/google/status")
+def google_auth_status():
+    """Returns whether Google OAuth is configured."""
+    has_client_id = bool(settings.google_client_id and settings.google_client_id.strip())
+    has_client_secret = bool(settings.google_client_secret and settings.google_client_secret.strip())
+    return {
+        "configured": has_client_id and has_client_secret,
+        "client_id_set": has_client_id,
+        "client_secret_set": has_client_secret,
+        "client_id": settings.google_client_id.strip() if has_client_id else ""
+    }
+
+@router.post("/guest")
+@router.get("/guest")
+def guest_login(next: str = "/", db: Session = Depends(get_db)):
+    """
+    Zero-barrier guest mode access. Creates or reuses a guest farmer session.
+    """
+    guest_email = "guest.farmer@gmail.com"
+    user = db.query(User).filter(User.email == guest_email).first()
+    if not user:
+        user = User(
+            email=guest_email,
+            name="Guest Farmer",
+            language="en",
+            state="Karnataka",
+            district="Bengaluru"
+        )
+        db.add(user)
+        db.commit()
+        db.refresh(user)
+
+    token = create_access_token(data={"sub": str(user.id), "email": user.email})
+    target = next if (next and next.startswith("/") and not next.startswith("//")) else "/"
+    response = RedirectResponse(url=target, status_code=303)
+    response.set_cookie(
+        key="access_token",
+        value=token,
+        httponly=True,
+        samesite="lax",
+        secure=False,
+        max_age=30 * 24 * 3600,
+        path="/"
+    )
+    return response
+
 @router.get("/google/login")
 def google_login_redirect(next: str = "/", req: Request = None):
     """Direct browser redirect to Google OAuth authorization endpoint."""
     client_id = settings.google_client_id.strip()
     if not client_id:
         return RedirectResponse(
-            url=f"/login?error={quote_plus('Google Sign-In is not configured. Set GOOGLE_CLIENT_ID and GOOGLE_CLIENT_SECRET in .env.')}",
+            url=f"/login?setup_google=1&next={quote_plus(next)}",
             status_code=303
         )
 

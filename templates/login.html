@@ -45,7 +45,7 @@
     </div>
 
     <!-- Content area -->
-    <div class="p-6 sm:p-8 space-y-6">
+    <div class="p-6 sm:p-8 space-y-5">
       
       <!-- Notifications / Alert Banners -->
       <div id="alert-error" class="hidden p-3.5 rounded-lg bg-red-50 border border-red-200 text-red-700 text-sm flex items-start gap-2.5">
@@ -58,9 +58,17 @@
         <span id="alert-info-text" class="flex-1"></span>
       </div>
 
+      <!-- Quick Guest Mode Button -->
+      <div>
+        <a href="/api/auth/guest" id="btn-guest-mode" class="w-full py-2.5 px-4 rounded-xl border border-dashed border-emerald-600 bg-emerald-50 hover:bg-emerald-100 text-emerald-900 font-bold text-xs flex items-center justify-center gap-2 transition shadow-xs cursor-pointer">
+          <i class="fa-solid fa-user-astronaut text-emerald-700"></i>
+          <span>Continue as Guest (Instant Preview / Demo)</span>
+        </a>
+      </div>
+
       <!-- Google OAuth Button -->
       <div>
-        <button id="btn-google-login" type="button" class="w-full py-3 px-4 border border-slate-300 rounded-xl font-semibold text-slate-700 bg-white hover:bg-slate-50 transition shadow-sm flex items-center justify-center gap-3 active:scale-[0.99] focus:outline-none focus:ring-2 focus:ring-forest-600">
+        <button id="btn-google-login" type="button" class="w-full py-3 px-4 border border-slate-300 rounded-xl font-semibold text-slate-700 bg-white hover:bg-slate-50 transition shadow-sm flex items-center justify-center gap-3 active:scale-[0.99] focus:outline-none focus:ring-2 focus:ring-forest-600 cursor-pointer">
           <!-- Google G Logo -->
           <svg class="w-5 h-5" viewBox="0 0 24 24">
             <path fill="#4285F4" d="M22.56 12.25c0-.78-.07-1.53-.2-2.25H12v4.26h5.92c-.26 1.37-1.04 2.53-2.21 3.31v2.77h3.57c2.08-1.92 3.28-4.74 3.28-8.09z"/>
@@ -84,10 +92,10 @@
 
       <!-- Mode Toggle (Login vs Register) -->
       <div class="flex rounded-xl bg-slate-100 p-1 text-sm font-medium">
-        <button id="tab-login" type="button" class="w-1/2 py-2 text-center rounded-lg bg-white shadow-sm text-forest-900 font-semibold transition">
+        <button id="tab-login" type="button" class="w-1/2 py-2 text-center rounded-lg bg-white shadow-sm text-forest-900 font-semibold transition cursor-pointer">
           Sign In
         </button>
-        <button id="tab-register" type="button" class="w-1/2 py-2 text-center rounded-lg text-slate-600 hover:text-slate-900 transition">
+        <button id="tab-register" type="button" class="w-1/2 py-2 text-center rounded-lg text-slate-600 hover:text-slate-900 transition cursor-pointer">
           Create Account
         </button>
       </div>
@@ -117,7 +125,7 @@
         </div>
 
         <button id="btn-submit-login" type="submit"
-                class="w-full py-3 px-4 bg-[#2e7d32] hover:bg-[#1b5e20] text-white font-semibold rounded-xl text-sm shadow-md transition active:scale-[0.99] flex items-center justify-center gap-2">
+                class="w-full py-3 px-4 bg-[#2e7d32] hover:bg-[#1b5e20] text-white font-semibold rounded-xl text-sm shadow-md transition active:scale-[0.99] flex items-center justify-center gap-2 cursor-pointer">
           <span>Sign In</span>
           <i class="fa-solid fa-arrow-right text-xs"></i>
         </button>
@@ -131,13 +139,13 @@
             <span class="absolute inset-y-0 left-0 pl-3 flex items-center text-slate-400 pointer-events-none">
               <i class="fa-solid fa-user text-xs"></i>
             </span>
-            <input id="reg-name" type="text" placeholder="Farmer Ramesh"
+            <input id="reg-name" type="text" required placeholder="Farmer Name"
                    class="w-full pl-9 pr-3 py-2.5 border border-slate-300 rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-forest-600 focus:border-forest-600 transition" />
           </div>
         </div>
 
         <div>
-          <label class="block text-xs font-semibold text-slate-700 mb-1" for="reg-email">Email Address <span class="text-red-500">*</span></label>
+          <label class="block text-xs font-semibold text-slate-700 mb-1" for="reg-email">Gmail Address</label>
           <div class="relative">
             <span class="absolute inset-y-0 left-0 pl-3 flex items-center text-slate-400 pointer-events-none">
               <i class="fa-solid fa-at text-xs"></i>
@@ -159,18 +167,18 @@
         </div>
 
         <div>
-          <label class="block text-xs font-semibold text-slate-700 mb-1" for="reg-password">Password (min 6 chars) <span class="text-red-500">*</span></label>
+          <label class="block text-xs font-semibold text-slate-700 mb-1" for="reg-password">Password (min 8 characters)</label>
           <div class="relative">
             <span class="absolute inset-y-0 left-0 pl-3 flex items-center text-slate-400 pointer-events-none">
               <i class="fa-solid fa-lock text-xs"></i>
             </span>
-            <input id="reg-password" type="password" required minlength="6" placeholder="••••••••"
+            <input id="reg-password" type="password" required minlength="8" placeholder="••••••••"
                    class="w-full pl-9 pr-3 py-2.5 border border-slate-300 rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-forest-600 focus:border-forest-600 transition" />
           </div>
         </div>
 
         <button id="btn-submit-register" type="submit"
-                class="w-full py-3 px-4 bg-[#2e7d32] hover:bg-[#1b5e20] text-white font-semibold rounded-xl text-sm shadow-md transition active:scale-[0.99] flex items-center justify-center gap-2">
+                class="w-full py-3 px-4 bg-[#2e7d32] hover:bg-[#1b5e20] text-white font-semibold rounded-xl text-sm shadow-md transition active:scale-[0.99] flex items-center justify-center gap-2 cursor-pointer">
           <span>Create Account</span>
           <i class="fa-solid fa-user-plus text-xs"></i>
         </button>
@@ -178,36 +186,87 @@
 
     </div>
 
-    <!-- Footer info -->
-    <div class="bg-slate-50 px-6 py-4 border-t border-slate-100 text-center text-xs text-slate-500">
-      Protected with OAuth 2.0 / PKCE & Secure HttpOnly Sessions
+    <!-- Footer -->
+    <div class="bg-slate-50 px-6 py-4 border-t border-earth-200 text-center text-xs text-slate-500">
+      <span>Protected by Farmer Advisory Session Management.</span>
+    </div>
+
+  </div>
+
+  <!-- Google Setup Guidance Modal -->
+  <div id="modal-google-setup" class="fixed inset-0 z-50 bg-slate-900/60 backdrop-blur-xs hidden flex items-center justify-center p-4">
+    <div class="bg-white rounded-3xl shadow-2xl max-w-lg w-full p-6 sm:p-7 space-y-4 max-h-[90vh] overflow-y-auto border border-slate-100">
+      <div class="flex items-center justify-between border-b border-slate-200 pb-3">
+        <div class="flex items-center gap-2.5">
+          <div class="w-9 h-9 rounded-full bg-amber-100 text-amber-800 flex items-center justify-center text-lg">
+            <i class="fa-brands fa-google"></i>
+          </div>
+          <div>
+            <h3 class="text-base font-bold text-slate-900">Google Sign-In Setup</h3>
+            <p class="text-xs text-slate-500">How to configure OAuth 2.0 Credentials</p>
+          </div>
+        </div>
+        <button id="btn-close-google-modal" class="text-slate-400 hover:text-slate-600 text-xl cursor-pointer">
+          <i class="fa-solid fa-xmark"></i>
+        </button>
+      </div>
+
+      <div class="space-y-3 text-xs text-slate-600">
+        <p class="bg-emerald-50 border border-emerald-200 p-2.5 rounded-xl text-emerald-900 font-medium">
+          💡 You don't need Google keys to test the app! You can click <strong>"Continue as Guest"</strong> or use standard email registration anytime.
+        </p>
+
+        <p class="font-semibold text-slate-800">To enable real Google Sign-In with your Google Account:</p>
+
+        <ol class="list-decimal pl-4 space-y-1.5 text-[11px] leading-relaxed">
+          <li>Open <a href="https://console.cloud.google.com" target="_blank" class="text-blue-600 underline font-semibold">Google Cloud Console</a> and create or select a project.</li>
+          <li>Go to <strong>APIs & Services &rarr; OAuth consent screen</strong> and select <strong>External</strong>. Fill App Name and support email.</li>
+          <li>Go to <strong>Credentials &rarr; Create Credentials &rarr; OAuth client ID</strong>.</li>
+          <li>Select Application type: <strong>Web application</strong>.</li>
+          <li>Add Authorized JavaScript origin: <code class="bg-slate-100 px-1 py-0.5 rounded text-slate-800">http://localhost:5000</code></li>
+          <li>Add Authorized redirect URI: <code class="bg-slate-100 px-1 py-0.5 rounded text-slate-800">http://localhost:5000/api/auth/google/callback</code></li>
+          <li>Copy your Client ID and Client Secret into your <code class="bg-slate-100 px-1 py-0.5 rounded text-slate-800">.env</code> file:
+            <pre class="bg-slate-900 text-slate-100 p-2.5 rounded-xl mt-1 font-mono text-[10px] overflow-x-auto">GOOGLE_CLIENT_ID=your-client-id.apps.googleusercontent.com
+GOOGLE_CLIENT_SECRET=your-client-secret</pre>
+          </li>
+        </ol>
+
+        <div class="pt-3 flex items-center justify-between gap-2 border-t border-slate-200">
+          <a href="/api/auth/guest" class="px-4 py-2 rounded-xl bg-[#2e7d32] hover:bg-[#1b5e20] text-white font-bold text-xs transition">
+            Continue as Guest Now
+          </a>
+          <button id="btn-close-google-modal-2" type="button" class="px-4 py-2 rounded-xl border border-slate-300 text-slate-700 hover:bg-slate-50 text-xs font-semibold">
+            Close
+          </button>
+        </div>
+      </div>
     </div>
   </div>
 
   <script>
-    const urlParams = new URLSearchParams(window.location.search);
-    const errorParam = urlParams.get('error');
-    const msgParam = urlParams.get('msg');
-    const nextParam = urlParams.get('next') || '/';
-
     const alertError = document.getElementById('alert-error');
     const alertErrorText = document.getElementById('alert-error-text');
     const alertInfo = document.getElementById('alert-info');
     const alertInfoText = document.getElementById('alert-info-text');
 
     function showError(msg) {
-      if (!msg) return;
       alertErrorText.textContent = msg;
       alertError.classList.remove('hidden');
       alertInfo.classList.add('hidden');
     }
 
     function showInfo(msg) {
-      if (!msg) return;
       alertInfoText.textContent = msg;
       alertInfo.classList.remove('hidden');
       alertError.classList.add('hidden');
     }
+
+    // Parse URL params
+    const urlParams = new URLSearchParams(window.location.search);
+    const errorParam = urlParams.get('error');
+    const msgParam = urlParams.get('msg');
+    const nextParam = urlParams.get('next') || '/';
+    const setupGoogle = urlParams.get('setup_google');
 
     if (errorParam) {
       showError(errorParam);
@@ -215,11 +274,28 @@
       showInfo(msgParam);
     }
 
+    const modalGoogle = document.getElementById('modal-google-setup');
+    if (setupGoogle === '1' && modalGoogle) {
+      modalGoogle.classList.remove('hidden');
+    }
+
+    // Google modal close
+    document.getElementById('btn-close-google-modal').onclick = () => modalGoogle.classList.add('hidden');
+    document.getElementById('btn-close-google-modal-2').onclick = () => modalGoogle.classList.add('hidden');
+
     // Google Sign-In button
-    document.getElementById('btn-google-login').onclick = () => {
-      // Direct redirect to initiate OAuth with state and PKCE
-      const target = `/api/auth/google/login?next=${encodeURIComponent(nextParam)}`;
-      window.location.href = target;
+    document.getElementById('btn-google-login').onclick = async () => {
+      try {
+        const resp = await fetch('/api/auth/google/status');
+        if (resp.ok) {
+          const status = await resp.json();
+          if (status.configured) {
+            window.location.href = `/api/auth/google/login?next=${encodeURIComponent(nextParam)}`;
+            return;
+          }
+        }
+      } catch (e) {}
+      modalGoogle.classList.remove('hidden');
     };
 
     // Tabs toggle
@@ -229,16 +305,16 @@
     const formRegister = document.getElementById('form-register');
 
     tabLogin.onclick = () => {
-      tabLogin.className = 'w-1/2 py-2 text-center rounded-lg bg-white shadow-sm text-forest-900 font-semibold transition';
-      tabRegister.className = 'w-1/2 py-2 text-center rounded-lg text-slate-600 hover:text-slate-900 transition';
+      tabLogin.className = 'w-1/2 py-2 text-center rounded-lg bg-white shadow-sm text-forest-900 font-semibold transition cursor-pointer';
+      tabRegister.className = 'w-1/2 py-2 text-center rounded-lg text-slate-600 hover:text-slate-900 transition cursor-pointer';
       formLogin.classList.remove('hidden');
       formRegister.classList.add('hidden');
       alertError.classList.add('hidden');
     };
 
     tabRegister.onclick = () => {
-      tabRegister.className = 'w-1/2 py-2 text-center rounded-lg bg-white shadow-sm text-forest-900 font-semibold transition';
-      tabLogin.className = 'w-1/2 py-2 text-center rounded-lg text-slate-600 hover:text-slate-900 transition';
+      tabRegister.className = 'w-1/2 py-2 text-center rounded-lg bg-white shadow-sm text-forest-900 font-semibold transition cursor-pointer';
+      tabLogin.className = 'w-1/2 py-2 text-center rounded-lg text-slate-600 hover:text-slate-900 transition cursor-pointer';
       formRegister.classList.remove('hidden');
       formLogin.classList.add('hidden');
       alertError.classList.add('hidden');

@@ -349,26 +349,38 @@ const I18N = {
 // ============================================================================
 // 2. Shared Farm Context & Application State
 // ============================================================================
-export const farmContext = {
-  lat: 15.3173,
-  lon: 75.7139,
+const storedState = localStorage.getItem('farmer_app_state');
+let initialContext = {
+  lat: 12.9716,
+  lon: 77.5946,
   accuracy_meters: 25.0,
-  village: "Hubballi-Dharwad",
-  district: "Dharwad",
+  village: "Bengaluru",
+  district: "Bengaluru",
   state: "Karnataka",
   country: "India",
-  display_name: "Hubballi-Dharwad, Dharwad, Karnataka, India",
-  soil_type: "Clay Loam",
-  soil_n: 85.0,
-  soil_p: 45.0,
-  soil_k: 42.0,
-  soil_ph: 6.8,
-  land_acres: 3.0,
+  display_name: "Bengaluru, Karnataka, India",
+  soil_type: "",
+  soil_n: null,
+  soil_p: null,
+  soil_k: null,
+  soil_ph: null,
+  land_acres: 2.0,
+  land_unit: "acres",
   budget_inr: 65000.0,
   irrigation: "drip",
   previous_crop: "gram",
-  target_price_inr: 4500.0
+  target_price_inr: 4500.0,
+  location_source: "initial"
 };
+
+if (storedState) {
+  try {
+    const parsed = JSON.parse(storedState);
+    initialContext = { ...initialContext, ...parsed };
+  } catch(e) {}
+}
+
+export const farmContext = initialContext;
 
 let currentLang = 'en';
 let currentStep = 1;
@@ -462,11 +474,39 @@ function initOrUpdateFarmMap() {
   }, 250);
 }
 
-// Throttled Reverse Geocoding (OpenStreetMap Nominatim: max 1 req/sec)
+// Reverse Geocoding with BigDataCloud (instant, free) + Nominatim fallback
 async function reverseGeocode(lat, lon) {
   const key = `${lat.toFixed(4)},${lon.toFixed(4)}`;
   if (geocodeCache.has(key)) {
     return geocodeCache.get(key);
+  }
+
+  // 1. Try BigDataCloud reverse geocode client API (free, fast, detailed suburb/locality)
+  try {
+    const bdcUrl = `https://api.bigdatacloud.net/data/reverse-geocode-client?latitude=${lat}&longitude=${lon}&localityLanguage=en`;
+    const resp = await fetch(bdcUrl);
+    if (resp.ok) {
+      const data = await resp.json();
+      const village = data.locality || data.city || "Bengaluru";
+      let district = data.city || "Bengaluru Urban";
+      if (data.localityInfo && data.localityInfo.administrative) {
+        const dObj = data.localityInfo.administrative.find(a => a.adminLevel === 5 || a.adminLevel === 6);
+        if (dObj) district = dObj.name.replace(/ district/i, "").replace(/ taluk/i, "");
+      }
+      const state = data.principalSubdivision || "Karnataka";
+      const postcode = data.postcode ? ` ${data.postcode}` : "";
+      const result = {
+        village,
+        district,
+        state,
+        country: data.countryName || "India",
+        display_name: `${village}, ${district}${postcode}, ${state}`
+      };
+      geocodeCache.set(key, result);
+      return result;
+    }
+  } catch (err) {
+    console.warn("BigDataCloud geocode failed, trying Nominatim fallback:", err);
   }
 
   const now = Date.now();
@@ -483,15 +523,15 @@ async function reverseGeocode(lat, lon) {
     if (resp.ok) {
       const data = await resp.json();
       const addr = data.address || {};
-      const village = addr.village || addr.suburb || addr.town || addr.city || addr.county || "Farmland";
-      const district = addr.county || addr.state_district || "";
+      const village = addr.suburb || addr.neighbourhood || addr.village || addr.town || addr.city || addr.county || "Farmland";
+      const district = addr.county || addr.state_district || addr.city || "District";
       const state = addr.state || "Karnataka";
       const result = {
         village,
         district,
         state,
         country: addr.country || "India",
-        display_name: data.display_name || `${village}, ${state}`
+        display_name: data.display_name || `${village}, ${district}, ${state}`
       };
       geocodeCache.set(key, result);
       return result;
@@ -513,12 +553,18 @@ async function updateFarmPosition(lat, lon, accuracy = 20.0, source = "manual") 
   farmContext.lat = lat;
   farmContext.lon = lon;
   farmContext.accuracy_meters = accuracy;
+  farmContext.location_source = source;
 
   const geo = await reverseGeocode(lat, lon);
   farmContext.village = geo.village;
   farmContext.district = geo.district;
   farmContext.state = geo.state;
   farmContext.display_name = geo.display_name;
+
+  // Persist updated confirmed state to localStorage
+  try {
+    localStorage.setItem('farmer_app_state', JSON.stringify(farmContext));
+  } catch (e) {}
 
   // Invalidate downstream dependent caches so weather, soil, and market re-fetch
   weatherData = null;
@@ -1028,26 +1074,31 @@ function renderLocationStepView(container) {
       </div>
 
       <!-- Current Location Display Card -->
-      <div class="p-5 rounded-2xl bg-earth-50 border border-earth-200 flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4">
-        <div class="space-y-1">
-          <div class="text-base sm:text-lg font-bold text-slate-800 flex items-center gap-2">
-            <span>📍</span>
-            <span id="loc-display-village">${farmContext.village || "Hubballi-Dharwad"}</span>, 
-            <span id="loc-display-state" class="text-slate-600 font-semibold">${farmContext.district ? farmContext.district + ", " : ""}${farmContext.state}</span>
+      <div class="p-5 rounded-2xl bg-earth-50 border border-earth-200 space-y-3">
+        <div class="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4">
+          <div class="space-y-1">
+            <div class="text-base sm:text-lg font-bold text-slate-800 flex items-center gap-2">
+              <span>📍</span>
+              <span id="loc-display-village">${farmContext.village || "Bengaluru"}</span>, 
+              <span id="loc-display-state" class="text-slate-600 font-semibold">${farmContext.district ? farmContext.district + ", " : ""}${farmContext.state}</span>
+            </div>
+            <div class="text-xs text-slate-500 font-mono flex items-center gap-3">
+              <span>Lat: <strong class="text-slate-700">${farmContext.lat.toFixed(4)}° N</strong></span>
+              <span>Lon: <strong class="text-slate-700">${farmContext.lon.toFixed(4)}° E</strong></span>
+              <span>Accuracy: <strong class="text-emerald-700">±${(farmContext.accuracy_meters || 20).toFixed(0)}m</strong></span>
+            </div>
           </div>
-          <div class="text-xs text-slate-500 font-mono flex items-center gap-3">
-            <span>Lat: <strong class="text-slate-700">${farmContext.lat.toFixed(4)}° N</strong></span>
-            <span>Lon: <strong class="text-slate-700">${farmContext.lon.toFixed(4)}° E</strong></span>
-            <span>Accuracy: <strong class="text-emerald-700">±${(farmContext.accuracy_meters || 20).toFixed(0)}m</strong></span>
+
+          <div class="flex items-center gap-2">
+            <button type="button" id="btn-save-this-loc" class="px-3 py-1.5 rounded-xl bg-white hover:bg-slate-50 border border-slate-300 text-slate-700 font-semibold text-xs transition shadow-xs flex items-center gap-1.5 cursor-pointer">
+              <i class="fa-solid fa-bookmark text-amber-600"></i>
+              <span>${t.btn_save_loc}</span>
+            </button>
           </div>
         </div>
 
-        <div class="flex items-center gap-2">
-          <button type="button" id="btn-save-this-loc" class="px-3 py-1.5 rounded-xl bg-white hover:bg-slate-50 border border-slate-300 text-slate-700 font-semibold text-xs transition shadow-xs flex items-center gap-1.5 cursor-pointer">
-            <i class="fa-solid fa-bookmark text-amber-600"></i>
-            <span>${t.btn_save_loc}</span>
-          </button>
-        </div>
+        <!-- Real-time Location Detection Status Banner -->
+        <div id="location-detect-status"></div>
       </div>
 
       <!-- Interactive Leaflet Map Container -->
@@ -1090,23 +1141,95 @@ function renderLocationStepView(container) {
 }
 
 function bindLocationStepListeners() {
+  const statusEl = document.getElementById("location-detect-status");
+
+  const triggerLocationDetection = () => {
+    if (statusEl) {
+      statusEl.innerHTML = `
+        <div class="p-3 bg-blue-50 border border-blue-200 text-blue-900 rounded-xl text-xs flex items-center gap-2">
+          <i class="fa-solid fa-spinner fa-spin"></i>
+          <span>Detecting your location via GPS (enableHighAccuracy, timeout 15s)...</span>
+        </div>
+      `;
+    }
+
+    if ("geolocation" in navigator) {
+      navigator.geolocation.getCurrentPosition(
+        async (pos) => {
+          await updateFarmPosition(pos.coords.latitude, pos.coords.longitude, pos.coords.accuracy, "gps");
+          if (statusEl) {
+            if (pos.coords.accuracy > 1000) {
+              statusEl.innerHTML = `
+                <div class="p-3 bg-amber-50 border border-amber-200 text-amber-900 rounded-xl text-xs flex items-center justify-between">
+                  <span>⚠️ Approximate location (±${(pos.coords.accuracy / 1000).toFixed(1)} km). Drag the green pin to your exact field.</span>
+                </div>
+              `;
+            } else {
+              statusEl.innerHTML = `
+                <div class="p-3 bg-emerald-50 border border-emerald-200 text-emerald-900 rounded-xl text-xs flex items-center justify-between">
+                  <span>✅ Confirmed GPS location: ${farmContext.display_name} (±${Math.round(pos.coords.accuracy)}m)</span>
+                </div>
+              `;
+            }
+          }
+        },
+        async (err) => {
+          console.warn("GPS unavailable or denied, falling back to IP network location:", err);
+          if (statusEl) {
+            statusEl.innerHTML = `
+              <div class="p-3 bg-blue-50 border border-blue-200 text-blue-900 rounded-xl text-xs flex items-center gap-2">
+                <i class="fa-solid fa-spinner fa-spin"></i>
+                <span>GPS unavailable. Resolving approximate network location...</span>
+              </div>
+            `;
+          }
+          try {
+            const resp = await fetch("/api/ip-location");
+            if (resp.ok) {
+              const ip = await resp.json();
+              if (ip.lat && ip.lon) {
+                await updateFarmPosition(ip.lat, ip.lon, 2500, "network");
+                if (statusEl) {
+                  statusEl.innerHTML = `
+                    <div class="p-3 bg-amber-50 border border-amber-200 text-amber-900 rounded-xl text-xs">
+                      ℹ️ Location set to <strong>${farmContext.display_name}</strong> (approximate – based on network). Drag the pin to your exact field.
+                    </div>
+                  `;
+                }
+                return;
+              }
+            }
+          } catch (e) {}
+
+          if (statusEl) {
+            statusEl.innerHTML = `
+              <div class="p-3 bg-rose-50 border border-rose-200 text-rose-900 rounded-xl text-xs">
+                ⚠️ Could not detect position. Please drag the pin on the map or search your village below.
+              </div>
+            `;
+          }
+        },
+        { enableHighAccuracy: true, timeout: 15000, maximumAge: 60000 }
+      );
+    } else {
+      // Fallback directly to IP location
+      fetch("/api/ip-location")
+        .then(r => r.json())
+        .then(ip => {
+          if (ip.lat && ip.lon) updateFarmPosition(ip.lat, ip.lon, 2500, "network");
+        })
+        .catch(() => {});
+    }
+  };
+
   const btnGps = document.getElementById("btn-use-browser-gps");
   if (btnGps) {
-    btnGps.onclick = () => {
-      if ("geolocation" in navigator) {
-        navigator.geolocation.getCurrentPosition(
-          async (pos) => {
-            await updateFarmPosition(pos.coords.latitude, pos.coords.longitude, pos.coords.accuracy, "gps");
-          },
-          (err) => {
-            alert("Could not retrieve GPS coordinates. Please drag the pin on the map or enter your town manually.");
-          },
-          { enableHighAccuracy: true, timeout: 10000, maximumAge: 0 }
-        );
-      } else {
-        alert("Geolocation not supported by this browser.");
-      }
-    };
+    btnGps.onclick = triggerLocationDetection;
+  }
+
+  // Auto-detect on first visit if not restored from a confirmed run
+  if (farmContext.location_source === "initial") {
+    triggerLocationDetection();
   }
 
   const btnSaveLoc = document.getElementById("btn-save-this-loc");
@@ -1211,8 +1334,12 @@ async function renderWeatherStepView(container) {
   const lastUpdated = cur.last_updated || new Date().toLocaleTimeString();
 
   // 7-Day irrigation schedule cards
-  const irriDays = (irrigationScheduleData && irrigationScheduleData.daily_schedule) || [];
-  const sowingAdvice = (irrigationScheduleData && irrigationScheduleData.sowing_window_advice) || {};
+  const irriDays = (irrigationScheduleData && (irrigationScheduleData.daily_schedule || irrigationScheduleData.schedule_7d)) || [];
+  const sowingAdvice = (irrigationScheduleData && (irrigationScheduleData.sowing_window_advice || irrigationScheduleData.sowing_window)) || {};
+  const periods = weatherData.today_periods || {};
+  const activePeriod = periods.current_period || "morning";
+  const pastRain = weatherData.past_7d_rainfall_actual !== undefined ? weatherData.past_7d_rainfall_actual : 0;
+  const nextRain = weatherData.forecast_7d_rainfall !== undefined ? weatherData.forecast_7d_rainfall : (weatherData.rainfall_7d_total || 0);
 
   container.innerHTML = `
     <div class="bg-white rounded-3xl shadow-sm border border-slate-200 p-6 sm:p-8 space-y-6">
@@ -1228,7 +1355,7 @@ async function renderWeatherStepView(container) {
                 ${dayNightBadge}
               </div>
               <p class="text-sm text-emerald-100 font-medium">${cur.description || "Clear sky"}</p>
-              <span class="text-[10px] text-emerald-200/80">Updated: ${lastUpdated}</span>
+              <span class="text-[10px] text-emerald-200/80">Location: ${farmContext.village || "Bengaluru"} • Updated: ${lastUpdated}</span>
             </div>
           </div>
 
@@ -1254,8 +1381,70 @@ async function renderWeatherStepView(container) {
           </div>
           <div class="bg-white/10 rounded-2xl p-3">
             <span class="text-emerald-200 block text-[11px]">${t.lbl_7d_rain}</span>
-            <span class="text-lg font-bold text-amber-300">${(weatherData.rainfall_7d_total || 0).toFixed(1)} mm</span>
+            <span class="text-lg font-bold text-amber-300">${(nextRain).toFixed(1)} mm</span>
           </div>
+        </div>
+      </div>
+
+      <!-- Weather Alerts / Plain-Language Farm Actions -->
+      ${(weatherData.alerts && weatherData.alerts.length > 0) ? `
+        <div class="space-y-2">
+          ${weatherData.alerts.map(a => `
+            <div class="p-4 rounded-2xl bg-amber-50 border border-amber-300 text-xs space-y-1 text-amber-950">
+              <div class="font-bold flex items-center gap-2">
+                <span>⚠️</span> <span>${a.title || "Agro-Weather Alert"}</span>
+              </div>
+              <p class="font-medium">${a.message || a.action || ""}</p>
+            </div>
+          `).join('')}
+        </div>
+      ` : ''}
+
+      <!-- Today's Time-of-Day Cards (Morning, Afternoon, Evening, Night) -->
+      <div class="space-y-3">
+        <div class="flex items-center justify-between">
+          <h3 class="text-sm font-bold text-slate-800 uppercase tracking-wider">Today's Time-of-Day Breakdown</h3>
+          <span class="text-xs text-emerald-800 font-semibold">Active: <strong class="capitalize">${activePeriod}</strong></span>
+        </div>
+        <div class="grid grid-cols-2 sm:grid-cols-4 gap-3 text-xs">
+          ${['morning', 'afternoon', 'evening', 'night'].map(k => {
+            const p = periods[k] || { label: k, temp_avg: 24, humidity_avg: 50, rain_prob_max: 0, rain_mm_total: 0, wind_speed_max: 10 };
+            const isActive = (k === activePeriod);
+            const icon = k === 'morning' ? '🌅' : (k === 'afternoon' ? '☀️' : (k === 'evening' ? '🌆' : '🌙'));
+            return `
+              <div class="p-3.5 rounded-2xl border ${isActive ? 'bg-emerald-50/80 border-emerald-500 shadow-sm ring-2 ring-emerald-400/30' : 'bg-slate-50 border-slate-200'} space-y-2">
+                <div class="flex items-center justify-between">
+                  <span class="font-bold text-slate-800 flex items-center gap-1">${icon} <span class="capitalize">${k}</span></span>
+                  ${isActive ? `<span class="px-2 py-0.5 rounded-full bg-emerald-600 text-white text-[10px] font-black">NOW</span>` : ''}
+                </div>
+                <div class="text-base font-extrabold text-slate-900">${(p.temp_avg || 24).toFixed(1)}°C</div>
+                <div class="text-[11px] text-slate-600 space-y-0.5">
+                  <div>Humidity: <strong>${Math.round(p.humidity_avg || 50)}%</strong></div>
+                  <div>Rain Chance: <strong class="${p.rain_prob_max > 30 ? 'text-blue-700 font-bold' : 'text-slate-700'}">${p.rain_prob_max || 0}% (${(p.rain_mm_total || 0).toFixed(1)} mm)</strong></div>
+                  <div>Wind: <strong>${(p.wind_speed_max || 10).toFixed(1)} km/h</strong></div>
+                </div>
+              </div>
+            `;
+          }).join('')}
+        </div>
+      </div>
+
+      <!-- Rainfall Comparison: Actual Past 7 Days vs Next 7 Days Forecast -->
+      <div class="p-4 rounded-2xl bg-blue-50/70 border border-blue-200 grid grid-cols-1 sm:grid-cols-3 gap-3 text-xs text-center">
+        <div class="p-2.5 bg-white rounded-xl border border-blue-100">
+          <span class="text-slate-500 text-[10px] block">Actual Past 7 Days Rain</span>
+          <strong class="text-base text-blue-900">${pastRain.toFixed(1)} mm</strong>
+          <span class="text-[10px] text-slate-400 block">Observed precipitation</span>
+        </div>
+        <div class="p-2.5 bg-white rounded-xl border border-blue-100">
+          <span class="text-slate-500 text-[10px] block">Forecast Next 7 Days Rain</span>
+          <strong class="text-base text-blue-900">${nextRain.toFixed(1)} mm</strong>
+          <span class="text-[10px] text-slate-400 block">Satellite model prediction</span>
+        </div>
+        <div class="p-2.5 bg-white rounded-xl border border-blue-100">
+          <span class="text-slate-500 text-[10px] block">14-Day Cumulative Rain</span>
+          <strong class="text-base text-emerald-800">${(pastRain + nextRain).toFixed(1)} mm</strong>
+          <span class="text-[10px] text-slate-400 block">Soil water balance index</span>
         </div>
       </div>
 
@@ -1293,18 +1482,25 @@ async function renderWeatherStepView(container) {
               </tr>
             </thead>
             <tbody class="divide-y divide-slate-100 bg-white">
-              ${irriDays.map(d => `
-                <tr class="hover:bg-slate-50">
-                  <td class="p-2.5 font-bold text-slate-800">${d.date}</td>
-                  <td class="p-2.5 text-slate-600">${d.etc_water_demand_mm.toFixed(1)} mm</td>
-                  <td class="p-2.5 text-blue-700 font-semibold">${d.forecast_rainfall_mm.toFixed(1)} mm</td>
-                  <td class="p-2.5 font-bold ${d.net_irrigation_depth_mm > 0 ? 'text-amber-700' : 'text-emerald-700'}">
-                    ${d.net_irrigation_depth_mm.toFixed(1)} mm
-                  </td>
-                  <td class="p-2.5 font-bold text-slate-800">${d.liters_needed_per_acre.toLocaleString()} L</td>
-                  <td class="p-2.5 text-slate-600">${d.drip_runtime_hours.toFixed(1)} hrs</td>
-                </tr>
-              `).join('')}
+              ${irriDays.map(d => {
+                const etc = Number(d.etc_water_demand_mm !== undefined ? d.etc_water_demand_mm : (d.crop_demand_etc_mm || 0));
+                const rain = Number(d.forecast_rainfall_mm !== undefined ? d.forecast_rainfall_mm : (d.forecast_rain_mm || 0));
+                const irr = Number(d.net_irrigation_depth_mm !== undefined ? d.net_irrigation_depth_mm : (d.irrigation_needed_mm || 0));
+                const liters = Number(d.liters_needed_per_acre !== undefined ? d.liters_needed_per_acre : (d.irrigation_liters || 0));
+                const runtime = Number(d.drip_runtime_hours !== undefined ? d.drip_runtime_hours : (d.duration_hours || 0));
+                return `
+                  <tr class="hover:bg-slate-50">
+                    <td class="p-2.5 font-bold text-slate-800">${d.date || 'Day'}</td>
+                    <td class="p-2.5 text-slate-600">${etc.toFixed(1)} mm</td>
+                    <td class="p-2.5 text-blue-700 font-semibold">${rain.toFixed(1)} mm</td>
+                    <td class="p-2.5 font-bold ${irr > 0 ? 'text-amber-700' : 'text-emerald-700'}">
+                      ${irr.toFixed(1)} mm
+                    </td>
+                    <td class="p-2.5 font-bold text-slate-800">${Math.round(liters).toLocaleString()} L</td>
+                    <td class="p-2.5 text-slate-600">${runtime.toFixed(1)} hrs</td>
+                  </tr>
+                `;
+              }).join('')}
             </tbody>
           </table>
         </div>
@@ -1350,14 +1546,14 @@ function renderClimateChart(data) {
       datasets: [
         {
           label: 'Rainfall (mm)',
-          data: data.map(d => d.rain_mm),
+          data: data.map(d => (d.rain_mm !== undefined ? d.rain_mm : (d.rainfall_mm !== undefined ? d.rainfall_mm : 0))),
           backgroundColor: '#3b82f6',
           borderRadius: 4,
           yAxisID: 'y'
         },
         {
           label: 'Avg Temp (°C)',
-          data: data.map(d => d.temp_avg),
+          data: data.map(d => (d.temp_avg !== undefined ? d.temp_avg : (d.temp_c !== undefined ? d.temp_c : 25))),
           borderColor: '#f59e0b',
           backgroundColor: '#f59e0b',
           type: 'line',
@@ -1434,7 +1630,7 @@ function renderSoilStepView(container) {
       <div class="bg-slate-50 p-6 rounded-3xl border border-slate-200 space-y-4">
         <div class="flex items-center justify-between flex-wrap gap-2">
           <span class="text-xs font-bold text-slate-800 uppercase tracking-wider">Soil Health Card Parameters</span>
-          <span class="text-[11px] text-emerald-800 font-medium">Used for crop suitability and fertilizer dosages</span>
+          <span id="soil-source-badge" class="text-[11px] text-emerald-800 font-medium">Editable • Used for crop suitability and fertilizer dosages</span>
         </div>
 
         <div class="grid grid-cols-2 sm:grid-cols-5 gap-3">
@@ -1443,7 +1639,7 @@ function renderSoilStepView(container) {
               <span>${t.lbl_soil_n}</span>
               <button type="button" id="mic-soil-n" class="text-slate-400 hover:text-emerald-700 cursor-pointer text-xs"><i class="fa-solid fa-microphone"></i></button>
             </label>
-            <input type="number" id="input-soil-n" value="${farmContext.soil_n}" min="0" max="300" class="w-full px-3 py-2 text-sm border border-slate-300 rounded-xl bg-white" />
+            <input type="number" id="input-soil-n" value="${farmContext.soil_n !== null && farmContext.soil_n !== undefined ? farmContext.soil_n : ''}" placeholder="e.g. 85" min="0" max="300" class="w-full px-3 py-2 text-sm border border-slate-300 rounded-xl bg-white" />
           </div>
 
           <div>
@@ -1451,7 +1647,7 @@ function renderSoilStepView(container) {
               <span>${t.lbl_soil_p}</span>
               <button type="button" id="mic-soil-p" class="text-slate-400 hover:text-emerald-700 cursor-pointer text-xs"><i class="fa-solid fa-microphone"></i></button>
             </label>
-            <input type="number" id="input-soil-p" value="${farmContext.soil_p}" min="0" max="250" class="w-full px-3 py-2 text-sm border border-slate-300 rounded-xl bg-white" />
+            <input type="number" id="input-soil-p" value="${farmContext.soil_p !== null && farmContext.soil_p !== undefined ? farmContext.soil_p : ''}" placeholder="e.g. 45" min="0" max="250" class="w-full px-3 py-2 text-sm border border-slate-300 rounded-xl bg-white" />
           </div>
 
           <div>
@@ -1459,7 +1655,7 @@ function renderSoilStepView(container) {
               <span>${t.lbl_soil_k}</span>
               <button type="button" id="mic-soil-k" class="text-slate-400 hover:text-emerald-700 cursor-pointer text-xs"><i class="fa-solid fa-microphone"></i></button>
             </label>
-            <input type="number" id="input-soil-k" value="${farmContext.soil_k}" min="0" max="300" class="w-full px-3 py-2 text-sm border border-slate-300 rounded-xl bg-white" />
+            <input type="number" id="input-soil-k" value="${farmContext.soil_k !== null && farmContext.soil_k !== undefined ? farmContext.soil_k : ''}" placeholder="e.g. 42" min="0" max="300" class="w-full px-3 py-2 text-sm border border-slate-300 rounded-xl bg-white" />
           </div>
 
           <div>
@@ -1467,25 +1663,28 @@ function renderSoilStepView(container) {
               <span>${t.lbl_soil_ph}</span>
               <button type="button" id="mic-soil-ph" class="text-slate-400 hover:text-emerald-700 cursor-pointer text-xs"><i class="fa-solid fa-microphone"></i></button>
             </label>
-            <input type="number" id="input-soil-ph" step="0.1" value="${farmContext.soil_ph}" min="4.0" max="9.5" class="w-full px-3 py-2 text-sm border border-slate-300 rounded-xl bg-white" />
+            <input type="number" id="input-soil-ph" step="0.1" value="${farmContext.soil_ph !== null && farmContext.soil_ph !== undefined ? farmContext.soil_ph : ''}" placeholder="e.g. 6.8" min="4.0" max="9.5" class="w-full px-3 py-2 text-sm border border-slate-300 rounded-xl bg-white" />
           </div>
 
           <div class="col-span-2 sm:col-span-1">
             <label class="block text-[11px] font-semibold text-slate-700 mb-1">${t.lbl_soil_type}</label>
             <select id="input-soil-type-select" class="w-full px-3 py-2 text-sm border border-slate-300 rounded-xl bg-white">
+              <option value="" ${!farmContext.soil_type ? 'selected' : ''}>-- Select / Upload --</option>
+              <option value="Red Soil" ${farmContext.soil_type === 'Red Soil' || farmContext.soil_type === 'Red Loam' ? 'selected' : ''}>Red Soil</option>
+              <option value="Black Soil" ${farmContext.soil_type === 'Black Soil' || farmContext.soil_type === 'Black Cotton' ? 'selected' : ''}>Black Soil</option>
               <option value="Clay Loam" ${farmContext.soil_type === 'Clay Loam' ? 'selected' : ''}>Clay Loam</option>
-              <option value="Black Cotton" ${farmContext.soil_type === 'Black Cotton' ? 'selected' : ''}>Black Cotton</option>
-              <option value="Red Loam" ${farmContext.soil_type === 'Red Loam' ? 'selected' : ''}>Red Loam</option>
-              <option value="Alluvial" ${farmContext.soil_type === 'Alluvial' ? 'selected' : ''}>Alluvial</option>
+              <option value="Alluvial Soil" ${farmContext.soil_type === 'Alluvial' || farmContext.soil_type === 'Alluvial Soil' ? 'selected' : ''}>Alluvial Soil</option>
               <option value="Sandy Loam" ${farmContext.soil_type === 'Sandy Loam' ? 'selected' : ''}>Sandy Loam</option>
+              <option value="Laterite Soil" ${farmContext.soil_type === 'Laterite Soil' ? 'selected' : ''}>Laterite Soil</option>
             </select>
           </div>
         </div>
       </div>
 
-      <!-- Soil Photo Upload Box -->
+      <!-- Soil Photo Upload & Classification Gate Box -->
       <div class="p-6 rounded-3xl border-2 border-dashed border-emerald-300 bg-emerald-50/40 hover:bg-emerald-50/70 transition space-y-4 text-center">
-        <input type="file" id="input-soil-file" accept="image/*" class="hidden" capture="environment" />
+        <input type="file" id="input-soil-file" accept="image/jpeg,image/png,image/webp" class="hidden" capture="environment" />
+        
         <div id="soil-upload-empty" class="space-y-3 cursor-pointer" onclick="document.getElementById('input-soil-file').click()">
           <div class="w-12 h-12 rounded-full bg-emerald-100 text-[#1b5e20] text-2xl flex items-center justify-center mx-auto shadow-inner">
             <i class="fa-solid fa-camera"></i>
@@ -1496,16 +1695,33 @@ function renderSoilStepView(container) {
           </div>
         </div>
 
-        <!-- Non-Soil Rejection Alert -->
-        <div id="soil-rejection-alert" class="hidden p-4 rounded-2xl bg-rose-50 border border-rose-200 text-xs text-left space-y-1">
-          <div class="font-bold text-rose-900">❌ ${t.soil_reject_title}</div>
-          <p class="text-rose-700 font-medium">${t.soil_reject_msg}</p>
+        <div id="soil-preview-box" class="hidden flex items-center justify-center gap-4 py-2">
+          <img id="soil-preview-img" src="" alt="Soil Photo" class="w-20 h-20 object-cover rounded-2xl border-2 border-emerald-400 shadow-xs" />
+          <div class="text-left">
+            <button type="button" id="btn-retake-soil" class="px-3 py-1.5 rounded-xl bg-white hover:bg-slate-50 border border-slate-300 text-slate-700 text-xs font-bold transition shadow-xs cursor-pointer">
+              📷 Retake / Upload Another
+            </button>
+          </div>
+        </div>
+
+        <!-- Non-Soil Strict Rejection Alert -->
+        <div id="soil-rejection-alert" class="hidden p-4 rounded-2xl bg-rose-50 border border-rose-300 text-xs text-left space-y-1.5">
+          <div class="font-bold text-rose-900 flex items-center gap-2">
+            <span>❌</span> <span>Non-Soil Image Detected</span>
+          </div>
+          <p class="text-rose-800 font-semibold leading-relaxed">
+            This doesn't look like a soil photo. Please upload a close-up of soil (top 5–10 cm, daylight, no plants/hands in frame).
+          </p>
+          <div id="soil-rejection-reason" class="text-[11px] text-rose-600 font-mono"></div>
         </div>
 
         <!-- Uncertainty Alert (<60%) -->
         <div id="soil-uncertain-alert" class="hidden p-4 rounded-2xl bg-amber-50 border border-amber-200 text-xs text-left space-y-1">
           <div class="font-bold text-amber-900">${t.lbl_uncertain_soil}</div>
         </div>
+
+        <!-- Detailed Soil Report (When photo IS soil) -->
+        <div id="soil-report-box" class="hidden text-left space-y-3"></div>
       </div>
 
       <!-- Interactive Fertilizer Plan Calculator Section -->
@@ -1513,15 +1729,43 @@ function renderSoilStepView(container) {
         <div class="flex items-center justify-between flex-wrap gap-2">
           <div>
             <h3 class="text-sm font-bold text-slate-800 uppercase tracking-wider">${t.heading_fertilizer_calc}</h3>
-            <p class="text-xs text-slate-500">Calculates whole-farm commercial bags (Urea, DAP, MOP) and organic balance</p>
+            <p class="text-xs text-slate-500">Calculates exact commercial bags (Urea, DAP, MOP, FYM) and split dosages</p>
           </div>
           <button type="button" id="btn-run-fertilizer-calc" class="px-4 py-2 rounded-xl bg-[#1b5e20] hover:bg-[#2e7d32] text-white text-xs font-bold transition shadow-xs cursor-pointer">
             ${t.btn_calc_fertilizer}
           </button>
         </div>
 
+        <!-- Farm Size & Unit Inputs for Fertilizer Calculation -->
+        <div class="grid grid-cols-1 sm:grid-cols-2 gap-3 pt-1">
+          <div>
+            <label class="block text-[11px] font-semibold text-slate-700 mb-1">Farm Land Size</label>
+            <div class="flex gap-2">
+              <input type="number" id="input-fert-size" value="${farmContext.land_acres || 2.0}" min="0.1" step="0.1" class="w-full px-3 py-2 text-sm border border-slate-300 rounded-xl bg-white" placeholder="e.g. 2.0" />
+              <select id="select-fert-unit" class="px-3 py-2 text-sm border border-slate-300 rounded-xl bg-white">
+                <option value="acres" selected>Acres</option>
+                <option value="hectares">Hectares</option>
+                <option value="gunthas">Gunthas</option>
+              </select>
+            </div>
+          </div>
+          <div>
+            <label class="block text-[11px] font-semibold text-slate-700 mb-1">Target Crop for Plan</label>
+            <select id="select-fert-crop" class="w-full px-3 py-2 text-sm border border-slate-300 rounded-xl bg-white">
+              <option value="maize" selected>Maize (Corn)</option>
+              <option value="chickpea">Chickpea (Bengal Gram)</option>
+              <option value="sunflower">Sunflower</option>
+              <option value="ragi">Finger Millet (Ragi)</option>
+              <option value="groundnut">Groundnut</option>
+              <option value="tomato">Tomato</option>
+              <option value="wheat">Wheat</option>
+              <option value="cotton">Cotton</option>
+            </select>
+          </div>
+        </div>
+
         <div id="fertilizer-calc-results" class="space-y-4">
-          <div class="text-center py-4 text-xs text-slate-400">Click "Calculate Fertilizer Doses" to generate whole-farm commercial bag requirements.</div>
+          <div class="text-center py-4 text-xs text-slate-400">Specify farm size and click "Calculate Fertilizer Doses" to generate whole-farm commercial bag requirements.</div>
         </div>
       </div>
 
@@ -1593,15 +1837,40 @@ function bindSoilStepListeners() {
 
   // Soil Photo Upload handler
   const soilFileInput = document.getElementById("input-soil-file");
+  const retakeBtn = document.getElementById("btn-retake-soil");
+  if (retakeBtn && soilFileInput) {
+    retakeBtn.onclick = () => soilFileInput.click();
+  }
+
   if (soilFileInput) {
     soilFileInput.onchange = async (e) => {
       const file = e.target.files[0];
       if (!file) return;
 
+      // Client-side pre-validation
+      if (file.size > 10 * 1024 * 1024) {
+        alert("File size exceeds 10MB limit. Please upload an image under 10MB.");
+        return;
+      }
+
       const rejectAlert = document.getElementById("soil-rejection-alert");
+      const rejectReason = document.getElementById("soil-rejection-reason");
       const uncertainAlert = document.getElementById("soil-uncertain-alert");
-      rejectAlert.classList.add("hidden");
-      uncertainAlert.classList.add("hidden");
+      const reportBox = document.getElementById("soil-report-box");
+      const uploadEmpty = document.getElementById("soil-upload-empty");
+      const previewBox = document.getElementById("soil-preview-box");
+      const previewImg = document.getElementById("soil-preview-img");
+
+      if (rejectAlert) rejectAlert.classList.add("hidden");
+      if (uncertainAlert) uncertainAlert.classList.add("hidden");
+      if (reportBox) reportBox.classList.add("hidden");
+
+      // Show preview thumbnail
+      if (previewBox && previewImg) {
+        const objectUrl = URL.createObjectURL(file);
+        previewImg.src = objectUrl;
+        previewBox.classList.remove("hidden");
+      }
 
       const formData = new FormData();
       formData.append("file", file);
@@ -1610,14 +1879,109 @@ function bindSoilStepListeners() {
         const resp = await fetch("/api/photo/analyze-soil", { method: "POST", body: formData });
         if (resp.ok) {
           const res = await resp.json();
-          if (res.status === "not_soil") {
-            rejectAlert.classList.remove("hidden");
-          } else if (res.status === "uncertain" || (res.confidence && res.confidence < 60)) {
-            uncertainAlert.classList.remove("hidden");
-          } else {
-            farmContext.soil_type = res.soil_type;
-            if (soilTypeSelect) soilTypeSelect.value = res.soil_type;
-            alert(`Detected Soil: ${res.soil_type} (${res.confidence.toFixed(1)}% confidence)`);
+
+          // Soil Gate: Strict rejection of non-soil imagery
+          if (res.is_soil === false || res.status === "not_soil") {
+            if (rejectAlert) rejectAlert.classList.remove("hidden");
+            if (rejectReason && res.reasons_if_rejected) {
+              rejectReason.innerText = `Reason: ${res.reasons_if_rejected.join(', ')}`;
+            }
+            // Do NOT fill any soil values into inputs!
+            return;
+          }
+
+          // If valid soil, show report and auto-fill
+          if (res.is_soil === true) {
+            const conf = res.confidence ? (res.confidence > 1 ? res.confidence : res.confidence * 100) : 85.0;
+            const npkObj = res.npk || res.npk_kg_ha || {};
+            const nVal = npkObj.n !== undefined ? npkObj.n : (npkObj.N !== undefined ? npkObj.N : (res.estimated_n || 120));
+            const pVal = npkObj.p !== undefined ? npkObj.p : (npkObj.P !== undefined ? npkObj.P : (res.estimated_p || 35));
+            const kVal = npkObj.k !== undefined ? npkObj.k : (npkObj.K !== undefined ? npkObj.K : (res.estimated_k || 160));
+            const phVal = res.ph !== undefined ? res.ph : (res.estimated_ph || 6.5);
+            const soilTypeName = res.soil_type || "Red Soil";
+
+            farmContext.soil_type = soilTypeName;
+            farmContext.soil_n = nVal;
+            farmContext.soil_p = pVal;
+            farmContext.soil_k = kVal;
+            farmContext.soil_ph = phVal;
+
+            // Auto-fill inputs and mark "(from photo)"
+            const phIn = document.getElementById("input-soil-ph");
+            const typeSel = document.getElementById("input-soil-type-select");
+            const nIn = document.getElementById("input-soil-n");
+            const pIn = document.getElementById("input-soil-p");
+            const kIn = document.getElementById("input-soil-k");
+            const sourceBadge = document.getElementById("soil-source-badge");
+
+            if (phIn) phIn.value = phVal;
+            if (typeSel) typeSel.value = soilTypeName;
+            if (nIn) nIn.value = nVal;
+            if (pIn) pIn.value = pVal;
+            if (kIn) kIn.value = kVal;
+            if (sourceBadge) {
+              sourceBadge.innerHTML = `<span class="px-2 py-0.5 rounded-full bg-emerald-100 text-emerald-800 font-bold">✨ Auto-filled (from photo) • Editable</span>`;
+            }
+
+            // Render Soil Report Box
+            if (reportBox) {
+              reportBox.innerHTML = `
+                <div class="p-5 rounded-2xl bg-white border border-emerald-300 shadow-sm space-y-3">
+                  <div class="flex items-center justify-between flex-wrap gap-2">
+                    <div class="flex items-center gap-2">
+                      <span class="text-xl">🔬</span>
+                      <div>
+                        <h4 class="text-xs font-bold text-slate-800 uppercase tracking-wider">AI Soil Classification Report</h4>
+                        <span class="text-[10px] text-emerald-700 font-semibold">Identified: <strong>${soilTypeName}</strong> (${conf.toFixed(1)}% confidence)</span>
+                      </div>
+                    </div>
+                    <span class="px-2.5 py-1 rounded-full bg-emerald-50 border border-emerald-200 text-emerald-800 text-[10px] font-bold">
+                      AI estimate from photo
+                    </span>
+                  </div>
+
+                  <div class="grid grid-cols-2 sm:grid-cols-4 gap-2 text-xs">
+                    <div class="p-2.5 rounded-xl bg-slate-50 border border-slate-200">
+                      <span class="text-slate-500 text-[10px] block">Texture & Color</span>
+                      <strong class="text-slate-800">${res.texture || 'Medium Loam'}</strong>
+                      <span class="text-[10px] text-slate-500 block">${res.color || 'Dark Brown'}</span>
+                    </div>
+                    <div class="p-2.5 rounded-xl bg-slate-50 border border-slate-200">
+                      <span class="text-slate-500 text-[10px] block">Moisture & OC</span>
+                      <strong class="text-slate-800">${res.moisture || 'Adequate'}</strong>
+                      <span class="text-[10px] text-slate-500 block">OC: ${res.organic_carbon || '0.68%'}</span>
+                    </div>
+                    <div class="p-2.5 rounded-xl bg-slate-50 border border-slate-200">
+                      <span class="text-slate-500 text-[10px] block">Est. NPK Rating</span>
+                      <strong class="text-slate-800">N:${nVal} P:${pVal} K:${kVal}</strong>
+                      <span class="text-[10px] text-emerald-700 font-medium block">kg/ha (Medium)</span>
+                    </div>
+                    <div class="p-2.5 rounded-xl bg-slate-50 border border-slate-200">
+                      <span class="text-slate-500 text-[10px] block">pH & EC</span>
+                      <strong class="text-slate-800">pH ${phVal}</strong>
+                      <span class="text-[10px] text-slate-500 block">EC: ${res.ec || '0.42 dS/m'}</span>
+                    </div>
+                  </div>
+
+                  ${res.micronutrients ? `
+                    <div class="text-[11px] text-slate-600 bg-emerald-50/60 p-2.5 rounded-xl border border-emerald-100 flex items-center justify-between flex-wrap gap-2">
+                      <span><strong>Micronutrient hints:</strong> Zinc (Zn): ${res.micronutrients.zinc || 'Normal'}, Iron (Fe): ${res.micronutrients.iron || 'Sufficient'}, Sulfur (S): ${res.micronutrients.sulfur || 'Adequate'}</span>
+                    </div>
+                  ` : ''}
+
+                  ${res.suitable_crops ? `
+                    <div class="text-[11px] text-slate-700">
+                      <strong>Recommended crops for this soil:</strong> ${Array.isArray(res.suitable_crops) ? res.suitable_crops.join(', ') : res.suitable_crops}
+                    </div>
+                  ` : ''}
+
+                  <div class="text-[10px] text-slate-400 italic">
+                    AI estimate from photo – confirm with a soil health card / lab test. Values above are editable.
+                  </div>
+                </div>
+              `;
+              reportBox.classList.remove("hidden");
+            }
           }
         }
       } catch (err) {
@@ -1630,9 +1994,34 @@ function bindSoilStepListeners() {
   const btnRunFert = document.getElementById("btn-run-fertilizer-calc");
   if (btnRunFert) {
     btnRunFert.onclick = async () => {
+      const sizeInput = document.getElementById("input-fert-size");
+      const unitSelect = document.getElementById("select-fert-unit");
+      const cropSelect = document.getElementById("select-fert-crop");
       const resContainer = document.getElementById("fertilizer-calc-results");
-      resContainer.innerHTML = `<div class="text-center py-4 text-xs text-slate-500">Calculating nutrient gap and commercial bags...</div>`;
-      const plan = await fetchFertilizerPlan(farmContext.previous_crop || "maize");
+
+      let rawSize = parseFloat(sizeInput ? sizeInput.value : 0);
+      const unit = unitSelect ? unitSelect.value : "acres";
+      const crop = cropSelect ? cropSelect.value : (farmContext.previous_crop || "maize");
+
+      if (isNaN(rawSize) || rawSize <= 0) {
+        resContainer.innerHTML = `
+          <div class="p-4 rounded-2xl bg-amber-50 border border-amber-300 text-amber-900 text-xs font-semibold">
+            ⚠️ Please enter a valid farm land size (> 0) to calculate fertilizer dosages.
+          </div>
+        `;
+        return;
+      }
+
+      // Convert unit to acres
+      let acres = rawSize;
+      if (unit === "hectares") acres = rawSize * 2.471;
+      else if (unit === "gunthas") acres = rawSize * 0.025;
+
+      farmContext.land_acres = acres;
+
+      resContainer.innerHTML = `<div class="text-center py-4 text-xs text-slate-500"><i class="fa-solid fa-spinner fa-spin"></i> Calculating nutrient deficit and commercial bags for ${acres.toFixed(2)} acres...</div>`;
+      
+      const plan = await fetchFertilizerPlan(crop);
       if (plan) {
         renderFertilizerPlanResults(resContainer, plan);
       } else {
@@ -1647,6 +2036,7 @@ function renderFertilizerPlanResults(container, plan) {
   const gap = plan.nutrient_gap_kg_per_acre || {};
   const farmGap = plan.whole_farm_nutrient_gap_kg || {};
   const phAlert = plan.ph_alert || {};
+  const acres = plan.acres || farmContext.land_acres || 2.0;
 
   container.innerHTML = `
     <!-- Extreme pH Warning (Lime / Gypsum guidance) -->
@@ -1661,9 +2051,9 @@ function renderFertilizerPlanResults(container, plan) {
     ` : ''}
 
     <!-- Whole-Farm Commercial Fertilizer Bags Table -->
-    <div class="space-y-2">
-      <div class="flex items-center justify-between">
-        <span class="text-xs font-bold text-slate-800 uppercase tracking-wider">Commercial Fertilizer Dosage (${plan.acres} Acres)</span>
+    <div class="space-y-3">
+      <div class="flex items-center justify-between flex-wrap gap-2">
+        <span class="text-xs font-bold text-slate-800 uppercase tracking-wider">Commercial Fertilizer Dosage (${acres.toFixed(2)} Acres • ${plan.crop || 'Crop'})</span>
         <span class="text-xs font-bold text-emerald-800">Total Fertilizer Cost: ₹${comm.total_cost_inr ? comm.total_cost_inr.toLocaleString() : '0'}</span>
       </div>
 
@@ -1671,26 +2061,66 @@ function renderFertilizerPlanResults(container, plan) {
         <div class="p-3 bg-white rounded-2xl border border-slate-200 space-y-1">
           <span class="text-slate-500 text-[10px] block">DAP (50kg bags)</span>
           <strong class="text-base text-slate-800">${comm.dap_bags || 0} bags</strong>
-          <span class="text-[10px] text-slate-500 block">Total: ₹${(comm.dap_cost_inr || 0).toLocaleString()}</span>
+          <span class="text-[10px] text-slate-500 block">Total: ₹${(comm.dap_cost_inr || 0).toLocaleString()} (₹1,350/bag)</span>
         </div>
 
         <div class="p-3 bg-white rounded-2xl border border-slate-200 space-y-1">
           <span class="text-slate-500 text-[10px] block">Urea (45kg bags)</span>
           <strong class="text-base text-slate-800">${comm.urea_bags || 0} bags</strong>
-          <span class="text-[10px] text-slate-500 block">Total: ₹${(comm.urea_cost_inr || 0).toLocaleString()}</span>
+          <span class="text-[10px] text-slate-500 block">Total: ₹${(comm.urea_cost_inr || 0).toLocaleString()} (₹266/bag)</span>
         </div>
 
         <div class="p-3 bg-white rounded-2xl border border-slate-200 space-y-1">
           <span class="text-slate-500 text-[10px] block">MOP (50kg bags)</span>
           <strong class="text-base text-slate-800">${comm.mop_bags || 0} bags</strong>
-          <span class="text-[10px] text-slate-500 block">Total: ₹${(comm.mop_cost_inr || 0).toLocaleString()}</span>
+          <span class="text-[10px] text-slate-500 block">Total: ₹${(comm.mop_cost_inr || 0).toLocaleString()} (₹1,700/bag)</span>
         </div>
 
         <div class="p-3 bg-white rounded-2xl border border-slate-200 space-y-1">
           <span class="text-slate-500 text-[10px] block">FYM (Farm Compost)</span>
-          <strong class="text-base text-slate-800">${comm.fym_organic_tons || 0} tons</strong>
-          <span class="text-[10px] text-slate-500 block">Total: ₹${(comm.fym_cost_inr || 0).toLocaleString()}</span>
+          <strong class="text-base text-slate-800">${comm.fym_organic_tons || comm.fym_tons || 0} tons</strong>
+          <span class="text-[10px] text-slate-500 block">Total: ₹${(comm.fym_cost_inr || 0).toLocaleString()} (₹800/ton)</span>
         </div>
+      </div>
+    </div>
+
+    <!-- Split-Dose Application Schedule -->
+    <div class="p-4 rounded-2xl bg-white border border-slate-200 space-y-2 text-xs">
+      <span class="font-bold text-slate-800 uppercase tracking-wider block text-[11px]">Split-Dose Application Timing:</span>
+      <div class="grid grid-cols-1 sm:grid-cols-3 gap-2 text-[11px]">
+        <div class="p-2.5 bg-emerald-50/60 rounded-xl border border-emerald-100">
+          <strong class="block text-emerald-950 font-bold">1. Basal (At Sowing)</strong>
+          <span class="text-slate-600 block">100% DAP (${comm.dap_bags || 0} bags)</span>
+          <span class="text-slate-600 block">100% MOP (${comm.mop_bags || 0} bags)</span>
+          <span class="text-slate-600 block">33% Urea (${Math.round((comm.urea_bags || 0) * 0.33)} bags)</span>
+          <span class="text-slate-600 block">All FYM Compost (${comm.fym_organic_tons || comm.fym_tons || 0} tons)</span>
+        </div>
+        <div class="p-2.5 bg-blue-50/60 rounded-xl border border-blue-100">
+          <strong class="block text-blue-950 font-bold">2. Vegetative (30 Days)</strong>
+          <span class="text-slate-600 block">33% Urea (${Math.round((comm.urea_bags || 0) * 0.33)} bags) top-dressed</span>
+          <span class="text-slate-500 block text-[10px]">Apply after first weeding / irrigation</span>
+        </div>
+        <div class="p-2.5 bg-amber-50/60 rounded-xl border border-amber-100">
+          <strong class="block text-amber-950 font-bold">3. Flowering (60 Days)</strong>
+          <span class="text-slate-600 block">34% Urea (${Math.round((comm.urea_bags || 0) * 0.34)} bags) top-dressed</span>
+          <span class="text-slate-500 block text-[10px]">Ensures grain filling and earhead size</span>
+        </div>
+      </div>
+    </div>
+
+    <!-- Step-by-Step Formula Breakdown -->
+    <div class="p-4 rounded-2xl bg-white border border-slate-200 space-y-2 text-xs">
+      <span class="font-bold text-slate-800 uppercase tracking-wider block text-[11px]">Formula Breakdown Behind Dosages:</span>
+      <ul class="list-disc list-inside space-y-1 text-slate-600">
+        ${(plan.formulas_explained || [
+          `Nutrient Deficit N = (${plan.target_n_kg || 120} - ${plan.soil_n || 85}) × ${acres.toFixed(1)} ac = ${Math.round((farmGap.n_deficit_kg || 70))} kg N required.`,
+          `DAP (18-46-0) supplies all required Phosphorus (${Math.round(farmGap.p_deficit_kg || 40)} kg P) in ${comm.dap_bags || 0} bags.`,
+          `Urea (46% N) supplies remaining Nitrogen deficit after deducting N from DAP (${comm.urea_bags || 0} bags).`,
+          `MOP (60% K2O) satisfies Potassium deficit (${Math.round(farmGap.k_deficit_kg || 50)} kg K) in ${comm.mop_bags || 0} bags.`
+        ]).map(f => `<li>${f}</li>`).join('')}
+      </ul>
+      <div class="pt-2 text-[10px] text-amber-800 font-semibold">
+        💡 Note: Always apply phosphorus and potash basal at sowing, and split urea doses at 30 & 60 days. ${I18N[currentLang].disclaimer_note}
       </div>
     </div>
 
@@ -1895,7 +2325,9 @@ async function renderResultsStepView(container) {
         soil_p: farmContext.soil_p,
         soil_k: farmContext.soil_k,
         soil_ph: farmContext.soil_ph,
-        previous_crop: farmContext.previous_crop
+        previous_crop: farmContext.previous_crop,
+        state: farmContext.state || "Karnataka",
+        district: farmContext.district || "Bengaluru"
       };
 
       const res = await fetch('/api/recommend', {
@@ -1922,15 +2354,20 @@ async function renderResultsStepView(container) {
 
   const renderCropCard = (c, rank) => {
     const riskBadgeColor = c.risk_badge === 'Low' ? 'bg-emerald-100 text-emerald-800' : (c.risk_badge === 'Medium' ? 'bg-amber-100 text-amber-800' : 'bg-rose-100 text-rose-800');
+    const isTopCrop = (rank === 1);
+    const cropName = currentLang === 'kn' ? c.kannada_name : (currentLang === 'hi' ? c.display_name : c.display_name);
 
     return `
-      <div class="crop-card bg-white rounded-3xl shadow-sm border border-slate-200 overflow-hidden transition hover:shadow-md">
+      <div class="crop-card bg-white rounded-3xl shadow-sm border ${isTopCrop ? 'border-emerald-400 ring-2 ring-emerald-500/20' : 'border-slate-200'} overflow-hidden transition hover:shadow-md space-y-3">
         <div class="p-5 sm:p-6 space-y-4">
           <div class="flex items-start justify-between flex-wrap gap-2">
             <div class="flex items-center gap-3">
-              <span class="w-8 h-8 rounded-full bg-[#1b5e20] text-white flex items-center justify-center font-bold text-sm shadow-xs">#${rank}</span>
+              <span class="w-8 h-8 rounded-full ${isTopCrop ? 'bg-[#1b5e20] text-amber-300 ring-2 ring-amber-300/40' : 'bg-slate-700 text-white'} flex items-center justify-center font-bold text-sm shadow-xs">#${rank}</span>
               <div>
-                <h3 class="text-lg font-extrabold text-slate-900">${currentLang === 'kn' ? c.kannada_name : (currentLang === 'hi' ? c.display_name : c.display_name)}</h3>
+                <div class="flex items-center gap-2">
+                  <h3 class="text-lg font-extrabold text-slate-900">${cropName}</h3>
+                  ${isTopCrop ? `<span class="px-2 py-0.5 rounded-full bg-amber-100 text-amber-900 text-[10px] font-black uppercase tracking-wider">Top Recommendation</span>` : ''}
+                </div>
                 <span class="text-xs text-slate-500 font-medium">${c.season} • ${c.duration_days} days • Water: ${c.water_need_level}</span>
               </div>
             </div>
@@ -1965,16 +2402,68 @@ async function renderResultsStepView(container) {
             <div class="p-2.5 rounded-2xl bg-emerald-50 border border-emerald-200">
               <span class="text-emerald-700 text-[10px] font-bold block">${t.profit}</span>
               <strong class="text-base text-emerald-900 font-black">₹${c.net_profit_inr.toLocaleString()}</strong>
-              <span class="text-[10px] text-emerald-700 block">Net Margin across ${farmContext.land_acres} ac</span>
+              <span class="text-[10px] text-emerald-700 block">Net Margin (${farmContext.land_acres} ac)</span>
             </div>
           </div>
 
           <!-- Reasons list matching the numbers -->
           <div class="space-y-1">
+            <span class="text-[11px] font-bold text-slate-800 uppercase tracking-wider block">Why Recommended:</span>
             <ul class="text-xs text-slate-700 space-y-1 font-medium">
               ${c.reasons.map(r => `<li class="flex items-start gap-1.5"><span class="text-emerald-700">✓</span><span>${r}</span></li>`).join('')}
             </ul>
           </div>
+
+          ${isTopCrop ? `
+            <!-- Top Crop Action Bar: Voice Readout, WhatsApp Share, PDF Print -->
+            <div class="pt-3 border-t border-slate-100 flex flex-wrap items-center justify-between gap-2 text-xs">
+              <div class="flex items-center gap-2">
+                <button type="button" id="btn-voice-readout" class="px-3 py-1.5 rounded-xl bg-emerald-100 hover:bg-emerald-200 text-[#1b5e20] font-bold flex items-center gap-1.5 transition cursor-pointer">
+                  <span>🔊</span> <span>Listen Advisory</span>
+                </button>
+                <button type="button" id="btn-share-whatsapp" class="px-3 py-1.5 rounded-xl bg-emerald-600 hover:bg-emerald-700 text-white font-bold flex items-center gap-1.5 transition cursor-pointer">
+                  <span>💬</span> <span>Share on WhatsApp</span>
+                </button>
+              </div>
+              <button type="button" id="btn-print-pdf-top" class="px-3 py-1.5 rounded-xl bg-white hover:bg-slate-50 border border-slate-300 text-slate-700 font-semibold flex items-center gap-1.5 transition cursor-pointer">
+                <span>🖨️</span> <span>Print Advisory PDF</span>
+              </button>
+            </div>
+
+            <!-- Crop Lifecycle Calendar -->
+            <div class="p-4 rounded-2xl bg-earth-50 border border-earth-200 space-y-2 text-xs">
+              <span class="font-bold text-slate-800 uppercase tracking-wider block text-[11px]">🗓️ Crop Calendar & Advisory Milestones (${cropName}):</span>
+              <div class="grid grid-cols-1 sm:grid-cols-4 gap-2 text-[11px]">
+                <div class="p-2.5 bg-white rounded-xl border border-slate-200">
+                  <strong class="block text-emerald-900 font-bold">1. Sowing (Days 1–7)</strong>
+                  <span class="text-slate-600">Basal DAP + MOP + FYM. Seed rate 8-10 kg/ac.</span>
+                </div>
+                <div class="p-2.5 bg-white rounded-xl border border-slate-200">
+                  <strong class="block text-blue-900 font-bold">2. Weeding (Day 30)</strong>
+                  <span class="text-slate-600">Inter-cultivation + 1st Urea top-dressing.</span>
+                </div>
+                <div class="p-2.5 bg-white rounded-xl border border-slate-200">
+                  <strong class="block text-amber-900 font-bold">3. Flowering (Day 60)</strong>
+                  <span class="text-slate-600">Critical moisture checkpoint + final Urea dose.</span>
+                </div>
+                <div class="p-2.5 bg-white rounded-xl border border-slate-200">
+                  <strong class="block text-purple-900 font-bold">4. Harvest (Day ${c.duration_days || 105})</strong>
+                  <span class="text-slate-600">Expected yield: ${c.total_yield_qtl.toFixed(1)} qtl for market sale.</span>
+                </div>
+              </div>
+            </div>
+
+            <!-- Pest & Disease Risk Hint -->
+            <div class="p-3.5 rounded-2xl bg-amber-50/80 border border-amber-200 text-xs text-amber-950 space-y-1">
+              <span class="font-bold flex items-center gap-1.5">
+                <span>🛡️</span> <span>Agro-Climatic Pest & Disease Risk Hint:</span>
+              </span>
+              <p class="text-[11px] leading-relaxed">
+                Under current moderate humidity (${(weatherData && weatherData.current ? weatherData.current.humidity : 60).toFixed(0)}%) and seasonal temperatures, fungal blight risk is low. Maintain field drainage during rainfall events and scout for stem borer in early whorl stage.
+              </p>
+            </div>
+          ` : ''}
+
         </div>
       </div>
     `;
@@ -2064,6 +2553,45 @@ async function renderResultsStepView(container) {
 }
 
 function bindResultsStepListeners() {
+  const btnVoice = document.getElementById("btn-voice-readout");
+  if (btnVoice && recommendData && recommendData.top_crops && recommendData.top_crops.length > 0) {
+    btnVoice.onclick = () => {
+      if ('speechSynthesis' in window) {
+        window.speechSynthesis.cancel();
+        const top = recommendData.top_crops[0];
+        const cropName = currentLang === 'kn' ? top.kannada_name : (currentLang === 'hi' ? top.display_name : top.display_name);
+        const text = currentLang === 'kn'
+          ? `ಶಿಫಾರಸು ಮಾಡಿದ ಅತ್ಯುತ್ತಮ ಬೆಳೆ ${cropName}. ${farmContext.land_acres} ಎಕರೆಗೆ ಅಂದಾಜು ನಿವ್ವಳ ಲಾಭ ${Math.round(top.net_profit_inr)} ರೂಪಾಯಿಗಳು. ಒಟ್ಟು ಇಳುವರಿ ${top.total_yield_qtl.toFixed(1)} ಕ್ವಿಂಟಾಲ್.`
+          : (currentLang === 'hi'
+            ? `शीर्ष अनुशंसित फसल ${cropName} है। ${farmContext.land_acres} एकड़ में अनुमानित शुद्ध लाभ ${Math.round(top.net_profit_inr)} रुपये है। कुल अनुमानित उपज ${top.total_yield_qtl.toFixed(1)} क्विंटल होगी।`
+            : `Top recommended crop is ${cropName}. Projected net profit across ${farmContext.land_acres} acres is ${Math.round(top.net_profit_inr)} Rupees, with total expected harvest of ${top.total_yield_qtl.toFixed(1)} quintals.`);
+
+        const utter = new SpeechSynthesisUtterance(text);
+        utter.lang = currentLang === 'kn' ? 'kn-IN' : (currentLang === 'hi' ? 'hi-IN' : 'en-IN');
+        utter.rate = 0.95;
+        window.speechSynthesis.speak(utter);
+      } else {
+        alert("Text-to-speech not supported in this browser.");
+      }
+    };
+  }
+
+  const btnWhatsapp = document.getElementById("btn-share-whatsapp");
+  if (btnWhatsapp && recommendData && recommendData.top_crops && recommendData.top_crops.length > 0) {
+    btnWhatsapp.onclick = () => {
+      const top = recommendData.top_crops[0];
+      const cropName = top.display_name;
+      const msg = `🌾 AgroProfit AI Farm Advisory Report:\n📍 Location: ${farmContext.display_name}\n🌱 Recommended Crop: ${cropName}\n🚜 Land: ${farmContext.land_acres} Acres\n💰 Projected Net Profit: ₹${Math.round(top.net_profit_inr).toLocaleString()}\n📦 Expected Yield: ${top.total_yield_qtl.toFixed(1)} qtl\n💧 Irrigation: ${farmContext.irrigation}\nGenerated via AgroProfit AI.`;
+      const url = `https://api.whatsapp.com/send?text=${encodeURIComponent(msg)}`;
+      window.open(url, '_blank');
+    };
+  }
+
+  const btnPrint = document.getElementById("btn-print-pdf-top");
+  if (btnPrint) {
+    btnPrint.onclick = () => window.print();
+  }
+
   const btnSetTarget = document.getElementById("btn-save-target-price");
   const inTarget = document.getElementById("input-target-price");
   if (btnSetTarget && inTarget) {

@@ -5,6 +5,7 @@ NPK fertilizer balancing advice, growth calendars, weather-fit crops, and condit
 """
 
 import os
+from datetime import datetime
 import pandas as pd
 import numpy as np
 from typing import Dict, Any, List, Optional
@@ -64,6 +65,10 @@ def compute_farmer_recommendations(
     w_suit: float = 0.40,
     w_profit: float = 0.40,
     w_risk: float = 0.20,
+    lat: float = 12.9716,
+    lon: float = 77.5946,
+    state: str = "Karnataka",
+    district: str = "Bengaluru",
     alerts: list = None
 ) -> Dict[str, Any]:
     """
@@ -135,9 +140,29 @@ def compute_farmer_recommendations(
         # Max RF probability for relative scaling
         max_prob = max(suitability_map.values()) if suitability_map else 0.05
         rf_relative = suit_score / max(0.01, max_prob)
+        final_suit_score = (rf_relative * 0.65) + (agro_fit * 0.35)
 
-        # Combined suitability (0 to 1)
-        final_suit_score = round(0.55 * rf_relative + 0.45 * agro_fit, 3)
+        # Regional & Agro-Climatic Zone Check
+        state_str = str(state).lower()
+        district_str = str(district).lower()
+        is_karnataka = "karnataka" in state_str or (11.5 <= float(lat) <= 18.5 and 74.0 <= float(lon) <= 78.6)
+        is_bengaluru_zone = "bengaluru" in district_str or "bangalore" in district_str or (12.5 <= float(lat) <= 13.5 and 77.0 <= float(lon) <= 78.0)
+
+        is_regional_mismatch = False
+        if is_karnataka and crop_id in ["jute", "apple", "lentil"]:
+            is_regional_mismatch = True
+        elif is_bengaluru_zone and crop_id in ["jute", "apple", "cotton", "lentil"]:
+            is_regional_mismatch = True
+
+        # Current Season Alignment Check
+        current_month = datetime.now().month
+        current_season = "Kharif" if 6 <= current_month <= 10 else ("Rabi" if current_month in [11, 12, 1, 2, 3] else "Zaid")
+        crop_season_str = str(eco.get("season", "All Seasons"))
+
+        if current_season in crop_season_str or "All Seasons" in crop_season_str or "Annual" in crop_season_str:
+            final_suit_score = min(1.0, final_suit_score + 0.10)
+        else:
+            final_suit_score = max(0.10, final_suit_score - 0.15)
         suitability_pct = round(final_suit_score * 100.0, 1)
 
         # Climate Mismatch Check
@@ -312,6 +337,7 @@ def compute_farmer_recommendations(
             "suitability_pct": suitability_pct,
             "raw_suitability": final_suit_score,
             "climate_mismatch": is_climate_mismatch,
+            "is_regional_mismatch": is_regional_mismatch,
             "yield_per_acre_qtl": yield_per_acre,
             "total_yield_qtl": total_yield_qtl,
             "cost_per_acre_inr": cost_per_acre,
@@ -368,11 +394,13 @@ def compute_farmer_recommendations(
     # 2. Drop crops exceeding farmer's budget (total_cost_inr > budget_inr)
     # 3. Drop crops with climate mismatch
     # 4. Drop crops with water/irrigation infeasibility
+    # 5. Drop crops with regional / agro-climatic mismatch (e.g. Jute in Karnataka)
     viable_candidates = [
         c for c in all_candidates
         if not c["exceeds_budget"]
         and not c.get("is_water_infeasible", False)
         and not c.get("climate_mismatch", False)
+        and not c.get("is_regional_mismatch", False)
         and c.get("suitability_pct", 0.0) >= 30.0
     ]
     working_pool = viable_candidates
@@ -381,9 +409,9 @@ def compute_farmer_recommendations(
     top_5 = working_pool[:5]
 
     # Section B: Top 3 for Current Weather
-    # Select crops that thrive in the current temperature and rainfall profile
+    # Select crops that thrive in the current temperature and rainfall profile without regional mismatch
     weather_sorted = sorted(
-        all_candidates,
+        [c for c in all_candidates if not c.get("is_regional_mismatch", False)],
         key=lambda x: (
             1.0 - abs(x.get("water_need_mm", 600) - rainfall_annual) / 1500.0 +
             x.get("raw_suitability", 0.0)

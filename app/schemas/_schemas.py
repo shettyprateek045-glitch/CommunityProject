@@ -110,6 +110,8 @@ class RecommendRequest(BaseModel):
     lat: Optional[float] = 15.4589
     lng: Optional[float] = 75.0078
     lon: Optional[float] = None
+    state: Optional[str] = "Karnataka"
+    district: Optional[str] = "Bengaluru"
     location_name: Optional[str] = "Karnataka Farm Plot"
     land_acres: float = Field(default=3.0, ge=0.1, le=500.0)
     budget_inr: float = Field(default=65000.0, ge=1000.0)

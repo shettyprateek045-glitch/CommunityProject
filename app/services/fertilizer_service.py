@@ -151,10 +151,43 @@ def calculate_fertilizer_plan(
             "application": "Broadcast and mix thoroughly, followed by heavy ponding/leaching if drainage permits."
         }
 
+    comm_fert = {
+        "total_cost_inr": total_fertilizer_cost,
+        "urea_bags": total_urea_bags,
+        "dap_bags": total_dap_bags,
+        "mop_bags": total_mop_bags,
+        "fym_tons": total_fym_tons,
+        "urea_cost": cost_urea,
+        "dap_cost": cost_dap,
+        "mop_cost": cost_mop,
+        "fym_cost": cost_fym
+    }
+
+    ph_alert_dict = {
+        "warning": ph_status != "Optimal",
+        "status": ph_status,
+        "amendment_needed": ph_amendment["type"] if ph_amendment else "None required",
+        "guidance": ph_guidance
+    }
+
     return {
         "status": "success",
         "crop": crop,
+        "acres": acres,
         "land_acres": acres,
+        "soil_ph": soil_ph,
+        "commercial_fertilizers": comm_fert,
+        "nutrient_gap_kg_per_acre": {
+            "n": round(gap_n_per_acre, 1),
+            "p": round(gap_p_per_acre, 1),
+            "k": round(gap_k_per_acre, 1)
+        },
+        "whole_farm_nutrient_gap_kg": {
+            "n": round(total_gap_n, 1),
+            "p": round(total_gap_p, 1),
+            "k": round(total_gap_k, 1)
+        },
+        "ph_alert": ph_alert_dict,
         "soil_test": {
             "nitrogen_n": soil_n,
             "phosphorus_p": soil_p,

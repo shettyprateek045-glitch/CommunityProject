@@ -208,14 +208,14 @@ async def fetch_open_meteo_weather(lat: float, lon: float) -> Dict[str, Any]:
             cached_data["cached"] = True
             return cached_data
 
-    # Open-Meteo Current + 7-Day Forecast Endpoint
+    # Open-Meteo Current + 7-Day Forecast Endpoint with past 7 days actuals
     forecast_url = (
         f"https://api.open-meteo.com/v1/forecast?"
         f"latitude={lat}&longitude={lon}"
-        f"&current=temperature_2m,relative_humidity_2m,apparent_temperature,precipitation,rain,weather_code,wind_speed_10m,is_day"
-        f"&hourly=precipitation,temperature_2m,relative_humidity_2m,et0_fao_evapotranspiration,soil_moisture_0_to_1cm"
-        f"&daily=temperature_2m_max,temperature_2m_min,precipitation_sum,precipitation_probability_max,weather_code,et0_fao_evapotranspiration"
-        f"&forecast_days=7&timezone=auto"
+        f"&current=temperature_2m,relative_humidity_2m,apparent_temperature,precipitation,rain,weather_code,wind_speed_10m,wind_direction_10m,surface_pressure,cloud_cover,is_day"
+        f"&hourly=precipitation,precipitation_probability,temperature_2m,relative_humidity_2m,wind_speed_10m,et0_fao_evapotranspiration,soil_moisture_0_to_1cm"
+        f"&daily=temperature_2m_max,temperature_2m_min,precipitation_sum,precipitation_probability_max,weather_code,et0_fao_evapotranspiration,sunrise,sunset"
+        f"&past_days=7&forecast_days=7&timezone=auto"
     )
 
     # 12-Month Historical Archive Endpoint
@@ -276,8 +276,7 @@ async def fetch_open_meteo_weather(lat: float, lon: float) -> Dict[str, Any]:
 
         is_raining = bool(cur_rain > 0.1)
 
-        # Daily 7-day forecast
-        daily_items = []
+        # Process daily data: separate past 7 days from upcoming 7 days
         d_times = daily.get("time", [])
         d_tmax = daily.get("temperature_2m_max", [])
         d_tmin = daily.get("temperature_2m_min", [])
@@ -285,18 +284,36 @@ async def fetch_open_meteo_weather(lat: float, lon: float) -> Dict[str, Any]:
         d_prob = daily.get("precipitation_probability_max", [])
         d_code = daily.get("weather_code", [])
         d_et0 = daily.get("et0_fao_evapotranspiration", [])
+        d_sunrise = daily.get("sunrise", [])
+        d_sunset = daily.get("sunset", [])
 
+        today_str = datetime.now().strftime("%Y-%m-%d")
+        today_idx = 0
+        for idx, t_str in enumerate(d_times):
+            if t_str >= today_str:
+                today_idx = idx
+                break
+
+        # Past 7 days actual rainfall
+        past_7d_rainfall = sum(float(r) for r in d_rain[:today_idx] if r is not None)
+
+        # Forecast items (from today onward)
+        daily_items = []
         alerts = []
-        for i in range(len(d_times)):
+        forecast_indices = list(range(today_idx, min(len(d_times), today_idx + 7)))
+
+        for i in forecast_indices:
             code = d_code[i] if i < len(d_code) else 0
             d_desc, d_icon = WMO_CODES.get(code, ("Clear", "☀️"))
             dt_obj = datetime.strptime(d_times[i], "%Y-%m-%d")
             day_name = dt_obj.strftime("%a (%b %d)")
-            t_max = float(d_tmax[i]) if i < len(d_tmax) else 28.0
-            t_min = float(d_tmin[i]) if i < len(d_tmin) else 19.0
-            r_sum = float(d_rain[i]) if i < len(d_rain) else 0.0
-            r_prob = float(d_prob[i]) if i < len(d_prob) else 0.0
+            t_max = float(d_tmax[i]) if i < len(d_tmax) and d_tmax[i] is not None else 28.0
+            t_min = float(d_tmin[i]) if i < len(d_tmin) and d_tmin[i] is not None else 19.0
+            r_sum = float(d_rain[i]) if i < len(d_rain) and d_rain[i] is not None else 0.0
+            r_prob = float(d_prob[i]) if i < len(d_prob) and d_prob[i] is not None else 0.0
             et0_val = float(d_et0[i]) if i < len(d_et0) and d_et0[i] is not None else 4.2
+            s_rise = d_sunrise[i].split("T")[-1] if i < len(d_sunrise) and d_sunrise[i] else "06:15"
+            s_set = d_sunset[i].split("T")[-1] if i < len(d_sunset) and d_sunset[i] else "18:25"
 
             daily_items.append({
                 "date": d_times[i],
@@ -306,12 +323,14 @@ async def fetch_open_meteo_weather(lat: float, lon: float) -> Dict[str, Any]:
                 "rain_sum_mm": r_sum,
                 "rain_chance_pct": r_prob,
                 "et0": round(et0_val, 1),
+                "sunrise": s_rise,
+                "sunset": s_set,
                 "icon": d_icon,
                 "condition": d_desc
             })
 
-            # Check for agricultural weather alerts in upcoming 3 days
-            if i < 3:
+            # Check for agricultural alerts in upcoming 3 days
+            if (i - today_idx) < 3:
                 if r_sum >= 25.0:
                     alerts.append({
                         "type": "heavy_rain",
@@ -360,9 +379,85 @@ async def fetch_open_meteo_weather(lat: float, lon: float) -> Dict[str, Any]:
                 "farming_tip": "Normal seasonal weather. Ideal window for field inspection, weeding, and nutrient management."
             })
 
-        # Next 24 hours precipitation
-        h_times = hourly.get("time", [])[:24]
-        h_rain = hourly.get("precipitation", [])[:24]
+        # Next 24 hours precipitation & temperatures
+        h_all_times = hourly.get("time", [])
+        h_all_rain = hourly.get("precipitation", [])
+        h_all_prob = hourly.get("precipitation_probability", [])
+        h_all_temp = hourly.get("temperature_2m", [])
+        h_all_rh = hourly.get("relative_humidity_2m", [])
+
+        current_iso_hour = datetime.now().strftime("%Y-%m-%dT%H:00")
+        h_start_idx = 0
+        for idx, ht in enumerate(h_all_times):
+            if ht >= current_iso_hour:
+                h_start_idx = idx
+                break
+
+        h_times = h_all_times[h_start_idx:h_start_idx+24]
+        h_rain = [float(x) if x is not None else 0.0 for x in h_all_rain[h_start_idx:h_start_idx+24]]
+        h_temp = [float(x) if x is not None else 25.0 for x in h_all_temp[h_start_idx:h_start_idx+24]]
+        h_prob = [float(x) if x is not None else 0.0 for x in h_all_prob[h_start_idx:h_start_idx+24]]
+
+        hourly_24h_list = []
+        for ht, hr, htm, hp in zip(h_times, h_rain, h_temp, h_prob):
+            hour_str = ht.split("T")[-1] if "T" in ht else ht[-5:]
+            hourly_24h_list.append({
+                "time": ht,
+                "hour": hour_str,
+                "temp": round(htm, 1),
+                "rain_mm": round(hr, 1),
+                "rain_prob": round(hp, 0)
+            })
+
+        # Today's periods (Morning 6-12, Afternoon 12-17, Evening 17-21, Night 21-6)
+        cur_hour = datetime.now().hour
+        active_period = (
+            "Morning" if 6 <= cur_hour < 12 else (
+                "Afternoon" if 12 <= cur_hour < 17 else (
+                    "Evening" if 17 <= cur_hour < 21 else "Night"
+                )
+            )
+        )
+
+        today_periods = {
+            "current_period": active_period,
+            "morning": {
+                "label": "Morning (6 AM - 12 PM)",
+                "temp": round(cur_temp - 2.5, 1),
+                "humidity": round(min(95.0, cur_rh + 15.0), 0),
+                "rain_chance": round(d_prob[today_idx] * 0.4 if today_idx < len(d_prob) else 10.0, 0),
+                "rain_mm": round(cur_rain * 0.3, 1),
+                "wind_kmh": round(max(3.0, cur_wind * 0.8), 1),
+                "is_current": active_period == "Morning"
+            },
+            "afternoon": {
+                "label": "Afternoon (12 PM - 5 PM)",
+                "temp": round(cur_temp + 2.0, 1),
+                "humidity": round(max(25.0, cur_rh - 20.0), 0),
+                "rain_chance": round(d_prob[today_idx] * 0.8 if today_idx < len(d_prob) else 25.0, 0),
+                "rain_mm": round(cur_rain * 0.5, 1),
+                "wind_kmh": round(cur_wind * 1.2, 1),
+                "is_current": active_period == "Afternoon"
+            },
+            "evening": {
+                "label": "Evening (5 PM - 9 PM)",
+                "temp": round(cur_temp, 1),
+                "humidity": round(cur_rh, 0),
+                "rain_chance": round(d_prob[today_idx] * 0.6 if today_idx < len(d_prob) else 20.0, 0),
+                "rain_mm": round(cur_rain * 0.2, 1),
+                "wind_kmh": round(cur_wind, 1),
+                "is_current": active_period == "Evening"
+            },
+            "night": {
+                "label": "Night (9 PM - 6 AM)",
+                "temp": round(cur_temp - 4.5, 1),
+                "humidity": round(min(95.0, cur_rh + 25.0), 0),
+                "rain_chance": round(d_prob[today_idx] * 0.3 if today_idx < len(d_prob) else 5.0, 0),
+                "rain_mm": 0.0,
+                "wind_kmh": round(max(2.0, cur_wind * 0.6), 1),
+                "is_current": active_period == "Night"
+            }
+        }
 
         # 12-month climate calculation
         monthly_climate = []
@@ -386,25 +481,33 @@ async def fetch_open_meteo_weather(lat: float, lon: float) -> Dict[str, Any]:
                         month_temps[m_str].append(temp)
 
             for m in months_list:
+                r_val = round(sum(month_sums[m]), 1)
+                t_val = round(sum(month_temps[m]) / max(1, len(month_temps[m])), 1) if month_temps[m] else 26.0
                 monthly_climate.append({
                     "month": m,
-                    "rainfall_mm": round(sum(month_sums[m]), 1),
-                    "temp_c": round(sum(month_temps[m]) / max(1, len(month_temps[m])), 1) if month_temps[m] else 26.0
+                    "rainfall_mm": r_val,
+                    "rain_mm": r_val,
+                    "temp_c": t_val,
+                    "temp_avg": t_val
                 })
         else:
             base_factor = 1.0 + (lat - 15.0) * 0.02
             bench_rain = [8.5, 12.0, 25.4, 48.2, 95.0, 165.8, 210.5, 175.2, 145.0, 110.4, 42.0, 14.2]
             bench_temp = [23.5, 25.8, 28.9, 31.5, 31.2, 27.8, 26.2, 25.9, 26.4, 26.5, 24.8, 23.2]
             for m, r, t in zip(months_list, bench_rain, bench_temp):
+                r_val = round(r * base_factor, 1)
+                t_val = round(t, 1)
                 monthly_climate.append({
                     "month": m,
-                    "rainfall_mm": round(r * base_factor, 1),
-                    "temp_c": round(t, 1)
+                    "rainfall_mm": r_val,
+                    "rain_mm": r_val,
+                    "temp_c": t_val,
+                    "temp_avg": t_val
                 })
 
         total_7d_rain = sum(d["rain_sum_mm"] for d in daily_items)
         annual_rainfall_est = sum(m["rainfall_mm"] for m in monthly_climate)
-        rain_chance_today = float(d_prob[0]) if d_prob else (round(total_7d_rain / 7.0 * 10, 1))
+        rain_chance_today = float(d_prob[today_idx]) if today_idx < len(d_prob) and d_prob[today_idx] is not None else (round(total_7d_rain / 7.0 * 10, 1))
 
         farming_note, farming_note_kn = generate_farming_note(cur_rain, rain_chance_today, cur_temp, cur_wind)
 
@@ -420,9 +523,15 @@ async def fetch_open_meteo_weather(lat: float, lon: float) -> Dict[str, Any]:
             "last_updated": datetime.now().strftime("%Y-%m-%d %H:%M:%S"),
             "rain_chance_today": rain_chance_today,
             "rainfall_7d_total": round(total_7d_rain, 1),
+            "past_7d_rainfall_actual": round(past_7d_rainfall, 1),
+            "forecast_7d_rainfall": round(total_7d_rain, 1),
             "annual_rainfall_estimate": round(annual_rainfall_est, 1),
             "season": season,
             "season_name_kn": season_kn,
+            "farming_note": farming_note,
+            "farming_note_kn": farming_note_kn,
+            "today_periods": today_periods,
+            "hourly_24h": hourly_24h_list,
             "farming_note": farming_note,
             "farming_note_kn": farming_note_kn,
             "current": {
@@ -644,11 +753,16 @@ async def calculate_irrigation_and_sowing_advice(
             "day_name": day.get("day_name"),
             "et0_mm": et0,
             "crop_demand_etc_mm": etc,
+            "etc_water_demand_mm": etc,
             "forecast_rain_mm": rain,
+            "forecast_rainfall_mm": rain,
             "effective_rain_mm": round(eff_rain, 1),
             "irrigation_needed_mm": irr_needed_mm,
+            "net_irrigation_depth_mm": irr_needed_mm,
             "irrigation_liters": int(irr_liters),
+            "liters_needed_per_acre": int(round(irr_needed_mm * 4046.86, 0)),
             "duration_hours": runtime_hrs,
+            "drip_runtime_hours": runtime_hrs,
             "recommendation": action,
             "recommendation_kn": action_kn,
             "recommendation_hi": action_hi
@@ -685,6 +799,17 @@ async def calculate_irrigation_and_sowing_advice(
         sowing_advice_kn = f"ಮಳೆಯಾಶ್ರಿತ ಜಮೀನಿನಲ್ಲಿ ತೇವಾಂಶ ಕಡಿಮೆಯಿದೆ. ಒಣ ಮಣ್ಣಿನಲ್ಲಿ ಬಿತ್ತನೆ ಮಾಡಬೇಡಿ; ಕನಿಷ್ಠ 25 ಮಿ.ಮೀ ಮಳೆಯಾಗುವವರೆಗೆ ಕಾಯಿರಿ."
         sowing_advice_hi = f"वर्षा आधारित खेत में कम बारिश ({total_rain_mm:.1f} मिमी)। शुष्क बुवाई से बचें और पर्याप्त बारिश (25 मिमी) का इंतजार करें।"
 
+    sow_win = {
+        "status": sowing_status,
+        "title": sowing_title,
+        "summary": sowing_advice,
+        "advice": sowing_advice,
+        "advice_kn": sowing_advice_kn,
+        "advice_hi": sowing_advice_hi,
+        "start_date": first_date,
+        "end_date": last_date
+    }
+
     return {
         "status": "success",
         "crop": crop,
@@ -699,15 +824,9 @@ async def calculate_irrigation_and_sowing_advice(
         "total_irrigation_needed_mm": round(total_irr_needed_mm, 1),
         "total_irrigation_liters": int(round(total_irr_needed_mm * 4046.86 * max(0.1, acres), 0)),
         "schedule_7d": schedule,
-        "sowing_window": {
-            "status": sowing_status,
-            "title": sowing_title,
-            "advice": sowing_advice,
-            "advice_kn": sowing_advice_kn,
-            "advice_hi": sowing_advice_hi,
-            "start_date": first_date,
-            "end_date": last_date
-        },
+        "daily_schedule": schedule,
+        "sowing_window": sow_win,
+        "sowing_window_advice": sow_win,
         "data_source": "Open-Meteo Satellite Forecast & FAO-56 Penman-Monteith Evapotranspiration",
         "last_updated": datetime.now().strftime("%Y-%m-%d %H:%M:%S"),
         "disclaimer": "Advice is guidance only. Consult your local agriculture officer or Krishi Vigyan Kendra (KVK) for field-specific water management."

@@ -27,6 +27,8 @@ async def api_recommend(req: RecommendRequest):
         temp_c = req.temperature if req.temperature is not None else 26.5
         humidity = req.humidity if req.humidity is not None else 65.0
         rainfall = req.rainfall if req.rainfall is not None else 950.0
+        lon_val = req.lng if req.lng is not None else (req.lon if req.lon is not None else 77.5946)
+        lat_val = req.lat if req.lat is not None else 12.9716
 
         results = compute_farmer_recommendations(
             land_acres=req.land_acres,
@@ -43,7 +45,11 @@ async def api_recommend(req: RecommendRequest):
             rainfall_annual=rainfall,
             w_suit=req.w_suit or 0.40,
             w_profit=req.w_profit or 0.40,
-            w_risk=req.w_risk or 0.20
+            w_risk=req.w_risk or 0.20,
+            lat=lat_val,
+            lon=lon_val,
+            state=req.state or "Karnataka",
+            district=req.district or "Bengaluru"
         )
 
         # Save to SQLite history
@@ -73,6 +79,8 @@ async def api_whatif(req: RecommendRequest):
         temp_c = req.temperature if req.temperature is not None else 26.5
         humidity = req.humidity if req.humidity is not None else 65.0
         rainfall = req.rainfall if req.rainfall is not None else 950.0
+        lon_val = req.lng if req.lng is not None else (req.lon if req.lon is not None else 77.5946)
+        lat_val = req.lat if req.lat is not None else 12.9716
 
         results = compute_farmer_recommendations(
             land_acres=req.land_acres,
@@ -89,7 +97,11 @@ async def api_whatif(req: RecommendRequest):
             rainfall_annual=rainfall,
             w_suit=req.w_suit or 0.40,
             w_profit=req.w_profit or 0.40,
-            w_risk=req.w_risk or 0.20
+            w_risk=req.w_risk or 0.20,
+            lat=lat_val,
+            lon=lon_val,
+            state=req.state or "Karnataka",
+            district=req.district or "Bengaluru"
         )
         return {
             "status": "success",
