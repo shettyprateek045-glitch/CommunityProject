@@ -228,7 +228,7 @@ def analyze_leaf_disease(file_bytes: bytes) -> Dict[str, Any]:
             "message": "Leaf disease model weights are loading or unavailable.",
             "message_kn": "ರೋಗ ಪತ್ತೆ ಮಾದರಿ ಸದ್ಯ ಲಭ್ಯವಿಲ್ಲ.",
             "message_hi": "रोग पहचान मॉडल वर्तमान में उपलब्ध नहीं है।",
-            "consult_officer_note": "Guidance only. Consult your local agriculture officer."
+            "consult_officer_note": ""
         }
 
     try:
@@ -294,7 +294,7 @@ def analyze_leaf_disease(file_bytes: bytes) -> Dict[str, Any]:
             "detected_candidates": detected_items,
             "annotated_image": annotated_b64,
             "annotated_image_base64": annotated_b64.replace("data:image/jpeg;base64,", "") if annotated_b64 else None,
-            "consult_officer_note": "Advice is guidance only. Always consult your local agriculture officer or Krishi Vigyan Kendra (KVK) before applying chemical treatments."
+            "consult_officer_note": ""
         }
 
     # Confident detection (>= 60%)
@@ -327,7 +327,7 @@ def analyze_leaf_disease(file_bytes: bytes) -> Dict[str, Any]:
         "detected_count": len(detected_items),
         "all_detections": detected_items[:5],
         "model_info": "YOLO11m fine-tuned on PlantVillage foliar disease benchmark dataset (held-out validation accuracy 86.2% precision).",
-        "consult_officer_note": "Advice is guidance only. Always consult your local agriculture officer or Krishi Vigyan Kendra (KVK) before chemical spraying.",
-        "consult_officer_note_kn": "ಇದು ಕೇವಲ ತಾಂತ್ರಿಕ ಮಾರ್ಗದರ್ಶನ ಮಾತ್ರ. ಯಾವುದೇ ರಾಸಾಯನಿಕ ಸಿಂಪಡಿಸುವ ಮುನ್ನ ನಿಮ್ಮ ಸ್ಥಳೀಯ ಕೃಷಿ ಅಧಿಕಾರಿಗಳನ್ನು ಸಂಪರ್ಕಿಸಿ.",
-        "consult_officer_note_hi": "यह केवल तकनीकी मार्गदर्शन है। किसी भी रासायनिक छिड़काव से पहले हमेशा अपने स्थानीय कृषि अधिकारी या केवीके से परामर्श लें।"
+        "consult_officer_note": "",
+        "consult_officer_note_kn": "",
+        "consult_officer_note_hi": ""
     }

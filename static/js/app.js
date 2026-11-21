@@ -27,7 +27,7 @@ const I18N = {
     nav_schemes: "Govt Schemes",
     nav_leaf_scanner: "Leaf Disease Scanner",
     btn_export_pdf: "Export PDF",
-    disclaimer_note: "Guidance only. Always consult your local agriculture officer.",
+    disclaimer_note: "",
 
     // Stepper
     step_loc: "1. Location",
@@ -135,7 +135,7 @@ const I18N = {
     nav_schemes: "ಸರ್ಕಾರಿ ಯೋಜನೆಗಳು",
     nav_leaf_scanner: "ಎಲೆ ರೋಗ ತಪಾಸಣೆ",
     btn_export_pdf: "ವರದಿ ಡೌನ್‌ಲೋಡ್ (PDF)",
-    disclaimer_note: "ಇದು ಕೇವಲ ಕೃಷಿ ಮಾರ್ಗದರ್ಶನ. ಯಾವುದೇ ನಿರ್ಧಾರಕ್ಕೂ ಮುನ್ನ ಸ್ಥಳೀಯ ಕೃಷಿ ಅಧಿಕಾರಿಯನ್ನು ಸಂಪರ್ಕಿಸಿ.",
+    disclaimer_note: "",
 
     // Stepper
     step_loc: "೧. ಸ್ಥಳ",
@@ -243,7 +243,7 @@ const I18N = {
     nav_schemes: "सरकारी योजनाएं",
     nav_leaf_scanner: "पत्ती रोग जांच",
     btn_export_pdf: "पीडीएफ रिपोर्ट",
-    disclaimer_note: "यह केवल मार्गदर्शन है। किसी भी निर्णय से पहले स्थानीय कृषि अधिकारी से परामर्श लें।",
+    disclaimer_note: "",
 
     // Stepper
     step_loc: "१. स्थान",
@@ -874,7 +874,6 @@ export function renderDashboardShell(container, lang) {
           <div>
             <h1 class="text-base sm:text-lg font-bold tracking-tight text-white flex items-center gap-2">
               <span id="txt-app-title">${t.app_title}</span>
-              <span class="text-[10px] bg-[#2e7d32] text-emerald-100 px-2 py-0.5 rounded-full font-medium">Precision AI</span>
             </h1>
             <p class="text-[11px] text-emerald-200 hidden sm:block" id="txt-app-subtitle">${t.app_subtitle}</p>
           </div>
@@ -916,12 +915,6 @@ export function renderDashboardShell(container, lang) {
         </div>
       </div>
     </header>
-
-    <!-- Advisory Guidance Banner -->
-    <div class="bg-amber-50 border-b border-amber-200 px-4 py-1.5 text-center text-xs text-amber-900 font-semibold flex items-center justify-center gap-2">
-      <i class="fa-solid fa-circle-exclamation text-amber-600"></i>
-      <span>${t.disclaimer_note}</span>
-    </div>
 
     <!-- 6-Step Workflow Stepper Navigation Header -->
     <div class="bg-white border-b border-slate-200 sticky top-16 z-30 shadow-xs">
@@ -1060,11 +1053,6 @@ export function renderDashboardShell(container, lang) {
                 <span class="font-bold text-emerald-950">Recommended Treatment Guidance:</span>
                 <p id="leaf-treatment-txt" class="text-emerald-900"></p>
               </div>
-            </div>
-
-            <div class="text-[11px] text-amber-800 font-semibold bg-amber-100/70 p-2.5 rounded-xl border border-amber-200 flex items-center gap-2">
-              <i class="fa-solid fa-triangle-exclamation"></i>
-              <span>${t.disclaimer_note}</span>
             </div>
           </div>
         </div>
@@ -2236,7 +2224,7 @@ function renderFertilizerPlanResults(container, plan) {
         ]).map(f => `<li>${f}</li>`).join('')}
       </ul>
       <div class="pt-2 text-[10px] text-amber-800 font-semibold">
-        💡 Note: Always apply phosphorus and potash basal at sowing, and split urea doses at 30 & 60 days. ${I18N[currentLang].disclaimer_note}
+        💡 Note: Always apply phosphorus and potash basal at sowing, and split urea doses at 30 & 60 days.
       </div>
     </div>
 
@@ -2247,7 +2235,7 @@ function renderFertilizerPlanResults(container, plan) {
         ${(plan.formulas_explained || []).map(f => `<li>${f}</li>`).join('')}
       </ul>
       <div class="pt-2 text-[10px] text-amber-800 font-semibold">
-        💡 Note: Always apply phosphorus and potash basal at sowing, and split urea doses at 30 & 60 days. ${I18N[currentLang].disclaimer_note}
+        💡 Note: Always apply phosphorus and potash basal at sowing, and split urea doses at 30 & 60 days.
       </div>
     </div>
   `;
