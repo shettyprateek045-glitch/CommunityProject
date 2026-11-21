@@ -42,7 +42,7 @@ const I18N = {
     // Step 1: Location
     modal_loc_title: "Allow location access",
     modal_loc_desc: "We use your location to show live weather and suggest the best crops for your farm.",
-    btn_allow_location: "📍 Allow GPS Location",
+    btn_allow_location: "Detect My Location",
     btn_enter_manually: "⌨️ Enter Manually",
     loc_detecting: "Detecting your location via GPS...",
     card_current_loc: "Confirmed Farm Location",
@@ -108,8 +108,8 @@ const I18N = {
     lbl_select_previous: "Select Previous / Standing Crop:",
 
     // Step 6: Recommendations & Market
-    heading_top_crops: "Section A: Top Recommended Crops",
-    subheading_top_crops: "Hard-filtered by budget, climate, and irrigation; ranked by agronomic profit score.",
+    heading_top_crops: "Section A: Top 3 Recommended Crops",
+    subheading_top_crops: "Hard-filtered by budget, climate, and irrigation; top 3 crops ranked by agronomic profit score.",
     heading_weather_fit: "Section B: Crops Adapted to Current Weather",
     heading_alternatives: "Section C: Strategic Alternatives",
     heading_mandi_prices: "Nearest Mandi 30-Day Modal Price Trends",
@@ -216,8 +216,8 @@ const I18N = {
     lbl_select_previous: "ಹಿಂದಿನ / ಪ್ರಸ್ತುತ ಬೆಳೆ ಆಯ್ಕೆಮಾಡಿ:",
 
     // Step 6: Recommendations & Market
-    heading_top_crops: "ವಿಭಾಗ ಎ: ಶಿಫಾರಸು ಮಾಡಿದ ಅತ್ಯುತ್ತಮ ಬೆಳೆಗಳು",
-    subheading_top_crops: "ಬಜೆಟ್, ಹವಾಮಾನ ಮತ್ತು ನೀರಾವರಿ ಆಧಾರದ ಮೇಲೆ ಕಟ್ಟುನಿಟ್ಟಾಗಿ ಶ್ರೇಣೀಕರಿಸಲಾಗಿದೆ.",
+    heading_top_crops: "ವಿಭಾಗ ಎ: ಶಿಫಾರಸು ಮಾಡಿದ ಅತ್ಯುತ್ತಮ ೩ ಬೆಳೆಗಳು",
+    subheading_top_crops: "ಬಜೆಟ್, ಹವಾಮಾನ ಮತ್ತು ನೀರಾವರಿ ಆಧಾರದ ಮೇಲೆ ಆಯ್ಕೆಮಾಡಿದ ಅತ್ಯುತ್ತಮ ೩ ಬೆಳೆಗಳು.",
     heading_weather_fit: "ವಿಭಾಗ ಬಿ: ಪ್ರಸ್ತುತ ಹವಾಮಾನಕ್ಕೆ ಸೂಕ್ತ ಬೆಳೆಗಳು",
     heading_alternatives: "ವಿಭಾಗ ಸಿ: ಪರ್ಯಾಯ ಲಾಭದಾಯಕ ಬೆಳೆಗಳು",
     heading_mandi_prices: "ಹತ್ತಿರದ ಎಪಿಎಂಸಿ ಮಾರುಕಟ್ಟೆ ೩೦ ದಿನಗಳ ದರ",
@@ -324,8 +324,8 @@ const I18N = {
     lbl_select_previous: "पिछली / वर्तमान फसल चुनें:",
 
     // Step 6: Recommendations & Market
-    heading_top_crops: "भाग क: शीर्ष अनुशंसित फसलें",
-    subheading_top_crops: "बजट, मौसम और सिंचाई सीमाओं के आधार पर छांटी और क्रमबद्ध की गई फसलें।",
+    heading_top_crops: "भाग क: शीर्ष ३ अनुशंसित फसलें",
+    subheading_top_crops: "बजट, मौसम और सिंचाई सीमाओं के आधार पर चयनित शीर्ष ३ फसलें।",
     heading_weather_fit: "भाग ख: वर्तमान मौसम के अनुकूल फसलें",
     heading_alternatives: "भाग ग: रणनीतिक वैकल्पिक फसलें",
     heading_mandi_prices: "निकटतम मंडी ३०-दिवसीय मॉडल भाव",
@@ -376,6 +376,10 @@ let initialContext = {
 if (storedState) {
   try {
     const parsed = JSON.parse(storedState);
+    // If stored display_name is truncated (less than 4 components), clear it so full address is loaded fresh
+    if (parsed.display_name && (parsed.display_name.split(',').length < 4 || parsed.display_name.includes("Bengaluru, Bengaluru Urban 560098"))) {
+      delete parsed.display_name;
+    }
     initialContext = { ...initialContext, ...parsed };
   } catch(e) {}
 }
@@ -474,14 +478,97 @@ function initOrUpdateFarmMap() {
   }, 250);
 }
 
-// Reverse Geocoding with BigDataCloud (instant, free) + Nominatim fallback
+// Reverse Geocoding returning FULL ADDRESS via OpenStreetMap Nominatim (zoom=18) + Backend + BigDataCloud fallback
 async function reverseGeocode(lat, lon) {
   const key = `${lat.toFixed(4)},${lon.toFixed(4)}`;
   if (geocodeCache.has(key)) {
-    return geocodeCache.get(key);
+    const cached = geocodeCache.get(key);
+    if (cached && cached.display_name && cached.display_name.split(',').length >= 4 && !cached.display_name.includes("Bengaluru, Bengaluru Urban 560098")) {
+      return cached;
+    }
   }
 
-  // 1. Try BigDataCloud reverse geocode client API (free, fast, detailed suburb/locality)
+  // Helper to extract clean comprehensive full address
+  const buildFullAddress = (addr, rawDisplayName) => {
+    if (rawDisplayName && rawDisplayName.includes(',') && rawDisplayName.split(',').length >= 4) {
+      return rawDisplayName;
+    }
+    const parts = [
+      addr.amenity || addr.building || addr.house_name || addr.house_number,
+      addr.road || addr.street,
+      addr.neighbourhood || addr.suburb || addr.hamlet,
+      addr.city_district || addr.city || addr.town || addr.village || addr.municipality,
+      addr.taluk || addr.county,
+      addr.state_district || addr.district,
+      addr.state,
+      addr.postcode,
+      addr.country || "India"
+    ].filter(Boolean);
+    return [...new Set(parts)].join(", ");
+  };
+
+  // 1. Primary: Direct OpenStreetMap Nominatim with zoom=18 for complete full address
+  try {
+    const now = Date.now();
+    if (now - lastGeocodeTime < 600) {
+      await new Promise(r => setTimeout(r, 600 - (now - lastGeocodeTime)));
+    }
+    lastGeocodeTime = Date.now();
+
+    const osmUrl = `https://nominatim.openstreetmap.org/reverse?format=json&lat=${lat}&lon=${lon}&zoom=18&addressdetails=1`;
+    const resp = await fetch(osmUrl, {
+      headers: { 'Accept': 'application/json' }
+    });
+    if (resp.ok) {
+      const data = await resp.json();
+      if (data && (data.display_name || data.address)) {
+        const addr = data.address || {};
+        const village = addr.suburb || addr.neighbourhood || addr.village || addr.town || addr.city || addr.county || "Bengaluru";
+        let district = addr.state_district || addr.county || addr.city || "Bengaluru Urban";
+        district = district.replace(/ district/i, "").replace(/ taluk/i, "").trim();
+        const state = addr.state || "Karnataka";
+        const country = addr.country || "India";
+        const fullAddress = buildFullAddress(addr, data.display_name);
+
+        const result = {
+          village,
+          district,
+          state,
+          country,
+          display_name: fullAddress,
+          raw_address: addr
+        };
+        geocodeCache.set(key, result);
+        return result;
+      }
+    }
+  } catch (err) {
+    console.warn("Direct Nominatim reverse geocode failed, trying backend:", err);
+  }
+
+  // 2. Secondary: Internal Backend reverse-geocode proxy (uses SQLite cached Nominatim)
+  try {
+    const backendResp = await fetch(`/api/reverse-geocode?lat=${lat}&lon=${lon}`);
+    if (backendResp.ok) {
+      const bData = await backendResp.json();
+      const r = bData.result || bData;
+      if (r && r.display_name && r.display_name.split(',').length >= 3) {
+        const result = {
+          village: r.village || "Bengaluru",
+          district: (r.district || "Bengaluru Urban").replace(/ district/i, "").trim(),
+          state: r.state || "Karnataka",
+          country: r.country || "India",
+          display_name: r.display_name
+        };
+        geocodeCache.set(key, result);
+        return result;
+      }
+    }
+  } catch (err) {
+    console.warn("Backend reverse-geocode failed, trying BigDataCloud:", err);
+  }
+
+  // 3. Tertiary: BigDataCloud client API with comprehensive full administrative hierarchy
   try {
     const bdcUrl = `https://api.bigdatacloud.net/data/reverse-geocode-client?latitude=${lat}&longitude=${lon}&localityLanguage=en`;
     const resp = await fetch(bdcUrl);
@@ -494,50 +581,42 @@ async function reverseGeocode(lat, lon) {
         if (dObj) district = dObj.name.replace(/ district/i, "").replace(/ taluk/i, "");
       }
       const state = data.principalSubdivision || "Karnataka";
-      const postcode = data.postcode ? ` ${data.postcode}` : "";
+      
+      // Filter out organizations and non-places from administrative list
+      const adminList = (data.localityInfo && Array.isArray(data.localityInfo.administrative))
+        ? data.localityInfo.administrative
+        : [];
+      const validAdmin = adminList
+        .filter(a => a.name && a.description !== "organization" && !a.name.includes("Development Authority"))
+        .sort((a, b) => (b.adminLevel || 0) - (a.adminLevel || 0));
+
+      const addressParts = [];
+      for (const adm of validAdmin) {
+        let cleanName = adm.name.replace(/ district$/i, "").replace(/ taluk$/i, "").trim();
+        if (cleanName && !addressParts.includes(cleanName)) {
+          addressParts.push(cleanName);
+        }
+      }
+      if (data.postcode && !addressParts.includes(data.postcode)) {
+        addressParts.push(data.postcode);
+      }
+      if (data.countryName && !addressParts.includes(data.countryName)) {
+        addressParts.push(data.countryName);
+      }
+      const fullAddress = addressParts.length >= 3 ? addressParts.join(", ") : `${village}, ${district}, ${state}, India`;
+
       const result = {
         village,
         district,
         state,
         country: data.countryName || "India",
-        display_name: `${village}, ${district}${postcode}, ${state}`
+        display_name: fullAddress
       };
       geocodeCache.set(key, result);
       return result;
     }
   } catch (err) {
-    console.warn("BigDataCloud geocode failed, trying Nominatim fallback:", err);
-  }
-
-  const now = Date.now();
-  if (now - lastGeocodeTime < 1000) {
-    await new Promise(r => setTimeout(r, 1000 - (now - lastGeocodeTime)));
-  }
-  lastGeocodeTime = Date.now();
-
-  try {
-    const url = `https://nominatim.openstreetmap.org/reverse?format=json&lat=${lat}&lon=${lon}&zoom=14&addressdetails=1`;
-    const resp = await fetch(url, {
-      headers: { 'Accept': 'application/json', 'User-Agent': 'FarmerDecisionDashboard/2.0' }
-    });
-    if (resp.ok) {
-      const data = await resp.json();
-      const addr = data.address || {};
-      const village = addr.suburb || addr.neighbourhood || addr.village || addr.town || addr.city || addr.county || "Farmland";
-      const district = addr.county || addr.state_district || addr.city || "District";
-      const state = addr.state || "Karnataka";
-      const result = {
-        village,
-        district,
-        state,
-        country: addr.country || "India",
-        display_name: data.display_name || `${village}, ${district}, ${state}`
-      };
-      geocodeCache.set(key, result);
-      return result;
-    }
-  } catch (err) {
-    console.warn("Reverse geocode fetch failed:", err);
+    console.warn("BigDataCloud fallback failed:", err);
   }
 
   return {
@@ -545,7 +624,7 @@ async function reverseGeocode(lat, lon) {
     district: "Local Region",
     state: "Karnataka",
     country: "India",
-    display_name: `Location (${lat.toFixed(4)}, ${lon.toFixed(4)})`
+    display_name: `Location at ${lat.toFixed(4)}° N, ${lon.toFixed(4)}° E, Karnataka, India`
   };
 }
 
@@ -1050,12 +1129,11 @@ export function renderDashboardShell(container, lang) {
 // ============================================================================
 function renderLocationStepView(container) {
   const t = I18N[currentLang];
-  const savedLocations = JSON.parse(localStorage.getItem('farmer_saved_locations') || '[]');
 
   container.innerHTML = `
     <div class="bg-white rounded-3xl shadow-sm border border-slate-200 p-6 sm:p-8 space-y-6">
       
-      <div class="flex items-center justify-between flex-wrap gap-2">
+      <div class="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
         <div class="flex items-center gap-3">
           <div class="w-12 h-12 rounded-2xl bg-emerald-100 text-[#1b5e20] text-2xl flex items-center justify-center shadow-inner">
             <i class="fa-solid fa-location-dot"></i>
@@ -1065,35 +1143,35 @@ function renderLocationStepView(container) {
             <p class="text-xs text-slate-500">${t.pin_drag_hint}</p>
           </div>
         </div>
-        <div class="flex items-center gap-2">
-          <button type="button" id="btn-use-browser-gps" class="px-3.5 py-1.5 rounded-xl bg-[#1b5e20] hover:bg-[#2e7d32] text-white text-xs font-bold flex items-center gap-1.5 shadow-xs transition cursor-pointer">
+        <div class="flex flex-col items-start sm:items-end gap-1">
+          <button type="button" id="btn-use-browser-gps" class="px-4 py-2 rounded-xl bg-[#1b5e20] hover:bg-[#2e7d32] text-white text-xs font-bold flex items-center gap-2 shadow-sm transition active:scale-[0.98] cursor-pointer">
             <i class="fa-solid fa-location-crosshairs"></i>
-            <span>${t.btn_allow_location}</span>
+            <span>Detect My Location</span>
           </button>
+          <span class="text-[10px] text-slate-500 flex items-center gap-1">
+            <span>🔒</span> <span>Used only for real-time weather & crop planning (never tracked).</span>
+          </span>
         </div>
       </div>
 
-      <!-- Current Location Display Card -->
+      <!-- Current Location Display Card & Text Element with id="location" -->
       <div class="p-5 rounded-2xl bg-earth-50 border border-earth-200 space-y-3">
-        <div class="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4">
-          <div class="space-y-1">
-            <div class="text-base sm:text-lg font-bold text-slate-800 flex items-center gap-2">
-              <span>📍</span>
-              <span id="loc-display-village">${farmContext.village || "Bengaluru"}</span>, 
-              <span id="loc-display-state" class="text-slate-600 font-semibold">${farmContext.district ? farmContext.district + ", " : ""}${farmContext.state}</span>
-            </div>
-            <div class="text-xs text-slate-500 font-mono flex items-center gap-3">
-              <span>Lat: <strong class="text-slate-700">${farmContext.lat.toFixed(4)}° N</strong></span>
-              <span>Lon: <strong class="text-slate-700">${farmContext.lon.toFixed(4)}° E</strong></span>
-              <span>Accuracy: <strong class="text-emerald-700">±${(farmContext.accuracy_meters || 20).toFixed(0)}m</strong></span>
-            </div>
+        <div class="space-y-2 w-full">
+          <div class="flex items-center justify-between">
+            <label class="block text-[11px] font-bold text-slate-700 uppercase tracking-wider">Detected Farm Location (Full Address)</label>
+            <span class="text-[10px] text-emerald-800 font-semibold bg-emerald-100 px-2 py-0.5 rounded-md flex items-center gap-1">
+              <i class="fa-solid fa-circle-check text-emerald-600"></i> Full Address
+            </span>
           </div>
-
-          <div class="flex items-center gap-2">
-            <button type="button" id="btn-save-this-loc" class="px-3 py-1.5 rounded-xl bg-white hover:bg-slate-50 border border-slate-300 text-slate-700 font-semibold text-xs transition shadow-xs flex items-center gap-1.5 cursor-pointer">
-              <i class="fa-solid fa-bookmark text-amber-600"></i>
-              <span>${t.btn_save_loc}</span>
-            </button>
+          <div class="flex items-start gap-2.5">
+            <span class="text-xl pt-1 text-emerald-700">📍</span>
+            <textarea id="location" rows="3" readonly class="w-full px-3.5 py-2 text-xs sm:text-sm font-bold text-slate-800 bg-white border border-slate-300 rounded-xl focus:outline-none resize-none shadow-xs leading-relaxed" placeholder="Detecting full address...">${farmContext.display_name}</textarea>
+          </div>
+          <div class="text-xs text-slate-500 font-mono flex items-center flex-wrap gap-3 pt-0.5">
+            <span>Lat: <strong id="loc-display-lat" class="text-slate-700">${farmContext.lat.toFixed(4)}° N</strong></span>
+            <span>Lon: <strong id="loc-display-lon" class="text-slate-700">${farmContext.lon.toFixed(4)}° E</strong></span>
+            <span>Accuracy: <strong id="loc-display-acc" class="text-emerald-700">±${(farmContext.accuracy_meters || 20).toFixed(0)}m</strong></span>
+            <span class="text-[10px] text-slate-400">⚡ Geolocation requires HTTPS or localhost</span>
           </div>
         </div>
 
@@ -1106,31 +1184,16 @@ function renderLocationStepView(container) {
         <div id="farm-leaflet-map" style="height: 340px; width: 100%; border-radius: 1.25rem; border: 1px solid #cbd5e1; z-index: 10;"></div>
       </div>
 
-      <!-- Manual Village Search & Saved Locations Bar -->
-      <div class="grid grid-cols-1 md:grid-cols-2 gap-4 pt-2">
-        <!-- Search -->
-        <div class="p-4 rounded-2xl bg-slate-50 border border-slate-200 space-y-2">
-          <label class="block text-xs font-bold text-slate-700 uppercase tracking-wider">${t.lbl_village_search}</label>
-          <div class="flex gap-2">
-            <input type="text" id="input-search-place" class="w-full px-3 py-2 text-xs border border-slate-300 rounded-xl bg-white" placeholder="e.g. Dharwad, Mandya, Belagavi, Davanagere" />
-            <button type="button" id="btn-exec-search" class="px-4 bg-[#1b5e20] hover:bg-[#2e7d32] text-white text-xs font-bold rounded-xl transition cursor-pointer">
-              ${t.btn_search}
-            </button>
-          </div>
-          <div id="place-search-results" class="space-y-1 max-h-36 overflow-y-auto text-xs"></div>
+      <!-- Manual Village Search Bar (Full Width) -->
+      <div class="p-4 rounded-2xl bg-slate-50 border border-slate-200 space-y-2">
+        <label class="block text-xs font-bold text-slate-700 uppercase tracking-wider">${t.lbl_village_search}</label>
+        <div class="flex gap-2">
+          <input type="text" id="input-search-place" class="w-full px-3 py-2 text-xs border border-slate-300 rounded-xl bg-white" placeholder="e.g. Dharwad, Mandya, Belagavi, Davanagere" />
+          <button type="button" id="btn-exec-search" class="px-4 bg-[#1b5e20] hover:bg-[#2e7d32] text-white text-xs font-bold rounded-xl transition cursor-pointer">
+            ${t.btn_search}
+          </button>
         </div>
-
-        <!-- Saved Locations -->
-        <div class="p-4 rounded-2xl bg-slate-50 border border-slate-200 space-y-2">
-          <label class="block text-xs font-bold text-slate-700 uppercase tracking-wider">${t.saved_locations}</label>
-          <div id="saved-locations-list" class="flex flex-wrap gap-2 text-xs">
-            ${savedLocations.length > 0 ? savedLocations.map((l, i) => `
-              <button type="button" data-idx="${i}" class="btn-load-saved-loc px-2.5 py-1 bg-white hover:bg-emerald-50 border border-slate-200 rounded-lg text-slate-800 font-medium transition cursor-pointer">
-                📌 ${l.name}
-              </button>
-            `).join('') : `<span class="text-slate-400 text-[11px]">No saved locations yet. Save current spot for 1-click recall.</span>`}
-          </div>
-        </div>
+        <div id="place-search-results" class="space-y-1 max-h-36 overflow-y-auto text-xs"></div>
       </div>
 
     </div>
@@ -1144,45 +1207,93 @@ function bindLocationStepListeners() {
   const statusEl = document.getElementById("location-detect-status");
 
   const triggerLocationDetection = () => {
+    // 2. Show loading state while detecting
     if (statusEl) {
       statusEl.innerHTML = `
         <div class="p-3 bg-blue-50 border border-blue-200 text-blue-900 rounded-xl text-xs flex items-center gap-2">
-          <i class="fa-solid fa-spinner fa-spin"></i>
-          <span>Detecting your location via GPS (enableHighAccuracy, timeout 15s)...</span>
+          <i class="fa-solid fa-spinner fa-spin text-blue-600"></i>
+          <span>Detecting your location...</span>
         </div>
       `;
     }
 
+    // 1. Browser Geolocation API with enableHighAccuracy: true and 10s timeout
     if ("geolocation" in navigator) {
       navigator.geolocation.getCurrentPosition(
         async (pos) => {
-          await updateFarmPosition(pos.coords.latitude, pos.coords.longitude, pos.coords.accuracy, "gps");
+          // 3 & 4. On success: get lat/lon, reverse geocode, display in #location and store in farmContext
+          const lat = pos.coords.latitude;
+          const lon = pos.coords.longitude;
+          const accuracy = pos.coords.accuracy;
+
+          await updateFarmPosition(lat, lon, accuracy, "gps");
+
           if (statusEl) {
-            if (pos.coords.accuracy > 1000) {
+            if (accuracy > 1000) {
               statusEl.innerHTML = `
                 <div class="p-3 bg-amber-50 border border-amber-200 text-amber-900 rounded-xl text-xs flex items-center justify-between">
-                  <span>⚠️ Approximate location (±${(pos.coords.accuracy / 1000).toFixed(1)} km). Drag the green pin to your exact field.</span>
+                  <span>⚠️ Approximate GPS location (±${(accuracy / 1000).toFixed(1)} km). Drag the green pin on the map to pinpoint your exact field.</span>
                 </div>
               `;
             } else {
               statusEl.innerHTML = `
                 <div class="p-3 bg-emerald-50 border border-emerald-200 text-emerald-900 rounded-xl text-xs flex items-center justify-between">
-                  <span>✅ Confirmed GPS location: ${farmContext.display_name} (±${Math.round(pos.coords.accuracy)}m)</span>
+                  <span>✅ Location detected successfully: <strong>${farmContext.display_name}</strong> (±${Math.round(accuracy)}m).</span>
                 </div>
               `;
             }
           }
         },
         async (err) => {
-          console.warn("GPS unavailable or denied, falling back to IP network location:", err);
-          if (statusEl) {
-            statusEl.innerHTML = `
-              <div class="p-3 bg-blue-50 border border-blue-200 text-blue-900 rounded-xl text-xs flex items-center gap-2">
-                <i class="fa-solid fa-spinner fa-spin"></i>
-                <span>GPS unavailable. Resolving approximate network location...</span>
+          console.warn("GPS Geolocation error:", err);
+          let errorExplanation = "";
+
+          // 5. Friendly error messages
+          if (err.code === err.PERMISSION_DENIED || err.code === 1) {
+            errorExplanation = `
+              <div class="space-y-1">
+                <div class="font-bold flex items-center gap-1.5 text-rose-900">
+                  <span>🚫</span> <span>Location permission was denied.</span>
+                </div>
+                <p class="text-rose-800">To enable location: click the 🔒 lock / tune icon in your browser address bar → site permissions → allow <strong>Location</strong>, then click Retry.</p>
+              </div>
+            `;
+          } else if (err.code === err.TIMEOUT || err.code === 3) {
+            errorExplanation = `
+              <div class="space-y-1">
+                <div class="font-bold flex items-center gap-1.5 text-amber-900">
+                  <span>⏱️</span> <span>Location request timed out (10-second limit).</span>
+                </div>
+                <p class="text-amber-800">Please check GPS signal or click Retry below.</p>
+              </div>
+            `;
+          } else {
+            errorExplanation = `
+              <div class="space-y-1">
+                <div class="font-bold flex items-center gap-1.5 text-amber-900">
+                  <span>⚠️</span> <span>GPS position unavailable (${err.message || 'Weak signal'}).</span>
+                </div>
               </div>
             `;
           }
+
+          // 6. Fallback: estimate approximate location from IP
+          if (statusEl) {
+            statusEl.innerHTML = `
+              <div class="p-3.5 bg-amber-50 border border-amber-300 text-amber-900 rounded-xl text-xs space-y-2">
+                ${errorExplanation}
+                <div class="flex items-center justify-between pt-1 border-t border-amber-200">
+                  <span class="text-slate-600">Resolving approximate location from IP network...</span>
+                  <button type="button" id="btn-retry-gps" class="px-3 py-1 bg-white hover:bg-amber-100 border border-amber-300 rounded-lg text-amber-900 font-bold transition cursor-pointer">
+                    🔄 Retry GPS
+                  </button>
+                </div>
+              </div>
+            `;
+            const retryBtn = document.getElementById("btn-retry-gps");
+            if (retryBtn) retryBtn.onclick = triggerLocationDetection;
+          }
+
           try {
             const resp = await fetch("/api/ip-location");
             if (resp.ok) {
@@ -1191,28 +1302,45 @@ function bindLocationStepListeners() {
                 await updateFarmPosition(ip.lat, ip.lon, 2500, "network");
                 if (statusEl) {
                   statusEl.innerHTML = `
-                    <div class="p-3 bg-amber-50 border border-amber-200 text-amber-900 rounded-xl text-xs">
-                      ℹ️ Location set to <strong>${farmContext.display_name}</strong> (approximate – based on network). Drag the pin to your exact field.
+                    <div class="p-3.5 bg-amber-50 border border-amber-300 text-amber-900 rounded-xl text-xs space-y-2">
+                      ${errorExplanation}
+                      <div class="p-2 bg-white rounded-lg border border-amber-200 flex items-center justify-between flex-wrap gap-2">
+                        <span>ℹ️ Location estimated: <strong>${farmContext.display_name}</strong> (approximate – based on network).</span>
+                        <button type="button" id="btn-retry-gps-fallback" class="px-3 py-1 bg-amber-100 hover:bg-amber-200 text-amber-950 font-bold rounded-lg transition cursor-pointer">
+                          🔄 Retry GPS
+                        </button>
+                      </div>
                     </div>
                   `;
+                  const retryBtn = document.getElementById("btn-retry-gps-fallback");
+                  if (retryBtn) retryBtn.onclick = triggerLocationDetection;
                 }
                 return;
               }
             }
-          } catch (e) {}
+          } catch (ipErr) {
+            console.error("IP fallback failed:", ipErr);
+          }
 
           if (statusEl) {
             statusEl.innerHTML = `
               <div class="p-3 bg-rose-50 border border-rose-200 text-rose-900 rounded-xl text-xs">
-                ⚠️ Could not detect position. Please drag the pin on the map or search your village below.
+                ⚠️ Could not detect position. Please drag the pin on the map or type your village below.
               </div>
             `;
           }
         },
-        { enableHighAccuracy: true, timeout: 15000, maximumAge: 60000 }
+        { enableHighAccuracy: true, timeout: 10000, maximumAge: 30000 }
       );
     } else {
-      // Fallback directly to IP location
+      // 5. Unsupported browser message
+      if (statusEl) {
+        statusEl.innerHTML = `
+          <div class="p-3 bg-amber-50 border border-amber-200 text-amber-900 rounded-xl text-xs">
+            ⚠️ Geolocation is not supported by your browser. Please type your location manually in the search box below.
+          </div>
+        `;
+      }
       fetch("/api/ip-location")
         .then(r => r.json())
         .then(ip => {
@@ -1231,30 +1359,6 @@ function bindLocationStepListeners() {
   if (farmContext.location_source === "initial") {
     triggerLocationDetection();
   }
-
-  const btnSaveLoc = document.getElementById("btn-save-this-loc");
-  if (btnSaveLoc) {
-    btnSaveLoc.onclick = () => {
-      const saved = JSON.parse(localStorage.getItem('farmer_saved_locations') || '[]');
-      saved.push({
-        name: farmContext.village || "Karnataka Farm",
-        lat: farmContext.lat,
-        lon: farmContext.lon
-      });
-      localStorage.setItem('farmer_saved_locations', JSON.stringify(saved.slice(-6)));
-      renderLocationStepView(document.getElementById("panel-step-1"));
-    };
-  }
-
-  document.querySelectorAll(".btn-load-saved-loc").forEach(btn => {
-    btn.onclick = async () => {
-      const idx = parseInt(btn.getAttribute("data-idx") || "0");
-      const saved = JSON.parse(localStorage.getItem('farmer_saved_locations') || '[]');
-      if (saved[idx]) {
-        await updateFarmPosition(saved[idx].lat, saved[idx].lon, 15.0, "saved");
-      }
-    };
-  });
 
   const btnSearch = document.getElementById("btn-exec-search");
   const inputSearch = document.getElementById("input-search-place");
@@ -1300,8 +1404,20 @@ function bindLocationStepListeners() {
 function renderLocationDisplayCards() {
   const v = document.getElementById("loc-display-village");
   const s = document.getElementById("loc-display-state");
-  if (v) v.innerText = farmContext.village || "Karnataka Farm";
+  const latEl = document.getElementById("loc-display-lat");
+  const lonEl = document.getElementById("loc-display-lon");
+  const accEl = document.getElementById("loc-display-acc");
+  const locInput = document.getElementById("location");
+
+  if (v) v.innerText = farmContext.village || "Bengaluru";
   if (s) s.innerText = (farmContext.district ? farmContext.district + ", " : "") + farmContext.state;
+  if (latEl) latEl.innerText = `${farmContext.lat.toFixed(4)}° N`;
+  if (lonEl) lonEl.innerText = `${farmContext.lon.toFixed(4)}° E`;
+  if (accEl) accEl.innerText = `±${(farmContext.accuracy_meters || 20).toFixed(0)}m`;
+  if (locInput) {
+    if (locInput.tagName === "INPUT" || locInput.tagName === "TEXTAREA") locInput.value = farmContext.display_name;
+    else locInput.innerText = farmContext.display_name;
+  }
 }
 
 // ============================================================================
@@ -2348,7 +2464,7 @@ async function renderResultsStepView(container) {
     return;
   }
 
-  const topCrops = (recommendData && recommendData.top_crops) || [];
+  const topCrops = ((recommendData && recommendData.top_crops) || []).slice(0, 3);
   const weatherFitCrops = (recommendData && recommendData.weather_fit_crops) || [];
   const alternativeCrops = (recommendData && recommendData.alternative_crops) || [];
 
@@ -2742,38 +2858,76 @@ function bindShellListeners() {
       uncAlert.classList.add("hidden");
       card.classList.add("hidden");
 
+      // Show loading indicator
+      let loadingEl = document.getElementById("leaf-loading-indicator");
+      if (!loadingEl) {
+        loadingEl = document.createElement("div");
+        loadingEl.id = "leaf-loading-indicator";
+        loadingEl.className = "p-6 rounded-2xl bg-blue-50 border border-blue-200 text-center space-y-2 text-xs text-blue-900";
+        loadingEl.innerHTML = `<div class="inline-block animate-spin text-2xl text-blue-600"><i class="fa-solid fa-spinner"></i></div><div class="font-bold">Analyzing leaf with PlantVillage AI...</div><div class="text-[11px] text-blue-700">Detecting foliar blight, lesions, and symptoms.</div>`;
+        card.parentNode.insertBefore(loadingEl, card);
+      }
+      loadingEl.classList.remove("hidden");
+
       const fd = new FormData();
+      fd.append("photo", file);
       fd.append("file", file);
 
       try {
         const resp = await fetch("/api/photo/leaf-disease", { method: "POST", body: fd });
+        loadingEl.classList.add("hidden");
         if (resp.ok) {
           const res = await resp.json();
-          if (res.status === "not_leaf") {
+          if (res.status === "not_leaf" || res.is_leaf === false) {
             rejAlert.classList.remove("hidden");
-          } else if (res.status === "uncertain" || (res.confidence && res.confidence < 0.60)) {
+            const rejTxt = rejAlert.querySelector("p");
+            const reason = currentLang === 'kn' ? (res.rejection_reason_kn || res.rejection_reason) : (currentLang === 'hi' ? (res.rejection_reason_hi || res.rejection_reason) : res.rejection_reason);
+            if (rejTxt && reason) rejTxt.innerText = reason;
+          } else if (res.status === "uncertain" || (res.confidence_pct && res.confidence_pct < 60) || (res.confidence && res.confidence < 0.60 && res.confidence <= 1.0)) {
             uncAlert.classList.remove("hidden");
+            const msg = currentLang === 'kn' ? (res.message_kn || res.message) : (currentLang === 'hi' ? (res.message_hi || res.message) : res.message);
+            if (msg) {
+              uncAlert.innerHTML = `
+                <div class="font-bold text-amber-900 flex items-center gap-1.5">
+                  <span>⚠️</span> <span>Low Confidence / Uncertain Diagnosis</span>
+                </div>
+                <p class="text-amber-800 text-xs">${msg}</p>
+              `;
+            }
           } else {
             card.classList.remove("hidden");
-            document.getElementById("leaf-diagnosis-name").innerText = res.disease_name;
+            const diseaseName = currentLang === 'kn' ? (res.disease_name_kn || res.disease_name) : (currentLang === 'hi' ? (res.disease_name_hi || res.disease_name) : res.disease_name);
+            document.getElementById("leaf-diagnosis-name").innerText = diseaseName;
+
+            const confPct = res.confidence_pct !== undefined ? res.confidence_pct : (res.confidence > 1 ? res.confidence : res.confidence * 100);
             const badge = document.getElementById("leaf-confidence-badge");
-            badge.innerText = `${(res.confidence * 100).toFixed(1)}% Confidence`;
-            badge.className = `px-2.5 py-1 rounded-full text-xs font-bold ${res.confidence > 0.75 ? 'bg-emerald-100 text-emerald-800' : 'bg-amber-100 text-amber-800'}`;
+            badge.innerText = `${confPct.toFixed(1)}% Confidence`;
+            badge.className = `px-2.5 py-1 rounded-full text-xs font-bold ${confPct >= 75 ? 'bg-emerald-100 text-emerald-800' : 'bg-amber-100 text-amber-800'}`;
 
             document.getElementById("leaf-pathogen-txt").innerText = res.pathogen || "N/A";
-            document.getElementById("leaf-symptoms-txt").innerText = res.symptoms || "N/A";
-            document.getElementById("leaf-treatment-txt").innerText = res.treatment_guidance || "Consult agriculture officer.";
+            document.getElementById("leaf-symptoms-txt").innerText = (currentLang === 'kn' ? (res.symptoms_kn || res.symptoms) : (currentLang === 'hi' ? (res.symptoms_hi || res.symptoms) : res.symptoms)) || "N/A";
+
+            const treatmentSteps = currentLang === 'kn' ? (res.treatment_steps_kn || res.treatment_steps) : (currentLang === 'hi' ? (res.treatment_steps_hi || res.treatment_steps) : res.treatment_steps);
+            const treatmentTxt = Array.isArray(treatmentSteps) ? treatmentSteps.join('\n\n') : (res.treatment_guidance || "Consult local agriculture officer.");
+            document.getElementById("leaf-treatment-txt").innerText = treatmentTxt;
 
             const img = document.getElementById("leaf-annotated-img");
-            if (res.annotated_image_base64) {
-              img.src = "data:image/jpeg;base64," + res.annotated_image_base64;
+            const imgSrc = res.annotated_image || (res.annotated_image_base64 ? `data:image/jpeg;base64,${res.annotated_image_base64}` : null);
+            if (imgSrc) {
+              img.src = imgSrc;
               img.classList.remove("hidden");
             } else {
               img.classList.add("hidden");
             }
           }
+        } else {
+          loadingEl.classList.add("hidden");
+          rejAlert.classList.remove("hidden");
+          const rejTxt = rejAlert.querySelector("p");
+          if (rejTxt) rejTxt.innerText = `Analysis error (${resp.status}). Please try a clearer leaf photo.`;
         }
       } catch (err) {
+        loadingEl.classList.add("hidden");
         console.error("Leaf scanner error:", err);
       }
     };

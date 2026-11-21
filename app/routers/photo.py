@@ -3,6 +3,7 @@ Photo Check Router: Implements POST /api/photo-check with Layered Non-Crop Rejec
 Rejects screenshots, selfies, non-crop objects, and low-confidence predictions.
 """
 
+from typing import Optional
 from fastapi import APIRouter, UploadFile, File, HTTPException
 from app.schemas import PhotoCheckResponse
 from app.services.vision_service import process_crop_photo
@@ -30,16 +31,23 @@ async def api_photo_check(photo: UploadFile = File(...)):
         raise HTTPException(status_code=500, detail=f"Photo evaluation failed: {str(e)}")
 
 @router.post("/photo/leaf-disease")
-async def api_leaf_disease(photo: UploadFile = File(...)):
+async def api_leaf_disease(
+    photo: Optional[UploadFile] = File(None),
+    file: Optional[UploadFile] = File(None)
+):
     """
     POST /api/photo/leaf-disease
     Phase 4: Foliar pest & disease detection on PlantVillage benchmark YOLO model:
+    - Accepts 'photo' or 'file' multipart field
     - Rejects non-leaf imagery
     - 60% confidence gate (returns 'Uncertain' if < 0.60)
     - Actionable treatments, annotated bounding boxes, and mandatory agriculture officer disclaimer.
     """
+    upload = photo or file
+    if upload is None:
+        raise HTTPException(status_code=400, detail="No leaf photo file provided in request.")
     try:
-        contents = await photo.read()
+        contents = await upload.read()
         result = analyze_leaf_disease(contents)
         return result
     except Exception as e:

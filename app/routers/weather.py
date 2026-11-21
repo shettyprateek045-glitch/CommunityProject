@@ -91,6 +91,28 @@ async def api_geocode(q: str = Query(..., min_length=1, description="Village or 
     except Exception as e:
         raise HTTPException(status_code=400, detail=f"Geocode search error: {str(e)}")
 
+@router.get("/reverse-geocode")
+async def api_reverse_geocode(lat: float = Query(...), lon: Optional[float] = None, lng: Optional[float] = None):
+    """
+    GET /api/reverse-geocode?lat=...&lon=...
+    Reverse-geocodes coordinates into a full address using OpenStreetMap Nominatim.
+    """
+    actual_lon = lon if lon is not None else (lng if lng is not None else 77.5946)
+    try:
+        res = await reverse_geocode_async(lat, actual_lon)
+        return {"status": "success", "result": res}
+    except Exception as e:
+        return {
+            "status": "fallback",
+            "result": {
+                "display_name": f"Coordinates ({lat:.4f}, {actual_lon:.4f})",
+                "village": "Local Farm",
+                "district": "Local District",
+                "state": "Karnataka",
+                "country": "India"
+            }
+        }
+
 @router.post("/weather/irrigation-schedule")
 async def api_irrigation_schedule(request: Request):
     """

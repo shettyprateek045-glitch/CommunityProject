@@ -102,7 +102,7 @@ async def reverse_geocode_async(lat: float, lon: float) -> Dict[str, Any]:
         conn.close()
         return json.loads(row[0])
 
-    url = f"https://nominatim.openstreetmap.org/reverse?format=json&lat={lat}&lon={lon}&zoom=14&addressdetails=1"
+    url = f"https://nominatim.openstreetmap.org/reverse?format=json&lat={lat}&lon={lon}&zoom=18&addressdetails=1"
     headers = {"User-Agent": "FarmerDecisionDashboard/2.1 (contact: agro-precision@community-project.org)"}
     
     try:

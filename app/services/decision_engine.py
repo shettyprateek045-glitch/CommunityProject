@@ -406,7 +406,7 @@ def compute_farmer_recommendations(
     working_pool = viable_candidates
 
     working_pool.sort(key=lambda x: x["composite_score"], reverse=True)
-    top_5 = working_pool[:5]
+    top_3 = working_pool[:3]
 
     # Section B: Top 3 for Current Weather
     # Select crops that thrive in the current temperature and rainfall profile without regional mismatch
@@ -484,7 +484,7 @@ def compute_farmer_recommendations(
     )
 
     return {
-        "top_crops": top_5,
+        "top_crops": top_3,
         "weather_fit_crops": weather_fit_crops,
         "alternative_crops": alternative_crops[:3],
         "all_candidates_count": len(working_pool),

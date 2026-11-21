@@ -59,8 +59,11 @@ def check_non_leaf_gate(image_pil: Image.Image) -> Dict[str, Any]:
     green_mask = (g > (r + 10.0)) & (g > (b + 10.0)) & (g > 40.0)
     # Yellow-green/chlorotic leaf mask
     yellow_mask = (r > 60.0) & (g > 60.0) & (b < 140.0) & (abs(r - g) < 50.0)
-    # Dark necrotic brown/black lesion on leaf tissue mask
-    plant_mask = green_mask | yellow_mask
+    # Dark necrotic brown/black lesion on leaf tissue mask (blight symptoms)
+    brown_lesion_mask = (r > 40.0) & (g > 30.0) & (b < 120.0) & (r >= g) & ((r - b) > 15.0)
+    # Pale green / vegetative tissue
+    vegetative_mask = (g > b) & (g > 35.0) & ((g + r) > 2.0 * b)
+    plant_mask = green_mask | yellow_mask | brown_lesion_mask | vegetative_mask
 
     foliage_ratio = float(np.mean(plant_mask))
 
@@ -76,7 +79,7 @@ def check_non_leaf_gate(image_pil: Image.Image) -> Dict[str, Any]:
             "reason_hi": "❌ आकाश या डिजिटल स्क्रीन का पता चला। कृपया पौधे की पत्ती का स्पष्ट फोटो लें।"
         }
 
-    if foliage_ratio < 0.08:
+    if foliage_ratio < 0.05:
         # Check if it might be pure bare soil (Brownish red / grey)
         return {
             "is_leaf": False,
@@ -279,18 +282,27 @@ def analyze_leaf_disease(file_bytes: bytes) -> Dict[str, Any]:
             "status": "uncertain",
             "is_leaf": True,
             "disease": "Uncertain",
-            "confidence": round(reported_conf, 1),
+            "disease_name": "Uncertain / Low Confidence",
+            "confidence": round(reported_conf / 100.0, 4),
+            "confidence_pct": round(reported_conf, 1),
             "message": f"Uncertain ({reported_conf:.1f}% < 60% threshold). Please retake the photo in bright, even lighting and focus closely on the affected leaf area.",
             "message_kn": f"ಅನಿಶ್ಚಿತ ಫಲಿತಾಂಶ ({reported_conf:.1f}% < 60% ಖಚಿತತೆ). ದಯವಿಟ್ಟು ಉತ್ತಮ ಬೆಳಕಿನಲ್ಲಿ ಎಲೆಯ ಮಚ್ಚೆಯ ಮೇಲೆ ಫೋಕಸ್ ಮಾಡಿ ಮತ್ತೊಮ್ಮೆ ಫೋಟೋ ತೆಗೆಯಿರಿ.",
             "message_hi": f"अनिश्चित परिणाम ({reported_conf:.1f}% < 60% सटीकता)। कृपया अच्छी रोशनी में पत्ती के प्रभावित हिस्से पर ध्यान केंद्रित करके दोबारा फोटो लें।",
+            "treatment_guidance": "Symptom confidence is below 60%. Please consult your nearest Krishi Vigyan Kendra (KVK) or Agriculture Officer for physical leaf inspection.",
+            "symptoms": "Foliar spotting detected but morphological features are below 60% confidence gate.",
+            "pathogen": "Foliar pathogen suspected (unconfirmed)",
             "detected_candidates": detected_items,
             "annotated_image": annotated_b64,
+            "annotated_image_base64": annotated_b64.replace("data:image/jpeg;base64,", "") if annotated_b64 else None,
             "consult_officer_note": "Advice is guidance only. Always consult your local agriculture officer or Krishi Vigyan Kendra (KVK) before applying chemical treatments."
         }
 
     # Confident detection (>= 60%)
     cls_name = top_match["class_name"]
     meta = DISEASE_KNOWLEDGE.get(cls_name, DISEASE_KNOWLEDGE["Leaf"])
+    conf_pct = float(top_match["confidence"])
+    conf_fraction = round(conf_pct / 100.0, 4)
+    treatment_steps = meta.get("treatment_steps", [])
 
     return {
         "status": "ok",
@@ -299,16 +311,19 @@ def analyze_leaf_disease(file_bytes: bytes) -> Dict[str, Any]:
         "disease_name": meta["disease_name"],
         "disease_name_kn": meta["disease_name_kn"],
         "disease_name_hi": meta["disease_name_hi"],
-        "confidence": top_match["confidence"],
+        "confidence": conf_fraction,
+        "confidence_pct": conf_pct,
         "severity": meta["severity"],
         "pathogen": meta["pathogen"],
         "symptoms": meta["symptoms"],
         "symptoms_kn": meta["symptoms_kn"],
         "symptoms_hi": meta["symptoms_hi"],
-        "treatment_steps": meta["treatment_steps"],
-        "treatment_steps_kn": meta["treatment_steps_kn"],
-        "treatment_steps_hi": meta["treatment_steps_hi"],
+        "treatment_steps": treatment_steps,
+        "treatment_guidance": "\n\n".join(treatment_steps),
+        "treatment_steps_kn": meta.get("treatment_steps_kn", []),
+        "treatment_steps_hi": meta.get("treatment_steps_hi", []),
         "annotated_image": annotated_b64,
+        "annotated_image_base64": annotated_b64.replace("data:image/jpeg;base64,", "") if annotated_b64 else None,
         "detected_count": len(detected_items),
         "all_detections": detected_items[:5],
         "model_info": "YOLO11m fine-tuned on PlantVillage foliar disease benchmark dataset (held-out validation accuracy 86.2% precision).",
