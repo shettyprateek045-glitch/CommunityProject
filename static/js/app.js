@@ -2945,22 +2945,32 @@ function bindShellListeners() {
       listContainer.innerHTML = `<div class="text-center py-6 text-slate-400">Loading government schemes...</div>`;
       const schemesData = await fetchSchemes();
       const schemes = Array.isArray(schemesData) ? schemesData : (schemesData.schemes || []);
-      listContainer.innerHTML = schemes.map(s => `
-        <div class="p-4 rounded-2xl bg-earth-50 border border-earth-200 space-y-2">
-          <div class="flex items-center justify-between">
-            <h4 class="font-extrabold text-slate-900 text-sm">${s.name}</h4>
-            <span class="text-[10px] bg-emerald-100 text-emerald-800 font-bold px-2 py-0.5 rounded-full">${s.type}</span>
+      listContainer.innerHTML = schemes.map(s => {
+        const portalUrl = s.official_portal_url || s.portal_url || '#';
+        const category = s.category || s.type || 'Government Scheme';
+        const name = (currentLang === 'kn' && s.name_kn) ? s.name_kn : ((currentLang === 'hi' && s.name_hi) ? s.name_hi : s.name);
+        const benefit = (currentLang === 'kn' && s.benefit_kn) ? s.benefit_kn : ((currentLang === 'hi' && s.benefit_hi) ? s.benefit_hi : s.benefit);
+        const eligibility = (currentLang === 'kn' && s.eligibility_kn) ? s.eligibility_kn : ((currentLang === 'hi' && s.eligibility_hi) ? s.eligibility_hi : s.eligibility);
+        const eligibilityLabel = currentLang === 'kn' ? 'ಅರ್ಹತೆ:' : (currentLang === 'hi' ? 'पात्रता:' : 'Eligibility:');
+        const verifiedLabel = currentLang === 'kn' ? 'ಪರಿಶೀಲಿಸಲಾಗಿದೆ:' : (currentLang === 'hi' ? 'सत्यापित:' : 'Verified:');
+        const portalBtnText = currentLang === 'kn' ? 'ಅಧಿಕೃತ ಪೋರ್ಟಲ್ ↗' : (currentLang === 'hi' ? 'आधिकारिक पोर्टल ↗' : 'Official Portal ↗');
+
+        return `
+        <div class="p-4 rounded-2xl bg-earth-50 border border-earth-200 space-y-2 hover:border-emerald-300 transition">
+          <div class="flex items-center justify-between gap-2">
+            <h4 class="font-extrabold text-slate-900 text-sm leading-snug">${name}</h4>
+            <span class="text-[10px] bg-emerald-100 text-emerald-800 font-bold px-2 py-0.5 rounded-full shrink-0">${category}</span>
           </div>
-          <p class="text-slate-600">${s.benefit}</p>
-          <div class="text-slate-500 font-medium"><strong>Eligibility:</strong> ${s.eligibility}</div>
+          <p class="text-slate-600 leading-relaxed">${benefit}</p>
+          <div class="text-slate-500 font-medium"><strong>${eligibilityLabel}</strong> ${eligibility}</div>
           <div class="flex items-center justify-between pt-2 border-t border-slate-200/60">
-            <span class="text-[10px] text-slate-400">Verified: ${s.last_verified}</span>
-            <a href="${s.official_portal_url}" target="_blank" rel="noopener noreferrer" class="px-3 py-1 bg-[#1b5e20] text-white rounded-lg font-bold hover:bg-[#2e7d32] transition text-[11px]">
-              Official Portal ↗
+            <span class="text-[10px] text-slate-400">${verifiedLabel} ${s.last_verified || '2026-11-20'}</span>
+            <a href="${portalUrl}" target="_blank" rel="noopener noreferrer" class="px-3 py-1.5 bg-[#1b5e20] hover:bg-[#2e7d32] text-white rounded-lg font-bold transition text-[11px] inline-flex items-center gap-1 shadow-xs cursor-pointer">
+              <span>${portalBtnText}</span>
             </a>
           </div>
         </div>
-      `).join('');
+      `}).join('');
     };
   }
   if (btnCloseSchemes && modalSchemes) btnCloseSchemes.onclick = () => modalSchemes.classList.add("hidden");

@@ -14,7 +14,8 @@
     "eligibility_hi": "अपने नाम पर कृषि योग्य भूमि रखने वाले सभी किसान परिवार (उच्च आय वर्ग को छोड़कर)।",
     "portal_url": "https://pmkisan.gov.in",
     "last_verified": "2026-11-20",
-    "status": "Active"
+    "status": "Active",
+    "official_portal_url": "https://pmkisan.gov.in"
   },
   {
     "id": "pmfby",
@@ -31,7 +32,8 @@
     "eligibility_hi": "अधिसूचित क्षेत्रों में अधिसूचित फसलें उगाने वाले सभी किसान।",
     "portal_url": "https://pmfby.gov.in",
     "last_verified": "2026-11-20",
-    "status": "Active"
+    "status": "Active",
+    "official_portal_url": "https://pmfby.gov.in"
   },
   {
     "id": "pmksy",
@@ -48,7 +50,8 @@
     "eligibility_hi": "निश्चित जल स्रोत (कुआं, नलकूप, नहर) के साथ कृषि योग्य भूमि वाले किसान।",
     "portal_url": "https://pmksy.gov.in",
     "last_verified": "2026-11-20",
-    "status": "Active"
+    "status": "Active",
+    "official_portal_url": "https://pmksy.gov.in"
   },
   {
     "id": "soil-health-card",
@@ -65,7 +68,8 @@
     "eligibility_hi": "सभी राज्यों और केंद्र शासित प्रदेशों के सभी किसान।",
     "portal_url": "https://soilhealth.dac.gov.in",
     "last_verified": "2026-11-20",
-    "status": "Active"
+    "status": "Active",
+    "official_portal_url": "https://soilhealth.dac.gov.in"
   },
   {
     "id": "pkvy",
@@ -82,7 +86,8 @@
     "eligibility_hi": "कम से कम 50 एकड़ भूमि पर 20 या अधिक किसानों का समूह बनाने वाले किसान।",
     "portal_url": "https://pgsindia-ncof.gov.in",
     "last_verified": "2026-11-20",
-    "status": "Active"
+    "status": "Active",
+    "official_portal_url": "https://pgsindia-ncof.gov.in"
   },
   {
     "id": "rkvy",
@@ -98,6 +103,43 @@
     "eligibility_kn": "ರೈತರು, ರೈತ ಉತ್ಪಾದಕ ಸಂಸ್ಥೆಗಳು (FPO) ಮತ್ತು ಗ್ರಾಮೀಣ ಕೃಷಿ ಉದ್ಯಮಿಗಳು.",
     "eligibility_hi": "किसान, एफपीओ (किसान उत्पादक संगठन) और ग्रामीण कृषि उद्यमी।",
     "portal_url": "https://rkvy.nic.in",
+    "last_verified": "2026-11-20",
+    "status": "Active",
+    "official_portal_url": "https://rkvy.nic.in"
+  },
+  {
+    "id": "krishi-bhagya",
+    "name": "Karnataka Krishi Bhagya Scheme (Farm Pond & Micro-Irrigation)",
+    "name_kn": "ಕರ್ನಾಟಕ ಕೃಷಿ ಭಾಗ್ಯ ಯೋಜನೆ (ಕೃಷಿ ಹೊಂಡ ಮತ್ತು ಹನಿ ನೀರಾವರಿ)",
+    "name_hi": "कर्नाटक कृषि भाग्य योजना (खेत तालाब और सूक्ष्म सिंचाई)",
+    "ministry": "Department of Agriculture, Government of Karnataka",
+    "category": "Water Conservation & Subsidy",
+    "benefit": "80% to 90% subsidy for SC/ST farmers and up to 50% for general farmers for digging farm ponds (Krishi Honda), polythene lining, diesel pumps, and shade nets.",
+    "benefit_kn": "ಕೃಷಿ ಹೊಂಡ ನಿರ್ಮಾಣ, ಪಾಲಿಥೀನ್ ಹೊದಿಕೆ, ಡೀಸೆಲ್ ಪಂಪ್ ಮತ್ತು ನೆರಳು ಪರದೆಗಳಿಗೆ ಪರಿಶಿಷ್ಟ ಜಾತಿ/ಪಂಗಡದ ರೈತರಿಗೆ 80%-90% ಹಾಗೂ ಸಾಮಾನ್ಯ ರೈತರಿಗೆ 50% ಸಹಾಯಧನ.",
+    "benefit_hi": "खेत तालाब निर्माण, पॉलीथीन लाइनिंग और पंपसेट के लिए एससी/एसटी किसानों को 80%-90% तथा सामान्य किसानों को 50% तक सब्सिडी।",
+    "eligibility": "Farmers of dry-land agriculture zones across Karnataka holding valid RTC/Pahani.",
+    "eligibility_kn": "ಮಾನ್ಯವಾದ ಆರ್‌ಟಿಸಿ/ಪಹಣಿ ಹೊಂದಿರುವ ಕರ್ನಾಟಕದ ಮಳೆಯಾಶ್ರಿತ ಒಣಭೂಮಿ ಪ್ರದೇಶಗಳ ರೈತರು.",
+    "eligibility_hi": "कर्नाटक के वर्षा आधारित शुष्क कृषि क्षेत्रों के सभी भूमिधारक किसान।",
+    "portal_url": "https://raitamitra.karnataka.gov.in",
+    "official_portal_url": "https://raitamitra.karnataka.gov.in",
+    "last_verified": "2026-11-20",
+    "status": "Active"
+  },
+  {
+    "id": "fruits-karnataka",
+    "name": "FRUITS Karnataka (Farmer Registration & Unified Beneficiary Portal)",
+    "name_kn": "ಫ್ರೂಟ್ಸ್ ಕರ್ನಾಟಕ (ರೈತರ ನೋಂದಣಿ ಮತ್ತು ಏಕೀಕೃತ ಫಲಾನುಭವಿ ಪೋರ್ಟಲ್)",
+    "name_hi": "फ्रूट्स कर्नाटक (किसान पंजीकरण और एकीकृत लाभार्थी पोर्टल)",
+    "ministry": "e-Governance / Agriculture Department, Government of Karnataka",
+    "category": "Farmer DBT & Unified Services",
+    "benefit": "Single-window digital identification (FID) linking land ownership, Aadhaar, and bank accounts for direct release of all state & central subsidies without middlemen.",
+    "benefit_kn": "ಎಲ್ಲಾ ರಾಜ್ಯ ಮತ್ತು ಕೇಂದ್ರ ಸಬ್ಸಿಡಿಗಳನ್ನು ಮಧ್ಯವರ್ತಿಗಳಿಲ್ಲದೆ ನೇರವಾಗಿ ಪಡೆಯಲು ಭೂ ಒಡೆತನ, ಆಧಾರ್ ಮತ್ತು ಬ್ಯಾಂಕ್ ಲಿಂಕ್ ಮಾಡುವ ಏಕೈಕ ಡಿಜಿಟಲ್ ಗುರುತು (FID).",
+    "benefit_hi": "बिना बिचौलियों के सीधे राज्य और केंद्रीय सब्सिडी प्राप्त करने हेतु भूमि स्वामित्व, आधार और बैंक खाते से जुड़ा एकल डिजिटल किसान पहचान पत्र (FID)।",
+    "eligibility": "All farmers owning or cultivating agricultural land in Karnataka State.",
+    "eligibility_kn": "ಕರ್ನಾಟಕ ರಾಜ್ಯದಲ್ಲಿ ಕೃಷಿ ಭೂಮಿ ಹೊಂದಿರುವ ಅಥವಾ ಸಾಗುವಳಿ ಮಾಡುವ ಎಲ್ಲಾ ರೈತರು.",
+    "eligibility_hi": "कर्नाटक राज्य में कृषि भूमि रखने वाले या खेती करने वाले सभी किसान।",
+    "portal_url": "https://fruits.karnataka.gov.in",
+    "official_portal_url": "https://fruits.karnataka.gov.in",
     "last_verified": "2026-11-20",
     "status": "Active"
   }

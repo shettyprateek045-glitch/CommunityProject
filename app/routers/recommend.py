@@ -167,6 +167,13 @@ async def api_schemes(category: Optional[str] = None, q: Optional[str] = None):
                 or query in s.get("name_hi", "").lower()
                 or query in s.get("benefit", "").lower()
             ]
+        for s in schemes:
+            url = s.get("portal_url") or s.get("official_portal_url") or "#"
+            s["portal_url"] = url
+            s["official_portal_url"] = url
+            cat = s.get("category") or s.get("type") or "Government Scheme"
+            s["category"] = cat
+            s["type"] = cat
         return {"status": "success", "schemes": schemes, "last_verified": "2026-11-20"}
     except Exception as e:
         raise HTTPException(status_code=500, detail=f"Schemes lookup error: {str(e)}")
