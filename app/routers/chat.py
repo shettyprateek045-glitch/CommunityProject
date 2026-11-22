@@ -386,6 +386,7 @@ Answer in {'Kannada' if is_kn else 'English'}. Keep your answer concise (under 9
         except Exception as e:
             print(f"[VERIFY AGENT GEMINI ERROR] {e}")
 
+    openai_error_detail = None
     if openai_key:
         try:
             sys_prompt = f"""You are the Step 7 AI Crop and Market Verification Agent for the Farmer Decision Dashboard.
@@ -435,7 +436,15 @@ Answer in {'Kannada' if is_kn else 'English'}. Keep your answer concise (under 9
                         },
                         suggestions=["Confirm fertilizer schedule", "Check harvesting date", "Download advisory PDF"]
                     )
+                else:
+                    try:
+                        err_json = res.json()
+                        openai_error_detail = err_json.get("error", {}).get("message", res.text)
+                    except Exception:
+                        openai_error_detail = res.text
+                    print(f"[VERIFY AGENT OPENAI ERROR] HTTP {res.status_code}: {openai_error_detail}")
         except Exception as e:
+            openai_error_detail = str(e)
             print(f"[VERIFY AGENT OPENAI ERROR] {e}")
 
     # Fallback to High-precision Intelligent Agronomic Verification Engine
@@ -448,7 +457,27 @@ Answer in {'Kannada' if is_kn else 'English'}. Keep your answer concise (under 9
     ]) and not any(k in q_lower for k in ["price", "mandi", "fertilizer", "yield", "rate", "cost"])
 
     if is_greeting_or_status:
-        if is_kn:
+        if openai_error_detail and "credit" in openai_error_detail.lower():
+            if is_kn:
+                reply_txt = (
+                    f"ನಿಮ್ಮ OpenAI ChatGPT ಕೀಯನ್ನು ಯಶಸ್ವಿಯಾಗಿ ಸಂಪರ್ಕಿಸಲಾಗಿದೆ!\n\n"
+                    f"ಆದರೆ ನಿಮ್ಮ OpenAI ಖಾತೆಯಲ್ಲಿ ಕ್ರೆಡಿಟ್ ಮುಗಿದಿದೆ (HTTP 429: credit_balance_exhausted).\n\n"
+                    f"ಪರಿಹಾರ:\n"
+                    f"1. OpenAI ಬಿಲ್ಲಿಂಗ್‌ನಲ್ಲಿ ಕ್ರೆಡಿಟ್ ಸೇರಿಸಿ (platform.openai.com/settings/organization/billing), ಅಥವಾ\n"
+                    f"2. ಸಂಪೂರ್ಣ ಉಚಿತ Google Gemini ಕೀಯನ್ನು ಬಳಸಿ (aistudio.google.com/app/apikey).\n\n"
+                    f"ಪ್ರಸ್ತುತ, ಸ್ಥಳೀಯ ಕೃಷಿ ಪರಿಶೀಲನಾ ಎಂಜಿನ್ ಸಕ್ರಿಯವಾಗಿದ್ದು {top_name} ಬೆಳೆ ಮತ್ತು 30 ದಿನಗಳ ಮಂಡಿ ಧಾರಣೆಯನ್ನು ನಿಖರವಾಗಿ ಪರಿಶೀಲಿಸುತ್ತಿದೆ!"
+                )
+            else:
+                reply_txt = (
+                    f"OpenAI ChatGPT API Key Connected Successfully!\n\n"
+                    f"However, OpenAI returned a quota limitation (HTTP 429: Credit balance exhausted):\n"
+                    f"\"{openai_error_detail}\"\n\n"
+                    f"Next Steps to activate live responses:\n"
+                    f"• Option 1: Add credits to your OpenAI account at https://platform.openai.com/settings/organization/billing\n"
+                    f"• Option 2: Use a 100% free Google Gemini key from https://aistudio.google.com/app/apikey (generous free tier, no credit card required).\n\n"
+                    f"In the meantime, the Local Agronomic Intelligence Engine is actively verifying your recommended crop ({top_name}) and 30-day Mandi market price trends!"
+                )
+        elif is_kn:
             reply_txt = (
                 f"ನಮಸ್ಕಾರ! ನಾನು ನಿಮ್ಮ AI ಕೃಷಿ ಮತ್ತು ಮಾರುಕಟ್ಟೆ ಪರಿಶೀಲನಾ ಸಹಾಯಕ.\n\n"
                 f"ಸಂಪರ್ಕ ಸ್ಥಿತಿ: ಪ್ರಸ್ತುತ ಸ್ಥಳೀಯ ಕೃಷಿ ಇಂಟೆಲಿಜೆನ್ಸ್ ಎಂಜಿನ್ (ಆಫ್‌ಲೈನ್ ಮೋಡ್) ನಲ್ಲಿ ಕಾರ್ಯನಿರ್ವಹಿಸುತ್ತಿದ್ದೇನೆ. "

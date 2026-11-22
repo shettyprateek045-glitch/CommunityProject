@@ -14,7 +14,7 @@
 
 ---
 
-## 🌾 Comprehensive Platform Workflow (6 Steps + AI Assistants)
+## 🌾 Comprehensive Platform Workflow (7 Steps + AI Assistants)
 
 The **Farmer Decision Dashboard** operates as an end-to-end precision agronomy advisor running on **FastAPI** (port 5000) and responsive client-side web application with PWA offline caching.
 
@@ -25,15 +25,16 @@ flowchart LR
     C --> D["4. Farm Profile<br/>Acres, Budget, Irrigation"]
     D --> E["5. Last Crop<br/>Rotation & N-Fixation"]
     E --> F["6. Recommendations<br/>Top 3 Crops + Market"]
+    F --> J["7. 30-Day Market & Verification<br/>Price Diff % + AI Multi-Modal"]
     
     subgraph Integrated AI Engines
         G["Krishi Mitra AI Chatbot<br/>(Voice, EN/KN, Navigation)"]
         H["PlantVillage YOLOv11<br/>Leaf Disease Scanner"]
         I["Downloadable PDF Report<br/>(ReportLab 5.0)"]
     end
-    F -.-> G
-    F -.-> H
-    F -.-> I
+    J -.-> G
+    J -.-> H
+    J -.-> I
 ```
 
 ### 1. Step-by-Step Workflow Description
@@ -164,6 +165,16 @@ flowchart LR
     - **Voice Verification**: Web Speech API speech-to-text (`SpeechRecognition`) in English and Kannada with live listening pulse animation, plus spoken audio responses via `speechSynthesis` with an audio mute toggle (🔊 / 🔇).
     - **Document & Photo Upload**: Upload Soil Health Card, Field Photo, Crop/Leaf Photo, or Mandi Receipt (`#input-step7-upload`) to receive a certified AI verification assessment.
   - **Backend Multi-Modal Endpoint (`POST /api/verify/agent`)**: Connects to Google Gemini 1.5/2.0 API or OpenAI GPT-4o when `.env` keys are configured, falling back to local deep-learning diagnostics (PlantVillage YOLOv11 leaf classifier and MobileNetV2 soil classifier).
+
+### 7. Full-Screen Slow-Motion Background Video & Glassmorphic UI
+- **Persistent Video Background**:
+  - Full-screen looping YouTube video background (`85kTHwJ1Ju8`, *Rural Farming & Agriculture*) running at **0.5x slow-motion** via the YouTube IFrame API ([`static/js/bg-video.js`](static/js/bg-video.js)).
+  - Scaled cover container (`177.78vh` by `56.25vw`, `min-width: 100vw`, `min-height: 100vh`) with dark gradient overlay (`rgba(0,0,0,0.45)`) eliminating black bars and maximizing text contrast.
+  - **Seamless Navigation**: Stores playback timestamp in `sessionStorage` and seeks to resume across page routes without restarting.
+  - **Fallbacks & Accessibility**: Offline HTML5 video fallback (`static/videos/farmer_field.mp4`) and static poster (`static/img/bg-poster.jpg`) on slow networks, Save-Data mode, or `prefers-reduced-motion`.
+- **Translucent Glassmorphic Login Experience (`/login`)**:
+  - Light-transparent card container (`bg-white/20 backdrop-blur-xl border border-white/30 text-white`) showcasing the background video while maintaining crisp legibility.
+  - Translucent inputs (`bg-black/25 placeholder-white/50 border-white/30`), frosted tab pills, and emerald translucent action buttons.
 
 ---
 
