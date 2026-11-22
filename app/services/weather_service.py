@@ -8,15 +8,33 @@ import time
 import json
 import sqlite3
 import httpx
+import asyncio
 from datetime import datetime, timedelta
 from typing import Dict, Any, Optional, Tuple
 
 CACHE_DB = "data/cache.db"
 
-# 10-minute in-memory cache per rounded (lat, lng)
+# 15-minute in-memory cache per rounded (lat, lng)
 # Key: (round(lat, 2), round(lng, 2)) -> (timestamp, data)
 _MEMORY_WEATHER_CACHE: Dict[tuple, tuple] = {}
-_CACHE_TTL = 600  # 10 minutes
+_CACHE_TTL = 900  # 15 minutes
+
+# 24-hour in-memory cache for 12-month historical climate archive
+_ARCHIVE_CACHE: Dict[tuple, tuple] = {}
+_ARCHIVE_TTL = 86400  # 24 hours
+
+_GLOBAL_HTTP_CLIENT: Optional[httpx.AsyncClient] = None
+
+def get_http_client() -> httpx.AsyncClient:
+    """Provides a shared singleton AsyncClient with keep-alive connection pooling."""
+    global _GLOBAL_HTTP_CLIENT
+    if _GLOBAL_HTTP_CLIENT is None or _GLOBAL_HTTP_CLIENT.is_closed:
+        _GLOBAL_HTTP_CLIENT = httpx.AsyncClient(
+            timeout=httpx.Timeout(connect=2.5, read=4.5, write=2.5, pool=5.0),
+            limits=httpx.Limits(max_keepalive_connections=25, max_connections=50, keepalive_expiry=120.0),
+            headers={"User-Agent": "FarmerDecisionDashboard/2.0 (agri-precision-client)"}
+        )
+    return _GLOBAL_HTTP_CLIENT
 
 WMO_CODES = {
     0: ("Clear sky", "☀️"),
@@ -106,38 +124,38 @@ async def reverse_geocode_async(lat: float, lon: float) -> Dict[str, Any]:
     headers = {"User-Agent": "FarmerDecisionDashboard/2.1 (contact: agro-precision@community-project.org)"}
     
     try:
-        async with httpx.AsyncClient(timeout=4.0) as client:
-            resp = await client.get(url, headers=headers)
-            if resp.status_code == 200:
-                raw = resp.json()
-                address = raw.get("address", {})
-                village = (
-                    address.get("village") or
-                    address.get("town") or
-                    address.get("suburb") or
-                    address.get("hamlet") or
-                    address.get("county") or
-                    "Farm Plot"
-                )
-                district = address.get("state_district") or address.get("district") or ""
-                state = address.get("state") or "Karnataka"
-                country = address.get("country") or "India"
+        client = get_http_client()
+        resp = await client.get(url, headers=headers, timeout=3.5)
+        if resp.status_code == 200:
+            raw = resp.json()
+            address = raw.get("address", {})
+            village = (
+                address.get("village") or
+                address.get("town") or
+                address.get("suburb") or
+                address.get("hamlet") or
+                address.get("county") or
+                "Farm Plot"
+            )
+            district = address.get("state_district") or address.get("district") or ""
+            state = address.get("state") or "Karnataka"
+            country = address.get("country") or "India"
 
-                result = {
-                    "display_name": raw.get("display_name", f"{village}, {state}"),
-                    "village": village,
-                    "district": district,
-                    "state": state,
-                    "country": country,
-                    "lat": lat,
-                    "lon": lon,
-                    "source": "nominatim"
-                }
-                c.execute("INSERT OR REPLACE INTO geocode_cache VALUES (?, ?, ?)",
-                          (cache_key, json.dumps(result), time.time()))
-                conn.commit()
-                conn.close()
-                return result
+            result = {
+                "display_name": raw.get("display_name", f"{village}, {state}"),
+                "village": village,
+                "district": district,
+                "state": state,
+                "country": country,
+                "lat": lat,
+                "lon": lon,
+                "source": "nominatim"
+            }
+            c.execute("INSERT OR REPLACE INTO geocode_cache VALUES (?, ?, ?)",
+                      (cache_key, json.dumps(result), time.time()))
+            conn.commit()
+            conn.close()
+            return result
     except Exception as e:
         print(f"[GEOCODE WARNING] Reverse geocode error: {e}")
 
@@ -158,26 +176,26 @@ async def get_ip_location() -> Dict[str, Any]:
     url = "https://ipapi.co/json/"
     headers = {"User-Agent": "FarmerDecisionDashboard/2.1"}
     try:
-        async with httpx.AsyncClient(timeout=4.0) as client:
-            resp = await client.get(url, headers=headers)
-            if resp.status_code == 200:
-                d = resp.json()
-                lat = float(d.get("latitude", 15.3173))
-                lon = float(d.get("longitude", 75.7139))
-                city = d.get("city", "Hubballi-Dharwad")
-                region = d.get("region", "Karnataka")
-                country = d.get("country_name", "India")
-                return {
-                    "status": "success",
-                    "lat": lat,
-                    "lon": lon,
-                    "village": city,
-                    "district": city,
-                    "state": region,
-                    "country": country,
-                    "display_name": f"{city}, {region}, {country} (Approximate IP)",
-                    "is_approximate": True
-                }
+        client = get_http_client()
+        resp = await client.get(url, headers=headers, timeout=3.0)
+        if resp.status_code == 200:
+            d = resp.json()
+            lat = float(d.get("latitude", 15.3173))
+            lon = float(d.get("longitude", 75.7139))
+            city = d.get("city", "Hubballi-Dharwad")
+            region = d.get("region", "Karnataka")
+            country = d.get("country_name", "India")
+            return {
+                "status": "success",
+                "lat": lat,
+                "lon": lon,
+                "village": city,
+                "district": city,
+                "state": region,
+                "country": country,
+                "display_name": f"{city}, {region}, {country} (Approximate IP)",
+                "is_approximate": True
+            }
     except Exception as e:
         print(f"[IP GEOLOCATION WARNING] {e}")
 
@@ -228,28 +246,46 @@ async def fetch_open_meteo_weather(lat: float, lon: float) -> Dict[str, Any]:
         f"&daily=temperature_2m_mean,precipitation_sum&timezone=auto"
     )
 
-    data = None
+    archive_key = (round(lat, 1), round(lon, 1))
     archive_data = None
+    if archive_key in _ARCHIVE_CACHE:
+        arch_t, arch_d = _ARCHIVE_CACHE[archive_key]
+        if (now - arch_t) < _ARCHIVE_TTL:
+            archive_data = arch_d
 
-    # Retry with exponential backoff (up to 2 retries, 5s timeout)
-    async with httpx.AsyncClient(timeout=5.0) as client:
+    client = get_http_client()
+
+    async def _fetch_forecast():
         for attempt in range(2):
             try:
-                resp = await client.get(forecast_url)
+                resp = await client.get(forecast_url, timeout=3.5)
                 if resp.status_code == 200:
-                    data = resp.json()
-                    break
+                    return resp.json()
             except Exception as e:
-                print(f"[WEATHER RETRY] Attempt {attempt+1} failed: {e}")
-                time.sleep(0.3)
+                if attempt == 0:
+                    await asyncio.sleep(0.1)
+        return None
 
-        # Attempt archive fetch
+    async def _fetch_archive():
+        if archive_data is not None:
+            return archive_data
         try:
-            arch_resp = await client.get(archive_url)
+            arch_resp = await client.get(archive_url, timeout=1.8)
             if arch_resp.status_code == 200:
-                archive_data = arch_resp.json()
+                res = arch_resp.json()
+                _ARCHIVE_CACHE[archive_key] = (time.time(), res)
+                return res
         except Exception:
-            archive_data = None
+            pass
+        return None
+
+    # Run forecast and archive requests concurrently in parallel
+    if archive_data is not None:
+        data = await _fetch_forecast()
+    else:
+        results = await asyncio.gather(_fetch_forecast(), _fetch_archive(), return_exceptions=True)
+        data = results[0] if (len(results) > 0 and not isinstance(results[0], Exception)) else None
+        archive_data = results[1] if (len(results) > 1 and not isinstance(results[1], Exception)) else None
 
     season, season_kn = get_current_season()
 
@@ -424,37 +460,57 @@ async def fetch_open_meteo_weather(lat: float, lon: float) -> Dict[str, Any]:
             "morning": {
                 "label": "Morning (6 AM - 12 PM)",
                 "temp": round(cur_temp - 2.5, 1),
+                "temp_avg": round(cur_temp - 2.5, 1),
                 "humidity": round(min(95.0, cur_rh + 15.0), 0),
+                "humidity_avg": round(min(95.0, cur_rh + 15.0), 0),
                 "rain_chance": round(d_prob[today_idx] * 0.4 if today_idx < len(d_prob) else 10.0, 0),
+                "rain_prob_max": round(d_prob[today_idx] * 0.4 if today_idx < len(d_prob) else 10.0, 0),
                 "rain_mm": round(cur_rain * 0.3, 1),
+                "rain_mm_total": round(cur_rain * 0.3, 1),
                 "wind_kmh": round(max(3.0, cur_wind * 0.8), 1),
+                "wind_speed_max": round(max(3.0, cur_wind * 0.8), 1),
                 "is_current": active_period == "Morning"
             },
             "afternoon": {
                 "label": "Afternoon (12 PM - 5 PM)",
                 "temp": round(cur_temp + 2.0, 1),
+                "temp_avg": round(cur_temp + 2.0, 1),
                 "humidity": round(max(25.0, cur_rh - 20.0), 0),
+                "humidity_avg": round(max(25.0, cur_rh - 20.0), 0),
                 "rain_chance": round(d_prob[today_idx] * 0.8 if today_idx < len(d_prob) else 25.0, 0),
+                "rain_prob_max": round(d_prob[today_idx] * 0.8 if today_idx < len(d_prob) else 25.0, 0),
                 "rain_mm": round(cur_rain * 0.5, 1),
+                "rain_mm_total": round(cur_rain * 0.5, 1),
                 "wind_kmh": round(cur_wind * 1.2, 1),
+                "wind_speed_max": round(cur_wind * 1.2, 1),
                 "is_current": active_period == "Afternoon"
             },
             "evening": {
                 "label": "Evening (5 PM - 9 PM)",
                 "temp": round(cur_temp, 1),
+                "temp_avg": round(cur_temp, 1),
                 "humidity": round(cur_rh, 0),
+                "humidity_avg": round(cur_rh, 0),
                 "rain_chance": round(d_prob[today_idx] * 0.6 if today_idx < len(d_prob) else 20.0, 0),
+                "rain_prob_max": round(d_prob[today_idx] * 0.6 if today_idx < len(d_prob) else 20.0, 0),
                 "rain_mm": round(cur_rain * 0.2, 1),
+                "rain_mm_total": round(cur_rain * 0.2, 1),
                 "wind_kmh": round(cur_wind, 1),
+                "wind_speed_max": round(cur_wind, 1),
                 "is_current": active_period == "Evening"
             },
             "night": {
                 "label": "Night (9 PM - 6 AM)",
                 "temp": round(cur_temp - 4.5, 1),
+                "temp_avg": round(cur_temp - 4.5, 1),
                 "humidity": round(min(95.0, cur_rh + 25.0), 0),
+                "humidity_avg": round(min(95.0, cur_rh + 25.0), 0),
                 "rain_chance": round(d_prob[today_idx] * 0.3 if today_idx < len(d_prob) else 5.0, 0),
+                "rain_prob_max": round(d_prob[today_idx] * 0.3 if today_idx < len(d_prob) else 5.0, 0),
                 "rain_mm": 0.0,
+                "rain_mm_total": 0.0,
                 "wind_kmh": round(max(2.0, cur_wind * 0.6), 1),
+                "wind_speed_max": round(max(2.0, cur_wind * 0.6), 1),
                 "is_current": active_period == "Night"
             }
         }
@@ -586,6 +642,57 @@ async def fetch_open_meteo_weather(lat: float, lon: float) -> Dict[str, Any]:
         )
     ]
     farming_note, farming_note_kn = generate_farming_note(0.0, 15.0, 26.5, 8.0)
+    cur_hour = datetime.now().hour
+    active_period = (
+        "Morning" if 6 <= cur_hour < 12 else (
+            "Afternoon" if 12 <= cur_hour < 17 else (
+                "Evening" if 17 <= cur_hour < 21 else "Night"
+            )
+        )
+    )
+    today_periods_fb = {
+        "current_period": active_period,
+        "morning": {
+            "label": "Morning (6 AM - 12 PM)",
+            "temp": 24.0, "temp_avg": 24.0,
+            "humidity": 75.0, "humidity_avg": 75.0,
+            "rain_chance": 10.0, "rain_prob_max": 10.0,
+            "rain_mm": 0.0, "rain_mm_total": 0.0,
+            "wind_kmh": 6.5, "wind_speed_max": 6.5,
+            "is_current": active_period == "Morning"
+        },
+        "afternoon": {
+            "label": "Afternoon (12 PM - 5 PM)",
+            "temp": 28.5, "temp_avg": 28.5,
+            "humidity": 48.0, "humidity_avg": 48.0,
+            "rain_chance": 20.0, "rain_prob_max": 20.0,
+            "rain_mm": 0.0, "rain_mm_total": 0.0,
+            "wind_kmh": 9.5, "wind_speed_max": 9.5,
+            "is_current": active_period == "Afternoon"
+        },
+        "evening": {
+            "label": "Evening (5 PM - 9 PM)",
+            "temp": 26.0, "temp_avg": 26.0,
+            "humidity": 62.0, "humidity_avg": 62.0,
+            "rain_chance": 15.0, "rain_prob_max": 15.0,
+            "rain_mm": 0.0, "rain_mm_total": 0.0,
+            "wind_kmh": 7.0, "wind_speed_max": 7.0,
+            "is_current": active_period == "Evening"
+        },
+        "night": {
+            "label": "Night (9 PM - 6 AM)",
+            "temp": 21.5, "temp_avg": 21.5,
+            "humidity": 82.0, "humidity_avg": 82.0,
+            "rain_chance": 5.0, "rain_prob_max": 5.0,
+            "rain_mm": 0.0, "rain_mm_total": 0.0,
+            "wind_kmh": 5.0, "wind_speed_max": 5.0,
+            "is_current": active_period == "Night"
+        }
+    }
+    hourly_fb = [
+        {"time": f"2026-11-22T{h:02d}:00", "hour": f"{h:02d}:00", "temp": 26.0, "rain_mm": 0.0, "rain_prob": 10.0}
+        for h in range(24)
+    ]
     return {
         "status": "success",
         "temperature": 26.5,
@@ -594,13 +701,19 @@ async def fetch_open_meteo_weather(lat: float, lon: float) -> Dict[str, Any]:
         "rainfall_mm": 0.0,
         "rain_now_mm": 0.0,
         "is_raining": False,
+        "is_day": 1 if 6 <= cur_hour < 18 else 0,
+        "last_updated": datetime.now().strftime("%Y-%m-%d %H:%M:%S"),
         "rain_chance_today": 15.0,
         "rainfall_7d_total": 14.2,
+        "past_7d_rainfall_actual": 8.5,
+        "forecast_7d_rainfall": 14.2,
         "annual_rainfall_estimate": 1052.2,
         "season": season,
         "season_name_kn": season_kn,
         "farming_note": farming_note,
         "farming_note_kn": farming_note_kn,
+        "today_periods": today_periods_fb,
+        "hourly_24h": hourly_fb,
         "current": {
             "temperature": 26.5,
             "feels_like": 27.0,
@@ -610,6 +723,7 @@ async def fetch_open_meteo_weather(lat: float, lon: float) -> Dict[str, Any]:
             "precipitation": 0.0,
             "rain_now_mm": 0.0,
             "is_raining": False,
+            "is_day": 1 if 6 <= cur_hour < 18 else 0,
             "rain_chance": 15.0,
             "rain_chance_today": 15.0,
             "weather_code": 1,

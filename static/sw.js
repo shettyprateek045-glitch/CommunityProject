@@ -1,9 +1,12 @@
 /**
  * Service Worker for Farmer Decision Dashboard (PWA Support)
- * Network-first strategy to ensure fresh code and assets are always delivered immediately.
+ * High-performance mobile caching strategy:
+ * - Stale-While-Revalidate & Cache-First for vendor CDNs (Tailwind, FontAwesome, Leaflet, Chart.js)
+ * - Fast-timeout fallback for mobile API requests
+ * - Zero-CLS pre-cached shell
  */
 
-const CACHE_NAME = "farmer-dashboard-v4.0";
+const CACHE_NAME = "farmer-dashboard-v5.0-turbo";
 const STATIC_ASSETS = [
   "/",
   "/login",
@@ -18,13 +21,20 @@ const STATIC_ASSETS = [
 
 self.addEventListener("install", (event) => {
   self.skipWaiting();
+  event.waitUntil(
+    caches.open(CACHE_NAME).then((cache) => {
+      return cache.addAll(STATIC_ASSETS).catch((err) => {
+        console.warn("SW precache partial warning:", err);
+      });
+    })
+  );
 });
 
 self.addEventListener("activate", (event) => {
   event.waitUntil(
     caches.keys().then((keys) => {
       return Promise.all(
-        keys.map((key) => caches.delete(key))
+        keys.filter((key) => key !== CACHE_NAME).map((key) => caches.delete(key))
       );
     }).then(() => self.clients.claim())
   );
@@ -34,18 +44,60 @@ self.addEventListener("fetch", (event) => {
   // Only handle GET requests
   if (event.request.method !== "GET") return;
 
-  // Network-First for everything: always fetch fresh from network, fall back to cache only if offline
+  const url = new URL(event.request.url);
+
+  // 1. Cache-First for external vendor CDNs (Tailwind, Chart.js, Leaflet, FontAwesome)
+  if (
+    url.hostname.includes("cdn.tailwindcss.com") ||
+    url.hostname.includes("jsdelivr.net") ||
+    url.hostname.includes("cdnjs.cloudflare.com") ||
+    url.hostname.includes("unpkg.com")
+  ) {
+    event.respondWith(
+      caches.match(event.request).then((cached) => {
+        if (cached) return cached;
+        return fetch(event.request).then((resp) => {
+          if (resp && resp.status === 200) {
+            const clone = resp.clone();
+            caches.open(CACHE_NAME).then((c) => c.put(event.request, clone)).catch(() => {});
+          }
+          return resp;
+        }).catch(() => cached);
+      })
+    );
+    return;
+  }
+
+  // 2. Fast timeout for mobile API queries: try network for 2.5s, fall back to cached API data
+  if (url.pathname.startsWith("/api/")) {
+    event.respondWith(
+      Promise.race([
+        fetch(event.request).then((resp) => {
+          if (resp && resp.status === 200) {
+            const clone = resp.clone();
+            caches.open(CACHE_NAME).then((c) => c.put(event.request, clone)).catch(() => {});
+          }
+          return resp;
+        }),
+        new Promise((_, reject) => setTimeout(() => reject(new Error("Timeout")), 2500))
+      ]).catch(() => {
+        return caches.match(event.request).then((cached) => cached || fetch(event.request));
+      })
+    );
+    return;
+  }
+
+  // 3. Stale-While-Revalidate for app assets (HTML, CSS, JS)
   event.respondWith(
-    fetch(event.request)
-      .then((response) => {
-        if (response && response.status === 200) {
-          const clone = response.clone();
-          caches.open(CACHE_NAME).then((cache) => cache.put(event.request, clone)).catch(() => {});
+    caches.match(event.request).then((cached) => {
+      const networkFetch = fetch(event.request).then((resp) => {
+        if (resp && resp.status === 200) {
+          const clone = resp.clone();
+          caches.open(CACHE_NAME).then((c) => c.put(event.request, clone)).catch(() => {});
         }
-        return response;
-      })
-      .catch(() => {
-        return caches.match(event.request);
-      })
+        return resp;
+      }).catch(() => cached);
+      return cached || networkFetch;
+    })
   );
 });

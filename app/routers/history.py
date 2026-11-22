@@ -44,13 +44,16 @@ async def api_history_compare(request: Request):
             if item:
                 top_crops = item.get("top_crops", [])
                 top_crop = top_crops[0] if top_crops else {}
+                acres_val = float(item["inputs"].get("land_acres") or 1.0)
+                profit_val = float(top_crop.get("net_profit_inr", 0))
+                profit_per_ac = round(profit_val / max(0.1, acres_val), 0)
                 compared_runs.append({
                     "run_id": item["id"],
                     "timestamp": item["timestamp"],
                     "location_name": item["location_name"],
                     "lat": item.get("lat"),
                     "lon": item.get("lon"),
-                    "land_acres": item["inputs"].get("land_acres", 1.0),
+                    "land_acres": acres_val,
                     "budget": item["inputs"].get("budget_inr", 0),
                     "soil_type": item["inputs"].get("soil_type", "Clay Loam"),
                     "irrigation": item["inputs"].get("irrigation", "drip"),
@@ -60,7 +63,8 @@ async def api_history_compare(request: Request):
                     "suitability_pct": top_crop.get("suitability_pct", 0),
                     "total_cost": top_crop.get("total_cost_inr", 0),
                     "total_revenue": top_crop.get("total_revenue_inr", 0),
-                    "net_profit": top_crop.get("net_profit_inr", 0),
+                    "net_profit": profit_val,
+                    "profit_per_acre": profit_per_ac,
                     "all_top_crops": [
                         {
                             "name": c.get("display_name"),

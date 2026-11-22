@@ -79,6 +79,37 @@ elif action == "recommend" or action == "whatif":
 elif action == "history":
     hist = get_farmer_history(20)
     print(json.dumps({"status": "success", "history": hist}))
+elif action == "compare":
+    from services.history import get_run_by_id
+    run_ids = data.get("run_ids", [])
+    compared_runs = []
+    for rid in run_ids:
+        item = get_run_by_id(int(rid))
+        if item:
+            top_crops = item.get("top_crops", [])
+            top_crop = top_crops[0] if top_crops else {}
+            acres_val = float(item["inputs"].get("land_acres", 1.0))
+            profit_val = float(top_crop.get("net_profit_inr", 0))
+            compared_runs.append({
+                "run_id": item["id"],
+                "timestamp": item["timestamp"],
+                "location_name": item["location_name"],
+                "lat": item.get("lat"),
+                "lon": item.get("lon"),
+                "land_acres": acres_val,
+                "budget": item["inputs"].get("budget_inr", 0),
+                "soil_type": item["inputs"].get("soil_type", "Clay Loam"),
+                "irrigation": item["inputs"].get("irrigation", "drip"),
+                "soil_npk": f"N:{item['inputs'].get('soil_n',0)} P:{item['inputs'].get('soil_p',0)} K:{item['inputs'].get('soil_k',0)} pH:{item['inputs'].get('soil_ph',6.5)}",
+                "top_crop_name": top_crop.get("display_name", "N/A"),
+                "top_crop_kannada": top_crop.get("kannada_name", ""),
+                "suitability_pct": top_crop.get("suitability_pct", 0),
+                "total_cost": top_crop.get("total_cost_inr", 0),
+                "total_revenue": top_crop.get("total_revenue_inr", 0),
+                "net_profit": profit_val,
+                "profit_per_acre": round(profit_val / max(0.1, acres_val), 0)
+            })
+    print(json.dumps({"status": "success", "count": len(compared_runs), "runs": compared_runs}))
 else:
     print(json.dumps({"status": "error", "message": "Unknown action"}))
 `, action]);
@@ -150,6 +181,25 @@ app.post('/api/whatif', async (req, res) => {
 app.get('/api/history', async (req, res) => {
   try {
     const result = await runPythonBridge('history', {});
+    res.json(result);
+  } catch (err) {
+    res.status(500).json({ status: 'error', message: err.message });
+  }
+});
+
+app.get('/api/history/runs', async (req, res) => {
+  try {
+    const result = await runPythonBridge('history', {});
+    const runs = (result && result.history) ? result.history : result;
+    res.json(runs);
+  } catch (err) {
+    res.status(500).json({ status: 'error', message: err.message });
+  }
+});
+
+app.post('/api/history/compare', async (req, res) => {
+  try {
+    const result = await runPythonBridge('compare', req.body);
     res.json(result);
   } catch (err) {
     res.status(500).json({ status: 'error', message: err.message });

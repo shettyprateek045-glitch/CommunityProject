@@ -407,6 +407,22 @@ let recommendData = null;
 let mandiTrendsData = null;
 let verifiedSchemes = [];
 
+// Performance / Turbo Mode state (optimized for mobile / low bandwidth)
+let isPerformanceMode = (function() {
+  try {
+    const saved = localStorage.getItem('fdd_perf_mode');
+    if (saved !== null) return saved === 'true';
+    if (navigator.connection && (navigator.connection.saveData || navigator.connection.effectiveType === '2g' || navigator.connection.effectiveType === '3g')) {
+      return true;
+    }
+  } catch (e) {}
+  return false;
+})();
+
+if (isPerformanceMode) {
+  document.documentElement.classList.add('perf-mode');
+}
+
 // Geocoding throttle & cache
 const geocodeCache = new Map();
 let lastGeocodeTime = 0;
@@ -655,8 +671,8 @@ async function updateFarmPosition(lat, lon, accuracy = 20.0, source = "manual") 
   renderLocationDisplayCards();
   initOrUpdateFarmMap();
 
-  // Proactively fetch SoilGrids estimate for the new coordinates
-  fetchSoilGridsEstimate(lat, lon);
+  // Proactively pre-fetch weather, irrigation, soil, and market trends in parallel
+  prefetchDashboardData(lat, lon);
 }
 
 // ============================================================================
@@ -718,27 +734,77 @@ function setupVoiceInput(targetInputId, micButtonId) {
 // ============================================================================
 // 5. Backend Service API Integrations
 // ============================================================================
+// 3. Ultra-Fast In-Memory & SessionStorage Caching + In-Flight Deduplication
+// ============================================================================
 const weatherCache = new Map();
 const mandiCache = new Map();
+const _inflightPromises = new Map();
+
+function getFromSessionCache(key, maxAgeMs = 15 * 60 * 1000) {
+  try {
+    const raw = sessionStorage.getItem(key);
+    if (!raw) return null;
+    const item = JSON.parse(raw);
+    if (Date.now() - item.time < maxAgeMs) {
+      return item.data;
+    }
+  } catch (e) {}
+  return null;
+}
+
+function saveToSessionCache(key, data) {
+  try {
+    sessionStorage.setItem(key, JSON.stringify({ data, time: Date.now() }));
+  } catch (e) {}
+}
 
 async function fetchLiveWeather(lat, lon) {
   try {
-    const latNum = parseFloat(lat) || 12.9716;
-    const lonNum = parseFloat(lon) || 77.5946;
+    const latNum = parseFloat(lat) || farmContext.lat || 12.9716;
+    const lonNum = parseFloat(lon) || farmContext.lon || 77.5946;
     const cacheKey = `${latNum.toFixed(3)},${lonNum.toFixed(3)}`;
+
+    // 1. Fast in-memory check
     const cached = weatherCache.get(cacheKey);
     if (cached && (Date.now() - cached.time < 15 * 60 * 1000)) {
       weatherData = cached.data;
       updateDashboardAlerts();
       return weatherData;
     }
-    const res = await fetch(`/api/weather/current?lat=${latNum}&lon=${lonNum}`);
-    if (res.ok) {
-      weatherData = await res.json();
+
+    // 2. Fast sessionStorage check
+    const sessionCached = getFromSessionCache(`fdd_wx_${cacheKey}`);
+    if (sessionCached) {
+      weatherData = sessionCached;
       weatherCache.set(cacheKey, { data: weatherData, time: Date.now() });
       updateDashboardAlerts();
       return weatherData;
     }
+
+    // 3. Deduplicate active in-flight request
+    const inflightKey = `wx_${cacheKey}`;
+    if (_inflightPromises.has(inflightKey)) {
+      return await _inflightPromises.get(inflightKey);
+    }
+
+    const fetchPromise = (async () => {
+      try {
+        const res = await fetch(`/api/weather/current?lat=${latNum}&lon=${lonNum}`);
+        if (res.ok) {
+          weatherData = await res.json();
+          weatherCache.set(cacheKey, { data: weatherData, time: Date.now() });
+          saveToSessionCache(`fdd_wx_${cacheKey}`, weatherData);
+          updateDashboardAlerts();
+          return weatherData;
+        }
+      } finally {
+        _inflightPromises.delete(inflightKey);
+      }
+      return null;
+    })();
+
+    _inflightPromises.set(inflightKey, fetchPromise);
+    return await fetchPromise;
   } catch (err) {
     console.error("Live weather fetch error:", err);
   }
@@ -756,15 +822,41 @@ async function fetchIrrigationSchedule() {
       irrigation_method: farmContext.irrigation,
       acres: farmContext.land_acres
     };
-    const res = await fetch('/api/weather/irrigation-schedule', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify(payload)
-    });
-    if (res.ok) {
-      irrigationScheduleData = await res.json();
+    const cacheKey = `${farmContext.lat.toFixed(3)},${farmContext.lon.toFixed(3)},${farmContext.irrigation}`;
+
+    if (irrigationScheduleData) return irrigationScheduleData;
+
+    const sessionCached = getFromSessionCache(`fdd_irri_${cacheKey}`);
+    if (sessionCached) {
+      irrigationScheduleData = sessionCached;
       return irrigationScheduleData;
     }
+
+    const inflightKey = `irri_${cacheKey}`;
+    if (_inflightPromises.has(inflightKey)) {
+      return await _inflightPromises.get(inflightKey);
+    }
+
+    const fetchPromise = (async () => {
+      try {
+        const res = await fetch('/api/weather/irrigation-schedule', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify(payload)
+        });
+        if (res.ok) {
+          irrigationScheduleData = await res.json();
+          saveToSessionCache(`fdd_irri_${cacheKey}`, irrigationScheduleData);
+          return irrigationScheduleData;
+        }
+      } finally {
+        _inflightPromises.delete(inflightKey);
+      }
+      return null;
+    })();
+
+    _inflightPromises.set(inflightKey, fetchPromise);
+    return await fetchPromise;
   } catch (err) {
     console.error("Irrigation schedule fetch error:", err);
   }
@@ -773,12 +865,41 @@ async function fetchIrrigationSchedule() {
 
 async function fetchSoilGridsEstimate(lat, lon) {
   try {
-    const res = await fetch(`/api/soil/soilgrids?lat=${lat}&lon=${lon}`);
-    if (res.ok) {
-      soilgridsData = await res.json();
+    const latNum = parseFloat(lat) || farmContext.lat;
+    const lonNum = parseFloat(lon) || farmContext.lon;
+    const cacheKey = `${latNum.toFixed(3)},${lonNum.toFixed(3)}`;
+
+    if (soilgridsData) return soilgridsData;
+
+    const sessionCached = getFromSessionCache(`fdd_soil_${cacheKey}`);
+    if (sessionCached) {
+      soilgridsData = sessionCached;
       renderSoilGridsBadge();
       return soilgridsData;
     }
+
+    const inflightKey = `soil_${cacheKey}`;
+    if (_inflightPromises.has(inflightKey)) {
+      return await _inflightPromises.get(inflightKey);
+    }
+
+    const fetchPromise = (async () => {
+      try {
+        const res = await fetch(`/api/soil/soilgrids?lat=${latNum}&lon=${lonNum}`);
+        if (res.ok) {
+          soilgridsData = await res.json();
+          saveToSessionCache(`fdd_soil_${cacheKey}`, soilgridsData);
+          renderSoilGridsBadge();
+          return soilgridsData;
+        }
+      } finally {
+        _inflightPromises.delete(inflightKey);
+      }
+      return null;
+    })();
+
+    _inflightPromises.set(inflightKey, fetchPromise);
+    return await fetchPromise;
   } catch (err) {
     console.warn("SoilGrids fetch failed:", err);
   }
@@ -818,23 +939,117 @@ async function fetchMandiTrends() {
     const lonNum = parseFloat(farmContext.lon) || 77.5946;
     const target = farmContext.target_price_inr || 4500;
     const cacheKey = `${latNum.toFixed(3)},${lonNum.toFixed(3)},${target}`;
+
     const cached = mandiCache.get(cacheKey);
     if (cached && (Date.now() - cached.time < 15 * 60 * 1000)) {
       mandiTrendsData = cached.data;
       checkPriceAlertNotification(mandiTrendsData);
       return mandiTrendsData;
     }
-    const res = await fetch(`/api/prices/mandi-trends?lat=${latNum}&lon=${lonNum}&target_price=${target}`);
-    if (res.ok) {
-      mandiTrendsData = await res.json();
+
+    const sessionCached = getFromSessionCache(`fdd_mandi_${cacheKey}`);
+    if (sessionCached) {
+      mandiTrendsData = sessionCached;
       mandiCache.set(cacheKey, { data: mandiTrendsData, time: Date.now() });
       checkPriceAlertNotification(mandiTrendsData);
       return mandiTrendsData;
     }
+
+    const inflightKey = `mandi_${cacheKey}`;
+    if (_inflightPromises.has(inflightKey)) {
+      return await _inflightPromises.get(inflightKey);
+    }
+
+    const fetchPromise = (async () => {
+      try {
+        const res = await fetch(`/api/prices/mandi-trends?lat=${latNum}&lon=${lonNum}&target_price=${target}`);
+        if (res.ok) {
+          mandiTrendsData = await res.json();
+          mandiCache.set(cacheKey, { data: mandiTrendsData, time: Date.now() });
+          saveToSessionCache(`fdd_mandi_${cacheKey}`, mandiTrendsData);
+          checkPriceAlertNotification(mandiTrendsData);
+          return mandiTrendsData;
+        }
+      } finally {
+        _inflightPromises.delete(inflightKey);
+      }
+      return null;
+    })();
+
+    _inflightPromises.set(inflightKey, fetchPromise);
+    return await fetchPromise;
   } catch (err) {
     console.error("Mandi trends error:", err);
   }
   return null;
+}
+
+// Background pre-fetching engine: powers instant navigation across all steps
+let _prefetchDebounceTimer = null;
+let _activeRecommendPromise = null;
+
+function prefetchDashboardData(lat, lon) {
+  clearTimeout(_prefetchDebounceTimer);
+  _prefetchDebounceTimer = setTimeout(() => {
+    const latNum = parseFloat(lat) || farmContext.lat;
+    const lonNum = parseFloat(lon) || farmContext.lon;
+
+    // Run parallel background queries so steps 2, 3, 6 load with 0ms wait
+    Promise.allSettled([
+      fetchLiveWeather(latNum, lonNum),
+      fetchIrrigationSchedule(),
+      fetchSoilGridsEstimate(latNum, lonNum),
+      fetchMandiTrends()
+    ]).then(() => {
+      prewarmRecommendations();
+    });
+  }, 120);
+}
+
+async function prewarmRecommendations() {
+  if (recommendData) return recommendData;
+  if (_activeRecommendPromise) return _activeRecommendPromise;
+
+  const payload = {
+    lat: farmContext.lat,
+    lon: farmContext.lon,
+    acres: farmContext.land_acres || 3.0,
+    land_acres: farmContext.land_acres || 3.0,
+    budget_inr: farmContext.budget_inr || 65000.0,
+    irrigation: farmContext.irrigation || "drip",
+    soil_type: farmContext.soil_type || "Clay Loam",
+    soil_n: farmContext.soil_n !== null ? farmContext.soil_n : 85.0,
+    soil_p: farmContext.soil_p !== null ? farmContext.soil_p : 45.0,
+    soil_k: farmContext.soil_k !== null ? farmContext.soil_k : 42.0,
+    soil_ph: farmContext.soil_ph !== null ? farmContext.soil_ph : 6.5,
+    previous_crop: farmContext.previous_crop,
+    state: farmContext.state || "Karnataka",
+    district: farmContext.district || "Bengaluru"
+  };
+
+  _activeRecommendPromise = (async () => {
+    try {
+      const [recRes, _] = await Promise.all([
+        fetch('/api/recommend', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify(payload)
+        }),
+        fetchMandiTrends()
+      ]);
+      if (recRes && recRes.ok) {
+        recommendData = await recRes.json();
+        saveToSessionCache("fdd_recommend", recommendData);
+      }
+    } catch (e) {
+      console.warn("Prewarm recommend background error:", e);
+    } finally {
+      _activeRecommendPromise = null;
+    }
+    return recommendData;
+  })();
+
+  return _activeRecommendPromise;
 }
 
 async function fetchSchemes() {
@@ -996,6 +1211,12 @@ export function renderDashboardShell(container, lang) {
           <button id="btn-history" class="px-2.5 py-1.5 rounded-lg bg-[#2e7d32] hover:bg-[#33691e] text-emerald-100 text-xs font-semibold flex items-center gap-1.5 transition cursor-pointer">
             <i class="fa-solid fa-clock-rotate-left"></i>
             <span class="hidden md:inline">${t.nav_history}</span>
+          </button>
+
+          <!-- Performance / Turbo Mode Toggle -->
+          <button id="btn-toggle-perf" class="px-2.5 py-1 rounded-lg ${isPerformanceMode ? 'bg-amber-400 text-amber-950 font-bold shadow-xs' : 'bg-emerald-800 hover:bg-emerald-700 text-emerald-200'} text-xs font-semibold flex items-center gap-1.5 transition cursor-pointer" title="Toggle Turbo Performance Mode (Faster loading & low battery usage)">
+            <i class="fa-solid fa-bolt-lightning ${isPerformanceMode ? 'text-amber-950' : 'text-amber-300'}"></i>
+            <span class="hidden md:inline">${isPerformanceMode ? 'Turbo Mode' : 'Fast Mode'}</span>
           </button>
 
           <!-- Trilingual Switcher (EN / ಕನ್ನಡ / हिंदी) -->
@@ -1588,6 +1809,14 @@ async function renderWeatherStepView(container) {
   const t = I18N[currentLang];
 
   if (!weatherData) {
+    const sessionKey = `${farmContext.lat.toFixed(3)},${farmContext.lon.toFixed(3)}`;
+    const cached = getFromSessionCache(`fdd_wx_${sessionKey}`);
+    if (cached) {
+      weatherData = cached;
+    }
+  }
+
+  if (!weatherData) {
     container.innerHTML = `
       <div class="bg-white rounded-3xl p-10 text-center space-y-4 border border-slate-100 shadow-sm">
         <div class="inline-block animate-spin text-4xl text-emerald-600"><i class="fa-solid fa-cloud-sun"></i></div>
@@ -1595,10 +1824,24 @@ async function renderWeatherStepView(container) {
         <p class="text-xs text-slate-500">Querying live satellite micro-climate for coordinates (${farmContext.lat.toFixed(4)}, ${farmContext.lon.toFixed(4)}).</p>
       </div>
     `;
-    await fetchLiveWeather(farmContext.lat, farmContext.lon);
-    await fetchIrrigationSchedule();
+    await Promise.allSettled([
+      fetchLiveWeather(farmContext.lat, farmContext.lon),
+      fetchIrrigationSchedule()
+    ]);
     if (currentStep === 2) renderWeatherStepView(container);
     return;
+  }
+
+  // If irrigation schedule is still pending in background, fetch without blocking UI
+  if (!irrigationScheduleData) {
+    fetchIrrigationSchedule().then(() => {
+      if (currentStep === 2) {
+        const schedEl = document.getElementById("irrigation-schedule-cards-container");
+        if (schedEl && irrigationScheduleData) {
+          renderWeatherStepView(container);
+        }
+      }
+    });
   }
 
   const cur = weatherData.current || {};
@@ -1685,7 +1928,12 @@ async function renderWeatherStepView(container) {
         </div>
         <div class="grid grid-cols-2 sm:grid-cols-4 gap-3 text-xs">
           ${['morning', 'afternoon', 'evening', 'night'].map(k => {
-            const p = periods[k] || { label: k, temp_avg: 24, humidity_avg: 50, rain_prob_max: 0, rain_mm_total: 0, wind_speed_max: 10 };
+            const p = periods[k] || {};
+            const tempVal = Number(p.temp_avg !== undefined ? p.temp_avg : (p.temp !== undefined ? p.temp : 24.0));
+            const humVal = Number(p.humidity_avg !== undefined ? p.humidity_avg : (p.humidity !== undefined ? p.humidity : 55.0));
+            const rainProb = Number(p.rain_prob_max !== undefined ? p.rain_prob_max : (p.rain_chance !== undefined ? p.rain_chance : 10.0));
+            const rainMm = Number(p.rain_mm_total !== undefined ? p.rain_mm_total : (p.rain_mm !== undefined ? p.rain_mm : 0.0));
+            const windSpeed = Number(p.wind_speed_max !== undefined ? p.wind_speed_max : (p.wind_kmh !== undefined ? p.wind_kmh : 8.0));
             const isActive = (k === activePeriod);
             const icon = k === 'morning' ? '🌅' : (k === 'afternoon' ? '☀️' : (k === 'evening' ? '🌆' : '🌙'));
             return `
@@ -1694,11 +1942,41 @@ async function renderWeatherStepView(container) {
                   <span class="font-bold text-slate-800 flex items-center gap-1">${icon} <span class="capitalize">${k}</span></span>
                   ${isActive ? `<span class="px-2 py-0.5 rounded-full bg-emerald-600 text-white text-[10px] font-black">NOW</span>` : ''}
                 </div>
-                <div class="text-base font-extrabold text-slate-900">${(p.temp_avg || 24).toFixed(1)}°C</div>
+                <div class="text-base font-extrabold text-slate-900">${tempVal.toFixed(1)}°C</div>
                 <div class="text-[11px] text-slate-600 space-y-0.5">
-                  <div>Humidity: <strong>${Math.round(p.humidity_avg || 50)}%</strong></div>
-                  <div>Rain Chance: <strong class="${p.rain_prob_max > 30 ? 'text-blue-700 font-bold' : 'text-slate-700'}">${p.rain_prob_max || 0}% (${(p.rain_mm_total || 0).toFixed(1)} mm)</strong></div>
-                  <div>Wind: <strong>${(p.wind_speed_max || 10).toFixed(1)} km/h</strong></div>
+                  <div>Humidity: <strong>${Math.round(humVal)}%</strong></div>
+                  <div>Rain Chance: <strong class="${rainProb > 30 ? 'text-blue-700 font-bold' : 'text-slate-700'}">${Math.round(rainProb)}% (${rainMm.toFixed(1)} mm)</strong></div>
+                  <div>Wind: <strong>${windSpeed.toFixed(1)} km/h</strong></div>
+                </div>
+              </div>
+            `;
+          }).join('')}
+        </div>
+      </div>
+
+      <!-- 7-Day Micro-Climate Forecast Cards -->
+      <div class="space-y-3">
+        <div class="flex items-center justify-between">
+          <h3 class="text-sm font-bold text-slate-800 uppercase tracking-wider">7-Day Micro-Climate Forecast</h3>
+          <span class="text-xs text-slate-500 font-medium">Open-Meteo High-Resolution Feed</span>
+        </div>
+        <div class="grid grid-cols-2 sm:grid-cols-4 md:grid-cols-7 gap-2.5 text-xs">
+          ${daily.map((d, idx) => {
+            const isToday = idx === 0;
+            const tMax = Number(d.max_temp !== undefined ? d.max_temp : (d.t_max !== undefined ? d.t_max : 28));
+            const tMin = Number(d.min_temp !== undefined ? d.min_temp : (d.t_min !== undefined ? d.t_min : 19));
+            const rSum = Number(d.rain_sum_mm !== undefined ? d.rain_sum_mm : (d.rain_mm !== undefined ? d.rain_mm : 0));
+            const rProb = Number(d.rain_chance_pct !== undefined ? d.rain_chance_pct : (d.rain_prob !== undefined ? d.rain_prob : 0));
+            return `
+              <div class="p-3 rounded-2xl border ${isToday ? 'bg-emerald-50/70 border-emerald-400 shadow-xs' : 'bg-slate-50 border-slate-200'} text-center space-y-1.5 flex flex-col justify-between">
+                <div>
+                  <span class="text-[11px] font-bold ${isToday ? 'text-emerald-800' : 'text-slate-700'} block truncate">${d.day_name || d.date || 'Day'}</span>
+                  <div class="text-2xl my-1">${d.icon || '⛅'}</div>
+                  <span class="text-[10px] text-slate-500 font-medium block truncate">${d.condition || d.description || 'Mainly clear'}</span>
+                </div>
+                <div class="pt-1.5 border-t border-slate-200/60 text-[11px]">
+                  <div class="font-extrabold text-slate-800">${tMax.toFixed(0)}° / <span class="text-slate-500 font-normal">${tMin.toFixed(0)}°</span></div>
+                  <div class="text-[10px] ${rProb > 30 ? 'text-blue-700 font-bold' : 'text-slate-500'}">💧 ${Math.round(rProb)}% (${rSum.toFixed(1)}mm)</div>
                 </div>
               </div>
             `;
@@ -2629,21 +2907,24 @@ async function renderResultsStepView(container) {
       if (pBar) pBar.style.width = "75%";
       if (pTitle) pTitle.innerText = "Ranking optimal crops by profit and risk...";
 
-      const res = await fetch('/api/recommend', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify(payload)
-      });
+      const [res, _] = await Promise.all([
+        fetch('/api/recommend', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify(payload)
+        }),
+        fetchMandiTrends()
+      ]);
 
-      if (res.ok) {
+      if (res && res.ok) {
         recommendData = await res.json();
+        saveToSessionCache("fdd_recommend", recommendData);
       }
     } catch (err) {
       console.error("Recommend fetch error:", err);
     }
 
     if (pBar) pBar.style.width = "100%";
-    await fetchMandiTrends();
     if (currentStep === 6) renderResultsStepView(container);
     return;
   }
@@ -3374,6 +3655,23 @@ function bindShellListeners() {
   if (lKn) lKn.onclick = () => renderDashboardShell(document.getElementById("app"), 'kn');
   if (lHi) lHi.onclick = () => renderDashboardShell(document.getElementById("app"), 'hi');
 
+  // Performance / Turbo Mode Button
+  const btnPerf = document.getElementById("btn-toggle-perf");
+  if (btnPerf) {
+    btnPerf.onclick = () => {
+      isPerformanceMode = !isPerformanceMode;
+      try {
+        localStorage.setItem('fdd_perf_mode', isPerformanceMode ? 'true' : 'false');
+      } catch (e) {}
+      if (isPerformanceMode) {
+        document.documentElement.classList.add('perf-mode');
+      } else {
+        document.documentElement.classList.remove('perf-mode');
+      }
+      renderDashboardShell(document.getElementById("app"), currentLang);
+    };
+  }
+
   // Leaf Disease Modal open/close
   const btnOpenLeaf = document.getElementById("btn-open-leaf-scanner");
   const modalLeaf = document.getElementById("modal-leaf-scanner");
@@ -3536,55 +3834,136 @@ function bindShellListeners() {
 
           content.innerHTML = `
             <div class="space-y-4">
-              <div class="flex items-center justify-between">
-                <span class="font-bold text-slate-700">Select runs to compare side-by-side:</span>
-                <button type="button" id="btn-exec-compare" class="px-4 py-1.5 bg-[#1b5e20] text-white rounded-xl font-bold hover:bg-[#2e7d32] transition cursor-pointer">
-                  Compare Selected
-                </button>
+              <div class="flex items-center justify-between flex-wrap gap-2 pb-1 border-b border-slate-100">
+                <div class="flex items-center gap-2">
+                  <span class="font-bold text-slate-800 text-xs">Select runs to compare:</span>
+                  <span id="compare-count-badge" class="px-2 py-0.5 rounded-full bg-emerald-100 text-emerald-800 text-[10px] font-bold">2 selected</span>
+                </div>
+                <div class="flex items-center gap-2">
+                  <button type="button" id="btn-select-latest2" class="px-2.5 py-1 text-[11px] font-semibold text-slate-600 bg-slate-100 hover:bg-slate-200 rounded-lg transition cursor-pointer">
+                    Select Latest 2
+                  </button>
+                  <button type="button" id="btn-exec-compare" class="px-4 py-1.5 bg-[#1b5e20] text-white rounded-xl text-xs font-bold hover:bg-[#2e7d32] shadow-xs transition cursor-pointer flex items-center gap-1.5 active:scale-95">
+                    <i class="fa-solid fa-code-compare"></i>
+                    <span>Compare Selected</span>
+                  </button>
+                </div>
               </div>
 
-              <div class="grid grid-cols-1 md:grid-cols-2 gap-3" id="runs-checkbox-list">
-                ${runs.map(r => {
-                  const runId = r.id || r.run_id;
-                  const loc = r.village || r.location_name || 'Farm';
-                  const acres = r.acres || (r.inputs && r.inputs.land_acres) || 1.0;
-                  const date = r.created_at || r.timestamp || 'Recent';
-                  const budget = r.budget_inr || (r.inputs && r.inputs.budget_inr) || 0;
-                  const topCrop = r.top_crop || (r.top_crops && r.top_crops[0] && r.top_crops[0].display_name) || 'Crop';
-                  const profit = r.net_profit_inr || (r.top_crops && r.top_crops[0] && r.top_crops[0].net_profit_inr) || 0;
-                  return `
-                  <label class="p-3 bg-earth-50 rounded-xl border border-earth-200 flex items-start gap-3 cursor-pointer hover:bg-earth-100">
-                    <input type="checkbox" value="${runId}" class="mt-1 run-compare-chk accent-emerald-700" />
-                    <div>
-                      <div class="font-bold text-slate-800">Run #${runId} - ${loc} (${acres} ac)</div>
-                      <div class="text-[11px] text-slate-500">Date: ${date} • Budget: ₹${budget.toLocaleString()}</div>
-                      <div class="text-[11px] text-emerald-800 font-semibold">Top Crop: ${topCrop} (Profit: ₹${profit.toLocaleString()})</div>
-                    </div>
-                  </label>
-                  `;
-                }).join('')}
+              <!-- Inline Alert for Selection Validation -->
+              <div id="compare-msg-banner" class="hidden p-3 bg-amber-50 border border-amber-300 text-amber-900 rounded-xl text-xs font-semibold flex items-center gap-2 animate-fadeIn">
+                <i class="fa-solid fa-triangle-exclamation text-amber-600 text-sm"></i>
+                <span>Please select at least 2 runs from the list below to generate a side-by-side comparison.</span>
               </div>
 
-              <div id="side-by-side-compare-table" class="space-y-2"></div>
+              <!-- Side-by-Side Comparison Output Container (Rendered prominently right here) -->
+              <div id="side-by-side-compare-table" class="space-y-3"></div>
+
+              <!-- List of Saved Past Runs with Checkboxes -->
+              <div class="space-y-1.5">
+                <span class="text-[11px] font-bold uppercase tracking-wider text-slate-400 block pt-1">Saved Runs History (${runs.length} runs):</span>
+                <div class="grid grid-cols-1 md:grid-cols-2 gap-2.5" id="runs-checkbox-list">
+                  ${runs.map((r, idx) => {
+                    const runId = r.id !== undefined ? r.id : r.run_id;
+                    const loc = r.location_name || r.village || 'Karnataka Farm Plot';
+                    const acres = Number(r.land_acres !== undefined ? r.land_acres : (r.acres || (r.inputs && r.inputs.land_acres) || 1.0));
+                    const date = r.timestamp || r.created_at || 'Recent';
+                    const budget = Number(r.budget !== undefined ? r.budget : (r.budget_inr || (r.inputs && r.inputs.budget_inr) || 0));
+                    const topCrop = r.top_crop || (r.top_crops && r.top_crops[0] && r.top_crops[0].display_name) || 'Crop';
+                    const profit = Number(r.top_profit !== undefined ? r.top_profit : (r.net_profit_inr || (r.top_crops && r.top_crops[0] && r.top_crops[0].net_profit_inr) || 0));
+                    const isChecked = (idx < 2) ? 'checked' : '';
+                    return `
+                    <label class="p-3 bg-earth-50 rounded-xl border border-earth-200 flex items-start gap-3 cursor-pointer hover:bg-earth-100 transition select-none">
+                      <input type="checkbox" value="${runId}" ${isChecked} class="mt-1 run-compare-chk accent-emerald-700 w-4 h-4 rounded cursor-pointer" />
+                      <div class="flex-1">
+                        <div class="flex items-center justify-between">
+                          <span class="font-bold text-slate-800 text-xs">Run #${runId} • ${loc}</span>
+                          <span class="text-[10px] bg-slate-200 text-slate-700 px-1.5 py-0.5 rounded font-mono">${acres} ac</span>
+                        </div>
+                        <div class="text-[11px] text-slate-500 mt-0.5">Date: ${date} • Budget: ₹${budget.toLocaleString()}</div>
+                        <div class="text-[11px] text-emerald-800 font-semibold mt-0.5 flex items-center justify-between">
+                          <span>Top Crop: <strong>${topCrop}</strong></span>
+                          <span class="text-emerald-700 font-bold">₹${profit.toLocaleString()}</span>
+                        </div>
+                      </div>
+                    </label>
+                    `;
+                  }).join('')}
+                </div>
+              </div>
             </div>
           `;
+
+          const updateCompareCount = () => {
+            const count = document.querySelectorAll(".run-compare-chk:checked").length;
+            const badge = document.getElementById("compare-count-badge");
+            if (badge) {
+              badge.innerText = `${count} selected`;
+              badge.className = count >= 2
+                ? "px-2 py-0.5 rounded-full bg-emerald-100 text-emerald-800 text-[10px] font-bold"
+                : "px-2 py-0.5 rounded-full bg-slate-200 text-slate-600 text-[10px] font-bold";
+            }
+          };
+
+          document.querySelectorAll(".run-compare-chk").forEach(chk => {
+            chk.onchange = updateCompareCount;
+          });
+
+          const btnLatest2 = document.getElementById("btn-select-latest2");
+          if (btnLatest2) {
+            btnLatest2.onclick = () => {
+              const allChks = document.querySelectorAll(".run-compare-chk");
+              allChks.forEach((chk, idx) => { chk.checked = (idx < 2); });
+              updateCompareCount();
+            };
+          }
 
           const btnCompare = document.getElementById("btn-exec-compare");
           if (btnCompare) {
             btnCompare.onclick = async () => {
+              const msgBanner = document.getElementById("compare-msg-banner");
+              const targetContainer = document.getElementById("side-by-side-compare-table");
               const selected = Array.from(document.querySelectorAll(".run-compare-chk:checked")).map(cb => parseInt(cb.value));
+
               if (selected.length < 2) {
-                alert("Please select at least 2 runs to compare side-by-side.");
+                if (msgBanner) {
+                  msgBanner.classList.remove("hidden");
+                  msgBanner.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
+                }
                 return;
               }
-              const compResp = await fetch("/api/history/compare", {
-                method: "POST",
-                headers: { "Content-Type": "application/json" },
-                body: JSON.stringify({ run_ids: selected })
-              });
-              if (compResp.ok) {
-                const compData = await compResp.json();
-                renderComparisonTable(document.getElementById("side-by-side-compare-table"), compData);
+
+              if (msgBanner) msgBanner.classList.add("hidden");
+
+              btnCompare.disabled = true;
+              const originalBtnHtml = btnCompare.innerHTML;
+              btnCompare.innerHTML = `<i class="fa-solid fa-circle-notch fa-spin"></i> <span>Comparing...</span>`;
+
+              try {
+                const compResp = await fetch("/api/history/compare", {
+                  method: "POST",
+                  headers: { "Content-Type": "application/json" },
+                  body: JSON.stringify({ run_ids: selected })
+                });
+
+                if (compResp.ok) {
+                  const compData = await compResp.json();
+                  renderComparisonTable(targetContainer, compData);
+                  targetContainer.scrollIntoView({ behavior: 'smooth', block: 'start' });
+                } else {
+                  if (msgBanner) {
+                    msgBanner.classList.remove("hidden");
+                    msgBanner.innerHTML = `<i class="fa-solid fa-circle-exclamation text-rose-600 text-sm"></i><span>Server returned error comparing runs (${compResp.status}).</span>`;
+                  }
+                }
+              } catch (e) {
+                if (msgBanner) {
+                  msgBanner.classList.remove("hidden");
+                  msgBanner.innerHTML = `<i class="fa-solid fa-circle-exclamation text-rose-600 text-sm"></i><span>Network error while comparing runs.</span>`;
+                }
+              } finally {
+                btnCompare.disabled = false;
+                btnCompare.innerHTML = originalBtnHtml;
               }
             };
           }
@@ -3724,43 +4103,146 @@ function bindShellListeners() {
 
 function renderComparisonTable(container, compData) {
   const runs = compData.runs || compData.compared_runs || [];
+  if (!container || runs.length === 0) return;
+
+  const maxProfit = Math.max(...runs.map(r => Number(r.net_profit || r.net_profit_inr || 0)));
+
   container.innerHTML = `
-    <div class="pt-4 border-t border-slate-200">
-      <h4 class="font-bold text-slate-800 text-sm mb-2">Side-by-Side Comparison Metrics:</h4>
+    <div class="p-4 bg-white rounded-2xl border-2 border-emerald-500/80 shadow-md space-y-3 animate-fadeIn">
+      <div class="flex items-center justify-between flex-wrap gap-2 pb-2 border-b border-slate-200">
+        <div class="flex items-center gap-2">
+          <div class="w-7 h-7 rounded-lg bg-emerald-100 text-emerald-800 flex items-center justify-center text-xs font-bold">
+            <i class="fa-solid fa-scale-balanced"></i>
+          </div>
+          <div>
+            <h4 class="font-extrabold text-slate-800 text-sm">Side-by-Side Past Run Comparison</h4>
+            <span class="text-[11px] text-slate-500">Comparing ${runs.length} selected historical farming scenarios</span>
+          </div>
+        </div>
+        <button type="button" id="btn-close-compare-tbl" class="text-xs px-2.5 py-1 text-slate-500 hover:text-slate-800 hover:bg-slate-100 rounded-lg transition cursor-pointer flex items-center gap-1">
+          <i class="fa-solid fa-xmark"></i> <span>Close Table</span>
+        </button>
+      </div>
+
       <div class="overflow-x-auto">
         <table class="w-full text-xs text-left border border-slate-200 rounded-xl overflow-hidden">
           <thead class="bg-slate-100 text-slate-700 font-bold border-b border-slate-200">
             <tr>
-              <th class="p-2.5">Metric</th>
-              ${runs.map(r => `<th class="p-2.5">Run #${r.id || r.run_id} (${r.top_crop || r.top_crop_name || 'Crop'})</th>`).join('')}
+              <th class="p-3 w-40 bg-slate-200/70">Parameter</th>
+              ${runs.map(r => {
+                const profit = Number(r.net_profit || r.net_profit_inr || 0);
+                const isWinner = profit > 0 && profit === maxProfit;
+                return `
+                <th class="p-3 min-w-[160px] ${isWinner ? 'bg-emerald-50/80 border-b-2 border-emerald-600' : ''}">
+                  <div class="flex items-center justify-between">
+                    <span>Run #${r.run_id || r.id}</span>
+                    ${isWinner ? '<span class="text-[10px] bg-emerald-600 text-white font-extrabold px-1.5 py-0.5 rounded shadow-xs">👑 Top Profit</span>' : ''}
+                  </div>
+                  <div class="text-[11px] font-normal text-slate-500">${r.timestamp ? r.timestamp.split(' ')[0] : 'Recent'}</div>
+                </th>
+                `;
+              }).join('')}
             </tr>
           </thead>
           <tbody class="divide-y divide-slate-100 bg-white">
-            <tr>
-              <td class="p-2.5 font-bold text-slate-700">Land Acres</td>
-              ${runs.map(r => `<td class="p-2.5">${r.acres || r.land_acres || 1.0} ac</td>`).join('')}
+            <tr class="hover:bg-slate-50">
+              <td class="p-3 font-bold text-slate-700">Top Recommended Crop</td>
+              ${runs.map(r => `
+                <td class="p-3">
+                  <span class="font-bold text-slate-900">${r.top_crop_name || r.top_crop || 'Crop'}</span>
+                  ${r.top_crop_kannada ? `<span class="block text-[11px] text-slate-500">${r.top_crop_kannada}</span>` : ''}
+                </td>
+              `).join('')}
             </tr>
-            <tr>
-              <td class="p-2.5 font-bold text-slate-700">Total Cultivation Cost</td>
-              ${runs.map(r => `<td class="p-2.5 text-slate-800">₹${(r.total_cost || r.total_cost_inr || 0).toLocaleString()}</td>`).join('')}
+            <tr class="hover:bg-slate-50">
+              <td class="p-3 font-bold text-slate-700">Crop Suitability</td>
+              ${runs.map(r => `
+                <td class="p-3">
+                  <span class="font-bold text-emerald-700 bg-emerald-50 px-2 py-0.5 rounded-full border border-emerald-200">${(r.suitability_pct || 0).toFixed(0)}% Match</span>
+                </td>
+              `).join('')}
             </tr>
-            <tr>
-              <td class="p-2.5 font-bold text-slate-700">Gross Revenue</td>
-              ${runs.map(r => `<td class="p-2.5 text-slate-800">₹${(r.gross_revenue || r.total_revenue || r.total_revenue_inr || 0).toLocaleString()}</td>`).join('')}
+            <tr class="hover:bg-slate-50 bg-emerald-50/30">
+              <td class="p-3 font-bold text-emerald-950">Net Profit (Total)</td>
+              ${runs.map(r => {
+                const profit = Number(r.net_profit || r.net_profit_inr || 0);
+                const isWinner = profit > 0 && profit === maxProfit;
+                return `
+                <td class="p-3 ${isWinner ? 'font-black text-emerald-900 text-sm' : 'font-extrabold text-emerald-700 text-sm'}">
+                  ₹${profit.toLocaleString()}
+                </td>
+                `;
+              }).join('')}
             </tr>
-            <tr>
-              <td class="p-2.5 font-bold text-emerald-800">Net Profit</td>
-              ${runs.map(r => `<td class="p-2.5 font-extrabold text-emerald-800">₹${(r.net_profit || r.net_profit_inr || 0).toLocaleString()}</td>`).join('')}
+            <tr class="hover:bg-slate-50">
+              <td class="p-3 font-bold text-slate-700">Profit / Acre</td>
+              ${runs.map(r => {
+                const acres = Number(r.land_acres || r.acres || 1.0);
+                const profit = Number(r.net_profit || r.net_profit_inr || 0);
+                const perAc = r.profit_per_acre || Math.round(profit / Math.max(0.1, acres));
+                return `
+                <td class="p-3 font-bold text-emerald-800">
+                  ₹${Number(perAc).toLocaleString()} / ac
+                </td>
+                `;
+              }).join('')}
             </tr>
-            <tr>
-              <td class="p-2.5 font-bold text-slate-700">Suitability</td>
-              ${runs.map(r => `<td class="p-2.5 font-bold text-emerald-700">${(r.suitability_pct || 0).toFixed(0)}%</td>`).join('')}
+            <tr class="hover:bg-slate-50">
+              <td class="p-3 font-bold text-slate-700">Total Cultivation Cost</td>
+              ${runs.map(r => `
+                <td class="p-3 text-slate-800">₹${Number(r.total_cost || r.total_cost_inr || 0).toLocaleString()}</td>
+              `).join('')}
+            </tr>
+            <tr class="hover:bg-slate-50">
+              <td class="p-3 font-bold text-slate-700">Expected Gross Revenue</td>
+              ${runs.map(r => `
+                <td class="p-3 text-slate-800 font-semibold">₹${Number(r.total_revenue || r.gross_revenue || r.total_revenue_inr || 0).toLocaleString()}</td>
+              `).join('')}
+            </tr>
+            <tr class="hover:bg-slate-50">
+              <td class="p-3 font-bold text-slate-700">Land Area & Irrigation</td>
+              ${runs.map(r => `
+                <td class="p-3 text-slate-700">
+                  <span class="font-bold">${r.land_acres || r.acres || 1.0} acres</span>
+                  <span class="block text-[11px] text-slate-500 capitalize">💧 ${r.irrigation || 'Drip'}</span>
+                </td>
+              `).join('')}
+            </tr>
+            <tr class="hover:bg-slate-50">
+              <td class="p-3 font-bold text-slate-700">Farmer Budget</td>
+              ${runs.map(r => `
+                <td class="p-3 text-slate-800">₹${Number(r.budget || 0).toLocaleString()}</td>
+              `).join('')}
+            </tr>
+            <tr class="hover:bg-slate-50">
+              <td class="p-3 font-bold text-slate-700">Soil Nutrients & Type</td>
+              ${runs.map(r => `
+                <td class="p-3 text-slate-700 text-[11px]">
+                  <span class="font-semibold block">${r.soil_type || 'Clay Loam'}</span>
+                  <span class="text-slate-500 font-mono">${r.soil_npk || 'Standard NPK'}</span>
+                </td>
+              `).join('')}
+            </tr>
+            <tr class="hover:bg-slate-50">
+              <td class="p-3 font-bold text-slate-700">Location</td>
+              ${runs.map(r => `
+                <td class="p-3 text-slate-600 text-[11px] truncate max-w-[180px]" title="${r.location_name || ''}">
+                  ${r.location_name || 'Karnataka Plot'}
+                </td>
+              `).join('')}
             </tr>
           </tbody>
         </table>
       </div>
     </div>
   `;
+
+  const btnClose = document.getElementById("btn-close-compare-tbl");
+  if (btnClose) {
+    btnClose.onclick = () => {
+      container.innerHTML = "";
+    };
+  }
 }
 
 // ============================================================================

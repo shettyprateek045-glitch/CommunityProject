@@ -180,21 +180,34 @@ def forward_geocode(query):
 # -----------------------------------------------------------------------------
 # Live Weather & 7-Day Forecast (Open-Meteo API)
 # -----------------------------------------------------------------------------
+_MEMORY_WEATHER_CACHE = {}
+_MEMORY_WEATHER_TTL = 900  # 15 minutes
+
 def get_live_weather(lat, lon):
     """
     Fetches real-time weather, 7-day forecast, 24-hr rain chart data, and alerts
-    from Open-Meteo free API (no key required).
+    from Open-Meteo free API (no key required) with 2-level memory + SQLite caching.
     """
     cache_key = f"wx_{round(lat, 2)}_{round(lon, 2)}"
+    now = time.time()
+
+    # Fast in-memory cache check (< 0.1ms)
+    if cache_key in _MEMORY_WEATHER_CACHE:
+        cached_time, cached_data = _MEMORY_WEATHER_CACHE[cache_key]
+        if (now - cached_time) < _MEMORY_WEATHER_TTL:
+            cached_data["cached"] = True
+            return cached_data
+
     conn = sqlite3.connect(CACHE_DB)
     c = conn.cursor()
     # 20 minutes cache
     c.execute("SELECT data, timestamp FROM weather_cache WHERE key = ?", (cache_key,))
     row = c.fetchone()
-    if row and (time.time() - row[1]) < 1200:
+    if row and (now - row[1]) < 1200:
         conn.close()
         data = json.loads(row[0])
         data["cached"] = True
+        _MEMORY_WEATHER_CACHE[cache_key] = (now, data)
         return data
 
     url = (
@@ -338,6 +351,7 @@ def get_live_weather(lat, lon):
                       (cache_key, json.dumps(result), time.time()))
             conn.commit()
             conn.close()
+            _MEMORY_WEATHER_CACHE[cache_key] = (time.time(), result)
             return result
     except Exception as e:
         conn.close()
