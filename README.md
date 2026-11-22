@@ -65,7 +65,7 @@ flowchart LR
    - **Factual 30-Day Price Trajectory**: Compares market prices exactly 1 month ago vs. current day prices across Karnataka APMC Mandi hubs with ₹ diff, % change, and revenue projection on farmer's acreage.
    - **Interactive 30-Day Price Trendline**: Daily modal price curve powered by Chart.js.
    - **Multi-Modal AI Verification Agent**: Verify crop recommendations and prices via text, Web Speech voice input/output, or field document/photo upload.
-   - **Dual Engine Architecture**: Connects live to Google Gemini (`GEMINI_API_KEY`) or OpenAI ChatGPT (`OPENAI_API_KEY`) when configured in `.env`, with automatic fallback to high-precision Local Agronomic Intelligence Engine.
+   - **Multi-Provider Architecture**: Connects live to Groq GPT-OSS (`openai/gpt-oss-20b`), Google Gemini (`GEMINI_API_KEY`), or OpenAI ChatGPT (`OPENAI_API_KEY`) when configured in `.env`, with automatic fallback to high-precision Local Agronomic Intelligence Engine. Private owner access configured for administrative oversight.
 
 ---
 

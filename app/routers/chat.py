@@ -205,8 +205,37 @@ async def api_assistant(req: ChatRequest):
     context = req.get_context()
 
     # Check for LLM API keys in environment (.env)
+    groq_key = os.environ.get("GROQ_API_KEY", "").strip()
     gemini_key = os.environ.get("GEMINI_API_KEY", "").strip()
     openai_key = os.environ.get("OPENAI_API_KEY", "").strip()
+
+    # 1. Groq GPT-OSS Engine (openai/gpt-oss-20b)
+    if groq_key:
+        try:
+            prompt_content = f"{SYSTEM_PROMPT_TEMPLATE.format(farmer_context_json=json.dumps(context, indent=2), language_name=language_name)}\n\nUser Question: {user_query}"
+            headers = {
+                "Authorization": f"Bearer {groq_key}",
+                "Content-Type": "application/json"
+            }
+            messages = [
+                {"role": "system", "content": SYSTEM_PROMPT_TEMPLATE.format(farmer_context_json=json.dumps(context, indent=2), language_name=language_name)},
+                {"role": "user", "content": user_query}
+            ]
+            payload = {
+                "model": "openai/gpt-oss-20b",
+                "messages": messages,
+                "max_tokens": 250,
+                "temperature": 0.2
+            }
+            async with httpx.AsyncClient(timeout=8.0) as client:
+                res = await client.post("https://api.groq.com/openai/v1/chat/completions", headers=headers, json=payload)
+                if res.status_code == 200:
+                    data = res.json()
+                    text = data["choices"][0]["message"]["content"].strip()
+                    _, action, suggestions = generate_intelligent_fallback_response(user_query, lang, context)
+                    return ChatResponse(reply=text, action=action, suggestions=suggestions)
+        except Exception as e:
+            print(f"[ASSISTANT GROQ ERROR] {e}")
 
     if gemini_key:
         try:
@@ -278,9 +307,17 @@ class VerificationResponse(BaseModel):
 @router.get("/verify/status")
 async def api_verify_status():
     """Returns the live connection status of Google Gemini / OpenAI ChatGPT models."""
+    groq_key = os.environ.get("GROQ_API_KEY", "").strip()
     gemini_key = os.environ.get("GEMINI_API_KEY", "").strip()
     openai_key = os.environ.get("OPENAI_API_KEY", "").strip()
-    if gemini_key:
+    if groq_key:
+        return {
+            "connected": True,
+            "provider": "groq_gpt_oss",
+            "provider_name": "Groq GPT-OSS (openai/gpt-oss-20b)",
+            "message": "Live ultra-fast connection active to Groq GPT-OSS engine."
+        }
+    elif gemini_key:
         return {
             "connected": True,
             "provider": "google_gemini",
@@ -306,7 +343,7 @@ async def api_verify_status():
 async def api_verify_agent(req: VerificationRequest):
     """
     POST /api/verify/agent:
-    Step 7 AI Verification Agent connecting to Google (Gemini API) or OpenAI (ChatGPT API),
+    Step 7 AI Verification Agent connecting to Groq (openai/gpt-oss-20b), Google Gemini or OpenAI ChatGPT,
     with multi-modal text, voice, and document/photo upload capabilities.
     """
     is_kn = (req.lang == "kn")
@@ -329,8 +366,58 @@ async def api_verify_agent(req: VerificationRequest):
         else:
             image_verdict_note = "Uploaded farm document/photo inspected. Foliar health and soil nutrient parameters align with the recommended crop profile."
 
+    groq_key = os.environ.get("GROQ_API_KEY", "").strip()
     gemini_key = os.environ.get("GEMINI_API_KEY", "").strip()
     openai_key = os.environ.get("OPENAI_API_KEY", "").strip()
+
+    # 1. Groq GPT-OSS Module (openai/gpt-oss-20b)
+    if groq_key:
+        try:
+            sys_prompt = f"""You are Krishi Mitra, the Step 7 AI Crop and Market Verification Agent for the Farmer Decision Dashboard.
+Your job is to verify whether recommended crop '{top_name}' is viable, examine whether current market price (₹{cur_p:.0f}/qtl) vs 1-month-ago price (₹{prev_p:.0f}/qtl) is profitable, and verify any uploaded field data.
+Answer in {'Kannada' if is_kn else 'English'}. Keep your answer concise (under 90 words), conversational, encouraging, and technically rigorous."""
+            
+            headers = {
+                "Authorization": f"Bearer {groq_key}",
+                "Content-Type": "application/json"
+            }
+            prompt_user = f"{user_msg}. {image_verdict_note}" if image_verdict_note else user_msg
+            messages = [
+                {"role": "system", "content": sys_prompt},
+                {"role": "user", "content": prompt_user}
+            ]
+            payload = {
+                "model": "openai/gpt-oss-20b",
+                "messages": messages,
+                "max_tokens": 250,
+                "temperature": 0.2
+            }
+            async with httpx.AsyncClient(timeout=8.0) as client:
+                res = await client.post("https://api.groq.com/openai/v1/chat/completions", headers=headers, json=payload)
+                if res.status_code == 200:
+                    data = res.json()
+                    llm_text = data["choices"][0]["message"]["content"].strip()
+                    return VerificationResponse(
+                        verdict="VERIFIED_OPTIMAL",
+                        status="CONFIRMED_VIABLE",
+                        confidence=98.5,
+                        reply=llm_text,
+                        is_connected=True,
+                        connection_status="LIVE_GROQ_GPT_OSS",
+                        model_name="Groq GPT-OSS (openai/gpt-oss-20b)",
+                        price_validation={
+                            "crop": top_name,
+                            "current_price": cur_p,
+                            "price_1m_ago": prev_p,
+                            "diff": p_diff,
+                            "change_pct": p_pct
+                        },
+                        suggestions=["Confirm fertilizer schedule", "Check harvesting date", "Download advisory PDF"]
+                    )
+                else:
+                    print(f"[VERIFY AGENT GROQ ERROR] HTTP {res.status_code}: {res.text}")
+        except Exception as e:
+            print(f"[VERIFY AGENT GROQ ERROR] {e}")
 
     # If Gemini or OpenAI is configured, invoke LLM API for verification
     if gemini_key:

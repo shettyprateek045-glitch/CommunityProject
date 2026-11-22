@@ -38,6 +38,8 @@ class Settings(BaseModel):
     google_redirect_uri: str = os.getenv("GOOGLE_REDIRECT_URI", "http://localhost:5000/api/auth/google/callback")
     gemini_api_key: str = os.getenv("GEMINI_API_KEY", "")
     openai_api_key: str = os.getenv("OPENAI_API_KEY", "")
+    groq_api_key: str = os.getenv("GROQ_API_KEY", "")
+    owner_email: str = os.getenv("OWNER_EMAIL", "shettyprateek@gmail.com")
 
 settings = Settings()
 
