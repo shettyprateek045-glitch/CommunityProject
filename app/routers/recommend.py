@@ -60,7 +60,9 @@ async def api_recommend(req: RecommendRequest):
             lat=lat_val,
             lon=lon_val,
             state=getattr(req, "state", "Karnataka") or "Karnataka",
-            district=getattr(req, "district", "Bengaluru") or "Bengaluru"
+            district=getattr(req, "district", "Bengaluru") or "Bengaluru",
+            hist_5yr_rain=getattr(req, "hist_5yr_rainfall", None),
+            hist_5yr_temp=getattr(req, "hist_5yr_temp", None)
         )
 
         # Save to SQLite history
@@ -123,7 +125,9 @@ async def api_whatif(req: RecommendRequest):
             lat=lat_val,
             lon=lon_val,
             state=getattr(req, "state", "Karnataka") or "Karnataka",
-            district=getattr(req, "district", "Bengaluru") or "Bengaluru"
+            district=getattr(req, "district", "Bengaluru") or "Bengaluru",
+            hist_5yr_rain=getattr(req, "hist_5yr_rainfall", None),
+            hist_5yr_temp=getattr(req, "hist_5yr_temp", None)
         )
         return {
             "status": "success",

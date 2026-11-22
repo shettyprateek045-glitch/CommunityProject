@@ -91,6 +91,17 @@ async def serve_login(next: str = "/", user: Optional[User] = Depends(get_curren
         return FileResponse(login_path)
     return HTMLResponse("<h1>Sign In</h1>")
 
+@app.get("/share/{token}", response_class=HTMLResponse)
+async def serve_share_page(token: str):
+    """
+    Serves the public, read-only crop advisory view without requiring user login.
+    """
+    share_path = os.path.join("templates", "share.html")
+    if os.path.exists(share_path):
+        return FileResponse(share_path)
+    return HTMLResponse("<h1>Shared Crop Advisory</h1>")
+
+
 @app.get("/logout")
 async def logout_redirect():
     """Clears the session cookie and redirects to /login."""

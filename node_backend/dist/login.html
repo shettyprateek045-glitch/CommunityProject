@@ -30,10 +30,42 @@
 
   <!-- FontAwesome Icons CDN -->
   <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.1/css/all.min.css" />
-</head>
-<body class="bg-earth-50 text-slate-800 min-h-screen flex flex-col items-center justify-center p-4 antialiased">
 
-  <div class="w-full max-w-md bg-white rounded-2xl shadow-xl border border-earth-200 overflow-hidden">
+  <!-- Video Background & Accessibility Styles -->
+  <style>
+    .video-bg-container {
+      background-image: url('/static/videos/farmer_poster.jpg');
+      background-size: cover;
+      background-position: center;
+    }
+    @media (prefers-reduced-motion: reduce) {
+      #bg-video {
+        display: none !important;
+      }
+    }
+  </style>
+</head>
+<body class="bg-slate-950 text-slate-800 min-h-screen flex flex-col items-center justify-center p-4 antialiased relative overflow-x-hidden">
+
+  <!-- Full-Screen Looping Background Video with Poster Fallback -->
+  <div class="fixed inset-0 w-full h-full overflow-hidden pointer-events-none -z-10 video-bg-container">
+    <video
+      id="bg-video"
+      autoplay
+      muted
+      loop
+      playsinline
+      poster="/static/videos/farmer_poster.jpg"
+      class="w-full h-full object-cover object-center transition-opacity duration-1000 opacity-0"
+    >
+      <source src="/static/videos/farmer_field.mp4" type="video/mp4">
+      <source src="/static/videos/farmer_field.webm" type="video/webm">
+    </video>
+    <!-- Dark Gradient Overlay for Maximum Legibility -->
+    <div class="absolute inset-0 bg-gradient-to-t from-black/85 via-black/60 to-black/75 backdrop-blur-[2px]"></div>
+  </div>
+
+  <div class="w-full max-w-md bg-white/95 backdrop-blur-md rounded-3xl shadow-2xl border border-white/30 overflow-hidden relative z-10 my-6">
     
     <!-- Header banner -->
     <div class="bg-[#1b5e20] text-white p-6 text-center">
@@ -372,6 +404,25 @@ GOOGLE_CLIENT_SECRET=your-client-secret</pre>
         showError(err.message);
       }
     };
+
+    // Video slow motion playback and progressive load
+    const bgVideo = document.getElementById('bg-video');
+    if (bgVideo) {
+      const isSlowNetwork = (navigator.connection && (navigator.connection.saveData || navigator.connection.effectiveType === '2g' || navigator.connection.effectiveType === '3g'));
+      const prefersReducedMotion = window.matchMedia && window.matchMedia('(prefers-reduced-motion: reduce)').matches;
+
+      if (isSlowNetwork || prefersReducedMotion) {
+        bgVideo.remove();
+      } else {
+        bgVideo.playbackRate = 0.5;
+        const reveal = () => {
+          bgVideo.classList.remove('opacity-0');
+          bgVideo.classList.add('opacity-100');
+        };
+        if (bgVideo.readyState >= 2) reveal();
+        else bgVideo.addEventListener('loadeddata', reveal);
+      }
+    }
   </script>
 </body>
 </html>

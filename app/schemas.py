@@ -123,6 +123,8 @@ class RecommendRequest(BaseModel):
     temperature: Optional[float] = None
     humidity: Optional[float] = None
     rainfall: Optional[float] = None
+    hist_5yr_rainfall: Optional[float] = None
+    hist_5yr_temp: Optional[float] = None
     w_suit: Optional[float] = 0.40
     w_profit: Optional[float] = 0.40
     w_risk: Optional[float] = 0.20

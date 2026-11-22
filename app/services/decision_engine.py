@@ -69,7 +69,9 @@ def compute_farmer_recommendations(
     lon: float = 77.5946,
     state: str = "Karnataka",
     district: str = "Bengaluru",
-    alerts: list = None
+    alerts: list = None,
+    hist_5yr_rain: Optional[float] = None,
+    hist_5yr_temp: Optional[float] = None
 ) -> Dict[str, Any]:
     """
     Computes recommendations across 3 sections:
@@ -202,10 +204,15 @@ def compute_farmer_recommendations(
         # Budget check
         exceeds_budget = bool(total_cost_inr > float(budget_inr))
 
-        # Water need vs irrigation constraint
+        # Water need vs irrigation constraint (Enhanced with 5-Year Historical Rainfall stability)
         water_need_mm = float(eco["water_need_mm"])
-        water_deficit_ratio = max(0.0, (water_need_mm - rainfall_annual) / max(1.0, water_need_mm))
+        effective_annual_rain = (0.55 * rainfall_annual + 0.45 * hist_5yr_rain) if hist_5yr_rain else rainfall_annual
+        water_deficit_ratio = max(0.0, (water_need_mm - effective_annual_rain) / max(1.0, water_need_mm))
         irr_risk = water_deficit_ratio * (1.0 - irr_efficiency)
+        # Bonus suitability for climate-resilient crops if 5-yr rainfall indicates drought-prone zone
+        if hist_5yr_rain and hist_5yr_rain < 700.0 and crop_id in ["ragi", "mothbeans", "mungbean", "chickpea", "groundnut", "jowar"]:
+            final_suit_score = min(1.0, final_suit_score + 0.08)
+            suitability_pct = round(final_suit_score * 100.0, 1)
         price_vol_ratio = min(1.0, (volatility_std / max(100.0, unit_price)) * 2.5)
 
         alert_penalty = 0.0

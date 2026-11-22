@@ -10,7 +10,8 @@ from app.services.weather_service import (
     fetch_open_meteo_weather,
     reverse_geocode_async,
     get_ip_location,
-    calculate_irrigation_and_sowing_advice
+    calculate_irrigation_and_sowing_advice,
+    fetch_5year_weather_analysis
 )
 from services.weather import forward_geocode
 
@@ -141,3 +142,31 @@ async def api_irrigation_schedule(request: Request):
         return res
     except Exception as e:
         raise HTTPException(status_code=500, detail=f"Irrigation schedule calculation failed: {str(e)}")
+
+@router.get("/weather/historical-5yr")
+async def api_weather_historical_5yr_get(lat: float = 15.3173, lon: Optional[float] = None, lng: Optional[float] = None):
+    """
+    GET /api/weather/historical-5yr?lat=...&lon=...
+    Fetches 5-year historical micro-climate analysis (2021-2025) from Open-Meteo Historical Archive API,
+    with monthly rainfall & temperature aggregations, extreme event analysis, and auto-generated insights.
+    """
+    actual_lon = lon if lon is not None else (lng if lng is not None else 75.7139)
+    try:
+        data = await fetch_5year_weather_analysis(lat, actual_lon)
+        return data
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"5-Year historical weather service failure: {str(e)}")
+
+@router.post("/weather/historical-5yr")
+async def api_weather_historical_5yr_post(req: WeatherRequest):
+    """
+    POST /api/weather/historical-5yr {lat, lng}
+    """
+    lat = req.lat
+    lon = req.get_lon()
+    try:
+        data = await fetch_5year_weather_analysis(lat, lon)
+        return data
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"5-Year historical weather service failure: {str(e)}")
+

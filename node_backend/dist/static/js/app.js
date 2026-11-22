@@ -69,6 +69,13 @@ const I18N = {
     heading_irrigation_schedule: "7-Day Smart Irrigation Schedule (FAO-56)",
     heading_sowing_window: "Recommended Sowing Window",
     heading_historical_climate: "12-Month Climate Baseline",
+    heading_5yr_weather: "5-Year Historical Weather Analysis (2021–2025)",
+    subheading_5yr_weather: "Open-Meteo Historical Archive API • 5-Year Trends, Extremes & Insights",
+    tab_monthly_rainfall: "🌧️ Monthly Rainfall",
+    tab_monthly_temp: "🌡️ Monthly Temperature",
+    tab_5yr_vs_current: "⚖️ 5-Yr Avg vs 2026 Comparison",
+    insights_heading: "Agro-Climatic Insights & Trends",
+    btn_retry_5yr: "Retry Analysis",
 
     // Step 3: Soil & Fertilizer
     heading_soil_section: "Soil Analysis, SoilGrids & Fertilizer Plan",
@@ -177,6 +184,13 @@ const I18N = {
     heading_irrigation_schedule: "೭ ದಿನಗಳ ಸ್ಮಾರ್ಟ್ ನೀರಾವರಿ ವೇಳಾಪಟ್ಟಿ (FAO-56)",
     heading_sowing_window: "ಶಿಫಾರಸು ಮಾಡಿದ ಬಿತ್ತನೆ ಸಮಯ",
     heading_historical_climate: "೧೨ ತಿಂಗಳ ಹವಾಮಾನ ದಾಖಲೆ",
+    heading_5yr_weather: "೫ ವರ್ಷಗಳ ಐತಿಹಾಸಿಕ ಹವಾಮಾನ ವಿಶ್ಲೇಷಣೆ (೨೦೨೧–೨೦೨೫)",
+    subheading_5yr_weather: "ಓಪನ್-ಮೆಟಿಯೊ ಆರ್ಕೈವ್ ಮಾಹಿತಿ • ೫ ವರ್ಷಗಳ ಪ್ರವೃತ್ತಿಗಳು ಮತ್ತು ಒಳನೋಟಗಳು",
+    tab_monthly_rainfall: "🌧️ ಮಾಸಿಕ ಮಳೆ",
+    tab_monthly_temp: "🌡️ ಮಾಸಿಕ ತಾಪಮಾನ",
+    tab_5yr_vs_current: "⚖️ ೫-ವರ್ಷದ ಸರಾಸರಿ vs ೨೦೨೬ ಹೋಲಿಕೆ",
+    insights_heading: "ಕೃಷಿ-ಹವಾಮಾನ ಒಳನೋಟಗಳು ಮತ್ತು ಪ್ರವೃತ್ತಿಗಳು",
+    btn_retry_5yr: "ಮತ್ತೆ ಪ್ರಯತ್ನಿಸಿ",
 
     // Step 3: Soil & Fertilizer
     heading_soil_section: "ಮಣ್ಣಿನ ವಿಶ್ಲೇಷಣೆ, ಸಾಯಿಲ್‌ಗ್ರಿಡ್ಸ್ ಮತ್ತು ಗೊಬ್ಬರ ಯೋಜನೆ",
@@ -285,6 +299,13 @@ const I18N = {
     heading_irrigation_schedule: "७-दिवसीय स्मार्ट सिंचाई सारणी (FAO-56)",
     heading_sowing_window: "अनुशंसित बुवाई का समय",
     heading_historical_climate: "१२ महीने का जलवायु रिकॉर्ड",
+    heading_5yr_weather: "५-वर्षीय ऐतिहासिक मौसम विश्लेषण (२०२१–२०२५)",
+    subheading_5yr_weather: "ओपन-मेटियो आर्काइव डेटा • ५ वर्षों के रुझान और अंतर्दृष्टि",
+    tab_monthly_rainfall: "🌧️ मासिक वर्षा",
+    tab_monthly_temp: "🌡️ मासिक तापमान",
+    tab_5yr_vs_current: "⚖️ ५-वर्षीय औसत बनाम २०२६ तुलना",
+    insights_heading: "कृषि-जलवायु अंतर्दृष्टि और रुझान",
+    btn_retry_5yr: "पुनः प्रयास करें",
 
     // Step 3: Soil & Fertilizer
     heading_soil_section: "मृदा विश्लेषण, सॉइल-ग्रिड्स और उर्वरक योजना",
@@ -396,6 +417,11 @@ let farmMarker = null;
 let farmCircle = null;
 let climateChartInstance = null;
 let mandiChartInstance = null;
+let weather5YrChartInstance = null;
+let weather5YrData = null;
+let weather5YrLoading = false;
+let weather5YrError = null;
+let weather5YrActiveTab = 'rainfall';
 
 // Cached API responses
 let weatherData = null;
@@ -811,6 +837,65 @@ async function fetchLiveWeather(lat, lon) {
   return null;
 }
 
+async function fetch5YearWeatherAnalysis(lat, lon, force = false) {
+  try {
+    const latNum = parseFloat(lat) || farmContext.lat || 12.9716;
+    const lonNum = parseFloat(lon) || farmContext.lon || 77.5946;
+    const cacheKey = `${latNum.toFixed(2)},${lonNum.toFixed(2)}`;
+
+    if (!force) {
+      if (weather5YrData && weather5YrData._latLon === cacheKey) {
+        return weather5YrData;
+      }
+      const sessionCached = getFromSessionCache(`fdd_wx_5yr_${cacheKey}`);
+      if (sessionCached) {
+        weather5YrData = sessionCached;
+        weather5YrData._latLon = cacheKey;
+        return weather5YrData;
+      }
+    }
+
+    const inflightKey = `wx_5yr_${cacheKey}`;
+    if (_inflightPromises.has(inflightKey)) {
+      return await _inflightPromises.get(inflightKey);
+    }
+
+    weather5YrLoading = true;
+    weather5YrError = null;
+
+    const fetchPromise = (async () => {
+      try {
+        const res = await fetch(`/api/weather/historical-5yr?lat=${latNum}&lon=${lonNum}`);
+        if (res.ok) {
+          const data = await res.json();
+          data._latLon = cacheKey;
+          weather5YrData = data;
+          saveToSessionCache(`fdd_wx_5yr_${cacheKey}`, data);
+          weather5YrLoading = false;
+          return data;
+        } else {
+          throw new Error(`Server returned status ${res.status}`);
+        }
+      } catch (err) {
+        console.error("5-Year weather fetch error:", err);
+        weather5YrError = err.message || "Failed to load 5-year weather analysis";
+        weather5YrLoading = false;
+        return null;
+      } finally {
+        _inflightPromises.delete(inflightKey);
+      }
+    })();
+
+    _inflightPromises.set(inflightKey, fetchPromise);
+    return await fetchPromise;
+  } catch (e) {
+    console.error("fetch5YearWeatherAnalysis fatal error:", e);
+    weather5YrLoading = false;
+    weather5YrError = e.message;
+    return null;
+  }
+}
+
 async function fetchIrrigationSchedule() {
   try {
     const payload = {
@@ -1024,7 +1109,9 @@ async function prewarmRecommendations() {
     soil_ph: farmContext.soil_ph !== null ? farmContext.soil_ph : 6.5,
     previous_crop: farmContext.previous_crop,
     state: farmContext.state || "Karnataka",
-    district: farmContext.district || "Bengaluru"
+    district: farmContext.district || "Bengaluru",
+    hist_5yr_rainfall: (weather5YrData && weather5YrData.five_year_averages) ? weather5YrData.five_year_averages.annual_rainfall_mm : undefined,
+    hist_5yr_temp: (weather5YrData && weather5YrData.five_year_averages) ? weather5YrData.five_year_averages.annual_temp_c : undefined
   };
 
   _activeRecommendPromise = (async () => {
@@ -1406,30 +1493,197 @@ export function renderDashboardShell(container, lang) {
       </div>
     </div>
 
-    <!-- Side-by-Side Run Comparison & History Modal -->
+    <!-- Google History-Style Past Runs & Comparison Modal -->
     <div id="modal-history" class="fixed inset-0 z-50 bg-slate-900/60 backdrop-blur-xs hidden flex items-center justify-center p-4">
-      <div class="bg-white rounded-3xl shadow-2xl max-w-4xl w-full p-6 sm:p-8 space-y-5 max-h-[88vh] flex flex-col border border-slate-100">
-        <div class="flex items-center justify-between border-b border-slate-200 pb-3">
+      <div class="bg-white rounded-3xl shadow-2xl max-w-4xl w-full p-6 sm:p-8 space-y-4 max-h-[90vh] flex flex-col border border-slate-100">
+        
+        <!-- Header -->
+        <div class="flex items-center justify-between border-b border-slate-200 pb-3 flex-wrap gap-2">
           <div class="flex items-center gap-2.5">
-            <div class="w-9 h-9 rounded-full bg-emerald-100 text-emerald-800 flex items-center justify-center text-lg">
+            <div class="w-10 h-10 rounded-full bg-emerald-100 text-emerald-800 flex items-center justify-center text-lg">
               <i class="fa-solid fa-clock-rotate-left"></i>
             </div>
             <div>
-              <h3 class="text-base font-bold text-slate-800">${t.modal_compare_title}</h3>
-              <p class="text-xs text-slate-500">Compare cost, revenue, profit and crop suitability across runs</p>
+              <h3 class="text-base font-bold text-slate-800">Recommendation History</h3>
+              <p class="text-xs text-slate-500">Search, filter, reopen and manage saved farm runs</p>
             </div>
           </div>
-          <button id="btn-close-history" class="text-slate-400 hover:text-slate-600 text-xl cursor-pointer">
-            <i class="fa-solid fa-xmark"></i>
-          </button>
+          
+          <div class="flex items-center gap-2">
+            <!-- Clear History Dropdown -->
+            <div class="relative inline-block text-left">
+              <button type="button" id="btn-clear-history-menu" class="px-3 py-1.5 rounded-xl border border-rose-200 bg-rose-50 hover:bg-rose-100 text-rose-800 font-bold text-xs flex items-center gap-1.5 transition cursor-pointer">
+                <i class="fa-solid fa-trash-can"></i>
+                <span>Clear History</span>
+                <i class="fa-solid fa-chevron-down text-[10px]"></i>
+              </button>
+              <div id="dropdown-clear-history" class="hidden absolute right-0 mt-1 w-44 rounded-xl bg-white shadow-xl border border-slate-200 py-1.5 z-30 text-xs">
+                <button type="button" data-tf="hour" class="btn-clear-tf w-full text-left px-3.5 py-2 hover:bg-rose-50 text-rose-700 transition font-medium">Delete Last Hour</button>
+                <button type="button" data-tf="today" class="btn-clear-tf w-full text-left px-3.5 py-2 hover:bg-rose-50 text-rose-700 transition font-medium">Delete Today</button>
+                <button type="button" data-tf="all" class="btn-clear-tf w-full text-left px-3.5 py-2 hover:bg-rose-50 text-rose-700 font-bold transition">Delete All Time</button>
+              </div>
+            </div>
+
+            <button id="btn-close-history" class="text-slate-400 hover:text-slate-600 text-xl cursor-pointer p-1">
+              <i class="fa-solid fa-xmark"></i>
+            </button>
+          </div>
         </div>
 
-        <!-- History Runs Selection & Compare Table -->
+        <!-- Search & Filters Toolbar -->
+        <div class="bg-slate-50 p-3 rounded-2xl border border-slate-200 space-y-2.5 text-xs">
+          <div class="flex flex-col sm:flex-row items-center gap-2">
+            <div class="relative flex-1 w-full">
+              <i class="fa-solid fa-magnifying-glass absolute left-3 top-2.5 text-slate-400"></i>
+              <input type="text" id="input-history-search" placeholder="Search by crop or location..." class="w-full pl-9 pr-3 py-2 bg-white border border-slate-200 rounded-xl focus:outline-none focus:border-emerald-600 text-xs" />
+            </div>
+            <div class="flex items-center gap-2 w-full sm:w-auto">
+              <select id="select-history-crop" class="px-3 py-2 bg-white border border-slate-200 rounded-xl text-xs focus:outline-none focus:border-emerald-600">
+                <option value="">All Crops</option>
+              </select>
+              <button type="button" id="btn-toggle-history-dates" class="px-3 py-2 bg-white border border-slate-200 rounded-xl text-xs font-semibold hover:bg-slate-100 transition whitespace-nowrap">
+                <i class="fa-regular fa-calendar mr-1"></i> Dates
+              </button>
+            </div>
+          </div>
+
+          <!-- Collapsible Date Range Bar -->
+          <div id="history-date-filter-row" class="hidden flex items-center gap-2 flex-wrap pt-1 border-t border-slate-200/60">
+            <span class="text-slate-500 text-[11px]">From:</span>
+            <input type="date" id="input-history-from" class="px-2.5 py-1 bg-white border border-slate-200 rounded-lg text-xs" />
+            <span class="text-slate-500 text-[11px]">To:</span>
+            <input type="date" id="input-history-to" class="px-2.5 py-1 bg-white border border-slate-200 rounded-lg text-xs" />
+            <button type="button" id="btn-apply-history-filter" class="px-3 py-1 bg-emerald-700 text-white font-bold rounded-lg text-xs">Apply</button>
+            <button type="button" id="btn-reset-history-filter" class="px-3 py-1 bg-slate-200 text-slate-700 font-semibold rounded-lg text-xs">Reset</button>
+          </div>
+        </div>
+
+        <!-- Multi-Select Action Banner (Appears when items are selected) -->
+        <div id="history-selection-bar" class="hidden p-3 bg-emerald-50 border border-emerald-200 rounded-2xl flex items-center justify-between text-xs animate-fadeIn">
+          <div class="flex items-center gap-2">
+            <span id="history-selected-count-badge" class="px-2 py-0.5 rounded-full bg-emerald-700 text-white text-[10px] font-bold">0 selected</span>
+            <span class="text-emerald-900 font-semibold">actions:</span>
+          </div>
+          <div class="flex items-center gap-2">
+            <button type="button" id="btn-history-bulk-delete" class="px-3 py-1.5 rounded-xl bg-rose-600 hover:bg-rose-700 text-white font-bold transition flex items-center gap-1 shadow-xs cursor-pointer">
+              <i class="fa-solid fa-trash"></i> <span>Delete Selected</span>
+            </button>
+            <button type="button" id="btn-history-compare" class="px-3 py-1.5 rounded-xl bg-[#1b5e20] hover:bg-[#2e7d32] text-white font-bold transition flex items-center gap-1 shadow-xs cursor-pointer">
+              <i class="fa-solid fa-code-compare"></i> <span>Compare Selected</span>
+            </button>
+            <button type="button" id="btn-history-clear-selection" class="px-2.5 py-1.5 rounded-xl bg-white border border-slate-300 text-slate-600 font-medium hover:bg-slate-100 transition cursor-pointer">
+              Clear
+            </button>
+          </div>
+        </div>
+
+        <!-- Side-by-Side Comparison Output Container -->
+        <div id="side-by-side-compare-table" class="space-y-3"></div>
+
+        <!-- History Runs Content Container (Grouped by Today, Yesterday, Last 7 Days, Earlier) -->
         <div id="history-content-container" class="overflow-y-auto flex-1 space-y-4 pr-1 text-xs">
           <div class="text-center py-8 text-slate-400">Loading saved runs...</div>
         </div>
       </div>
     </div>
+
+    <!-- Confirmation Dialog for Clear History -->
+    <div id="modal-confirm-clear" class="fixed inset-0 z-60 bg-slate-900/70 backdrop-blur-xs hidden flex items-center justify-center p-4">
+      <div class="bg-white rounded-3xl shadow-2xl max-w-sm w-full p-6 space-y-4 border border-slate-100 text-center">
+        <div class="w-12 h-12 rounded-full bg-rose-100 text-rose-600 flex items-center justify-center text-2xl mx-auto">
+          <i class="fa-solid fa-triangle-exclamation"></i>
+        </div>
+        <div>
+          <h4 class="text-base font-bold text-slate-900" id="confirm-clear-title">Clear Recommendation History?</h4>
+          <p class="text-xs text-slate-500 mt-1" id="confirm-clear-desc">Are you sure you want to delete your past runs? This action cannot be undone.</p>
+        </div>
+        <div class="flex items-center justify-center gap-2 pt-2">
+          <button type="button" id="btn-cancel-clear" class="px-4 py-2 rounded-xl bg-slate-100 hover:bg-slate-200 text-slate-700 font-bold text-xs transition cursor-pointer">Cancel</button>
+          <button type="button" id="btn-confirm-clear" class="px-5 py-2 rounded-xl bg-rose-600 hover:bg-rose-700 text-white font-bold text-xs transition shadow-sm cursor-pointer">Delete</button>
+        </div>
+      </div>
+    </div>
+
+    <!-- Share Searched Crops Modal -->
+    <div id="modal-share" class="fixed inset-0 z-50 bg-slate-900/60 backdrop-blur-xs hidden flex items-center justify-center p-4">
+      <div class="bg-white rounded-3xl shadow-2xl max-w-lg w-full p-6 sm:p-7 space-y-5 border border-slate-100 max-h-[92vh] flex flex-col">
+        <div class="flex items-center justify-between border-b border-slate-100 pb-3">
+          <div class="flex items-center gap-2.5">
+            <div class="w-9 h-9 rounded-full bg-blue-100 text-blue-700 flex items-center justify-center text-lg">
+              <i class="fa-solid fa-share-nodes"></i>
+            </div>
+            <div>
+              <h3 class="text-base font-bold text-slate-800">Share Searched Crops</h3>
+              <p class="text-xs text-slate-500">Public link & direct messaging for farmers</p>
+            </div>
+          </div>
+          <button id="btn-close-share" class="text-slate-400 hover:text-slate-600 text-xl cursor-pointer">
+            <i class="fa-solid fa-xmark"></i>
+          </button>
+        </div>
+
+        <!-- Summary Preview Card -->
+        <div id="share-card-preview" class="p-4 rounded-2xl bg-gradient-to-br from-[#1b5e20] to-[#2e7d32] text-white space-y-2.5 text-xs shadow-sm">
+          <div class="flex justify-between items-center text-[11px] text-emerald-200">
+            <span id="share-preview-loc">Farm Plot</span>
+            <span id="share-preview-date">Today</span>
+          </div>
+          <div class="font-extrabold text-base" id="share-preview-title">Top Crops Advisory</div>
+          <div id="share-preview-crops" class="space-y-1 text-emerald-100"></div>
+          <div class="pt-2 border-t border-white/20 flex justify-between font-bold text-amber-300">
+            <span>Estimated Profit Margin:</span>
+            <span id="share-preview-profit">₹0</span>
+          </div>
+        </div>
+
+        <!-- Public Share URL & Copy Box -->
+        <div class="space-y-1.5">
+          <label class="text-xs font-bold text-slate-700 block">Read-Only Public Link (No Login Needed):</label>
+          <div class="flex items-center gap-2">
+            <input type="text" id="share-link-input" readonly class="flex-1 px-3 py-2 text-xs bg-slate-50 border border-slate-200 rounded-xl font-mono text-slate-600 select-all" />
+            <button type="button" id="btn-copy-share-link" class="px-3.5 py-2 bg-emerald-700 hover:bg-emerald-800 text-white rounded-xl text-xs font-bold transition flex items-center gap-1.5 cursor-pointer">
+              <i class="fa-solid fa-copy"></i>
+              <span>Copy</span>
+            </button>
+          </div>
+          <span id="copy-toast" class="hidden text-[11px] text-emerald-600 font-bold block">✓ Link copied to clipboard!</span>
+        </div>
+
+        <!-- Sharing Channels -->
+        <div class="space-y-2">
+          <label class="text-xs font-bold text-slate-700 block">Share Directly via:</label>
+          <div class="grid grid-cols-2 sm:grid-cols-4 gap-2 text-xs">
+            <button type="button" id="btn-share-whatsapp" class="p-2.5 rounded-xl border border-emerald-200 bg-emerald-50 hover:bg-emerald-100 text-emerald-900 font-bold transition flex flex-col items-center justify-center gap-1 cursor-pointer">
+              <i class="fa-brands fa-whatsapp text-lg text-emerald-600"></i>
+              <span>WhatsApp</span>
+            </button>
+            <button type="button" id="btn-share-sms" class="p-2.5 rounded-xl border border-blue-200 bg-blue-50 hover:bg-blue-100 text-blue-900 font-bold transition flex flex-col items-center justify-center gap-1 cursor-pointer">
+              <i class="fa-solid fa-comment-sms text-lg text-blue-600"></i>
+              <span>SMS</span>
+            </button>
+            <button type="button" id="btn-share-email" class="p-2.5 rounded-xl border border-amber-200 bg-amber-50 hover:bg-amber-100 text-amber-900 font-bold transition flex flex-col items-center justify-center gap-1 cursor-pointer">
+              <i class="fa-solid fa-envelope text-lg text-amber-600"></i>
+              <span>Email</span>
+            </button>
+            <button type="button" id="btn-share-native" class="p-2.5 rounded-xl border border-purple-200 bg-purple-50 hover:bg-purple-100 text-purple-900 font-bold transition flex flex-col items-center justify-center gap-1 cursor-pointer">
+              <i class="fa-solid fa-share-nodes text-lg text-purple-600"></i>
+              <span>More</span>
+            </button>
+          </div>
+        </div>
+
+        <!-- Revoke Link & Download Options -->
+        <div class="pt-2 border-t border-slate-100 flex items-center justify-between text-xs">
+          <button type="button" id="btn-download-share-card" class="text-emerald-700 hover:text-emerald-900 font-bold flex items-center gap-1.5 cursor-pointer">
+            <i class="fa-solid fa-download"></i> <span>Download Summary Card</span>
+          </button>
+          <button type="button" id="btn-revoke-share" class="text-rose-600 hover:text-rose-800 font-semibold cursor-pointer text-[11px]">
+            Revoke Public Link
+          </button>
+        </div>
+      </div>
+    </div>
+
 
     <!-- Floating Krishi Mitra AI Chat Button -->
     <button id="btn-krishi-chat" type="button" class="fixed bottom-5 right-5 z-40 w-14 h-14 rounded-full bg-gradient-to-r from-emerald-700 to-green-600 text-white shadow-2xl hover:shadow-emerald-500/50 hover:scale-105 active:scale-95 transition flex items-center justify-center cursor-pointer group" title="Chat with Krishi Mitra (ಕೃಷಿ ಮಿತ್ರ)">
@@ -1458,6 +1712,9 @@ export function renderDashboardShell(container, lang) {
           </div>
         </div>
         <div class="flex items-center gap-1">
+          <button id="btn-chat-mute" type="button" class="p-2 text-emerald-200 hover:text-white rounded-lg hover:bg-white/10 transition cursor-pointer" title="Toggle Voice (Mute/Unmute)">
+            <i id="icon-chat-mute" class="fa-solid fa-volume-high text-xs"></i>
+          </button>
           <button id="btn-chat-clear" type="button" class="p-2 text-emerald-200 hover:text-white rounded-lg hover:bg-white/10 transition cursor-pointer" title="Clear Chat">
             <i class="fa-solid fa-trash-can text-xs"></i>
           </button>
@@ -1844,6 +2101,15 @@ async function renderWeatherStepView(container) {
     });
   }
 
+  // If 5-Year Weather Analysis is pending in background, fetch without blocking UI
+  if (!weather5YrData && !weather5YrLoading) {
+    fetch5YearWeatherAnalysis(farmContext.lat, farmContext.lon).then(() => {
+      if (currentStep === 2) {
+        renderWeatherStepView(container);
+      }
+    });
+  }
+
   const cur = weatherData.current || {};
   const daily = weatherData.daily_7d || [];
   const isDay = cur.is_day !== undefined ? cur.is_day : 1;
@@ -2072,6 +2338,74 @@ async function renderWeatherStepView(container) {
         </div>
       </div>
 
+      <!-- 5-Year Historical Weather Analysis (2021–2025) -->
+      <div id="card-5yr-weather-analysis" class="space-y-4 pt-5 border-t border-slate-200">
+        <div class="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
+          <div>
+            <div class="flex items-center gap-2 flex-wrap">
+              <h3 class="text-sm font-bold text-slate-900 uppercase tracking-wider flex items-center gap-1.5">
+                <span>📊 ${t.heading_5yr_weather}</span>
+              </h3>
+              ${weather5YrData?.cached ? `<span class="px-2.5 py-0.5 rounded-full bg-emerald-100 text-emerald-800 text-[10px] font-bold">⚡ Cached & Instant</span>` : (weather5YrData ? `<span class="px-2.5 py-0.5 rounded-full bg-blue-100 text-blue-800 text-[10px] font-bold">🌐 Open-Meteo Archive</span>` : '')}
+            </div>
+            <p class="text-xs text-slate-500 font-medium">${t.subheading_5yr_weather}</p>
+          </div>
+
+          <!-- Chart Selector Tabs -->
+          <div class="inline-flex rounded-xl bg-slate-100 p-1 text-xs font-bold border border-slate-200 self-start sm:self-auto shadow-2xs">
+            <button type="button" id="tab-5yr-rain" class="px-3 py-1.5 rounded-lg transition ${weather5YrActiveTab === 'rainfall' ? 'bg-white text-emerald-800 shadow-xs' : 'text-slate-600 hover:text-slate-900'}">
+              ${t.tab_monthly_rainfall}
+            </button>
+            <button type="button" id="tab-5yr-temp" class="px-3 py-1.5 rounded-lg transition ${weather5YrActiveTab === 'temp' ? 'bg-white text-emerald-800 shadow-xs' : 'text-slate-600 hover:text-slate-900'}">
+              ${t.tab_monthly_temp}
+            </button>
+            <button type="button" id="tab-5yr-comp" class="px-3 py-1.5 rounded-lg transition ${weather5YrActiveTab === 'comparison' ? 'bg-white text-emerald-800 shadow-xs' : 'text-slate-600 hover:text-slate-900'}">
+              ${t.tab_5yr_vs_current}
+            </button>
+          </div>
+        </div>
+
+        <!-- Chart Container with Loading/Error states -->
+        <div id="container-5yr-chart-body" class="rounded-2xl border border-slate-200 p-4 bg-slate-50 min-h-[300px] flex flex-col justify-center">
+          ${weather5YrLoading ? `
+            <div class="py-16 text-center space-y-3">
+              <div class="text-3xl text-emerald-600 animate-spin"><i class="fa-solid fa-spinner"></i></div>
+              <p class="text-xs text-slate-600 font-bold">Fetching 5-year daily climate records from Open-Meteo (2021–2025)...</p>
+              <p class="text-[11px] text-slate-400">Aggregating rainfall totals, temperature variations, and extreme weather events.</p>
+            </div>
+          ` : weather5YrError ? `
+            <div class="py-12 text-center space-y-3 p-4">
+              <div class="text-3xl text-amber-500"><i class="fa-solid fa-triangle-exclamation"></i></div>
+              <p class="text-xs text-slate-700 font-bold">${weather5YrError}</p>
+              <button type="button" id="btn-retry-5yr-fetch" class="px-4 py-2 rounded-xl bg-emerald-700 text-white text-xs font-bold shadow-sm hover:bg-emerald-800 transition">
+                <i class="fa-solid fa-rotate-right mr-1"></i> ${t.btn_retry_5yr}
+              </button>
+            </div>
+          ` : `
+            <div class="h-64 sm:h-72 w-full">
+              <canvas id="chart-5yr-weather-canvas"></canvas>
+            </div>
+          `}
+        </div>
+
+        <!-- Auto-Generated Agronomic Insights Under Charts -->
+        ${(weather5YrData && !weather5YrLoading && !weather5YrError) ? `
+          <div class="space-y-2 pt-1">
+            <h4 class="text-xs font-bold text-slate-700 uppercase tracking-wider flex items-center gap-1.5">
+              <span>💡 ${t.insights_heading}</span>
+            </h4>
+            <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-2.5">
+              ${((currentLang === 'kn' ? (weather5YrData.insights_kn || weather5YrData.insights_en) : weather5YrData.insights_en) || []).map(ins => `
+                <div class="p-3 rounded-2xl bg-white border border-slate-200/80 shadow-2xs text-xs text-slate-800 flex items-start gap-2.5">
+                  <span class="text-base shrink-0">${ins.slice(0, 2)}</span>
+                  <span class="font-medium leading-relaxed">${ins.slice(2).trim()}</span>
+                </div>
+              `).join('')}
+            </div>
+          </div>
+        ` : ''}
+      </div>
+
     </div>
   `;
 
@@ -2083,7 +2417,48 @@ async function renderWeatherStepView(container) {
     };
   }
 
+  const update5YrTabsUI = () => {
+    const bRain = document.getElementById("tab-5yr-rain");
+    const bTemp = document.getElementById("tab-5yr-temp");
+    const bComp = document.getElementById("tab-5yr-comp");
+    if (!bRain || !bTemp || !bComp) return;
+    const activeCls = ["bg-white", "text-emerald-800", "shadow-xs"];
+    const inactiveCls = ["text-slate-600", "hover:text-slate-900"];
+
+    [bRain, bTemp, bComp].forEach(btn => btn.classList.remove(...activeCls));
+    [bRain, bTemp, bComp].forEach(btn => btn.classList.add(...inactiveCls));
+
+    if (weather5YrActiveTab === 'rainfall') {
+      bRain.classList.remove(...inactiveCls);
+      bRain.classList.add(...activeCls);
+    } else if (weather5YrActiveTab === 'temp') {
+      bTemp.classList.remove(...inactiveCls);
+      bTemp.classList.add(...activeCls);
+    } else {
+      bComp.classList.remove(...inactiveCls);
+      bComp.classList.add(...activeCls);
+    }
+  };
+
+  const tabRain = document.getElementById("tab-5yr-rain");
+  const tabTemp = document.getElementById("tab-5yr-temp");
+  const tabComp = document.getElementById("tab-5yr-comp");
+  if (tabRain && tabTemp && tabComp) {
+    tabRain.onclick = () => { weather5YrActiveTab = 'rainfall'; update5YrTabsUI(); render5YearWeatherChart(); };
+    tabTemp.onclick = () => { weather5YrActiveTab = 'temp'; update5YrTabsUI(); render5YearWeatherChart(); };
+    tabComp.onclick = () => { weather5YrActiveTab = 'comparison'; update5YrTabsUI(); render5YearWeatherChart(); };
+  }
+
+  const btnRetry5Yr = document.getElementById("btn-retry-5yr-fetch");
+  if (btnRetry5Yr) {
+    btnRetry5Yr.onclick = async () => {
+      await fetch5YearWeatherAnalysis(farmContext.lat, farmContext.lon, true);
+      if (currentStep === 2) renderWeatherStepView(container);
+    };
+  }
+
   renderClimateChart(weatherData.monthly_climate_12m);
+  render5YearWeatherChart();
 }
 
 function renderClimateChart(data) {
@@ -2126,6 +2501,206 @@ function renderClimateChart(data) {
       }
     }
   });
+}
+
+function render5YearWeatherChart() {
+  const canvas = document.getElementById("chart-5yr-weather-canvas");
+  if (!canvas || !weather5YrData || typeof Chart === 'undefined') return;
+
+  if (weather5YrChartInstance) {
+    weather5YrChartInstance.destroy();
+  }
+
+  const months = weather5YrData.months || ["Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul", "Aug", "Sep", "Oct", "Nov", "Dec"];
+  const years = weather5YrData.years || [2021, 2022, 2023, 2024, 2025];
+  const yearColors = {
+    "2021": { border: "#0284c7", bg: "rgba(2, 132, 199, 0.08)" },
+    "2022": { border: "#10b981", bg: "rgba(16, 185, 129, 0.08)" },
+    "2023": { border: "#f59e0b", bg: "rgba(245, 158, 11, 0.08)" },
+    "2024": { border: "#ef4444", bg: "rgba(239, 68, 68, 0.08)" },
+    "2025": { border: "#8b5cf6", bg: "rgba(139, 92, 246, 0.08)" }
+  };
+
+  if (weather5YrActiveTab === 'rainfall') {
+    const datasets = years.map(yr => ({
+      label: `${yr} (${weather5YrData.annual_rain_by_year ? weather5YrData.annual_rain_by_year[yr] + ' mm' : yr})`,
+      data: weather5YrData.monthly_rainfall_by_year ? (weather5YrData.monthly_rainfall_by_year[yr] || []) : [],
+      borderColor: yearColors[yr]?.border || "#64748b",
+      backgroundColor: yearColors[yr]?.bg || "transparent",
+      tension: 0.3,
+      borderWidth: 2,
+      pointRadius: 3,
+      pointHoverRadius: 6
+    }));
+
+    if (weather5YrData.five_year_averages?.monthly_rainfall) {
+      datasets.push({
+        label: `5-Yr Average (${weather5YrData.five_year_averages.annual_rainfall_mm || 0} mm)`,
+        data: weather5YrData.five_year_averages.monthly_rainfall,
+        borderColor: "#0f172a",
+        backgroundColor: "transparent",
+        borderWidth: 3.5,
+        borderDash: [6, 4],
+        tension: 0.3,
+        pointRadius: 4,
+        pointBackgroundColor: "#0f172a"
+      });
+    }
+
+    weather5YrChartInstance = new Chart(canvas, {
+      type: 'line',
+      data: { labels: months, datasets },
+      options: {
+        responsive: true,
+        maintainAspectRatio: false,
+        plugins: {
+          legend: { position: 'bottom', labels: { boxWidth: 12, font: { size: 11, weight: '600' } } },
+          tooltip: {
+            callbacks: {
+              label: (ctx) => ` ${ctx.dataset.label}: ${ctx.raw} mm`
+            }
+          }
+        },
+        scales: {
+          y: {
+            beginAtZero: true,
+            title: { display: true, text: 'Rainfall (mm)', font: { size: 11, weight: 'bold' } },
+            grid: { color: 'rgba(0, 0, 0, 0.05)' }
+          },
+          x: { grid: { display: false } }
+        }
+      }
+    });
+
+  } else if (weather5YrActiveTab === 'temp') {
+    const datasets = years.map(yr => ({
+      label: `${yr} (avg ${weather5YrData.annual_temp_by_year ? weather5YrData.annual_temp_by_year[yr] + '°C' : yr})`,
+      data: weather5YrData.monthly_temp_by_year ? (weather5YrData.monthly_temp_by_year[yr] || []) : [],
+      borderColor: yearColors[yr]?.border || "#64748b",
+      backgroundColor: yearColors[yr]?.bg || "transparent",
+      tension: 0.3,
+      borderWidth: 2,
+      pointRadius: 3,
+      pointHoverRadius: 6
+    }));
+
+    if (weather5YrData.five_year_averages?.monthly_temperature) {
+      datasets.push({
+        label: `5-Yr Average (${weather5YrData.five_year_averages.annual_temp_c || 0}°C)`,
+        data: weather5YrData.five_year_averages.monthly_temperature,
+        borderColor: "#0f172a",
+        backgroundColor: "transparent",
+        borderWidth: 3.5,
+        borderDash: [6, 4],
+        tension: 0.3,
+        pointRadius: 4,
+        pointBackgroundColor: "#0f172a"
+      });
+    }
+
+    weather5YrChartInstance = new Chart(canvas, {
+      type: 'line',
+      data: { labels: months, datasets },
+      options: {
+        responsive: true,
+        maintainAspectRatio: false,
+        plugins: {
+          legend: { position: 'bottom', labels: { boxWidth: 12, font: { size: 11, weight: '600' } } },
+          tooltip: {
+            callbacks: {
+              label: (ctx) => ` ${ctx.dataset.label}: ${ctx.raw}°C`
+            }
+          }
+        },
+        scales: {
+          y: {
+            title: { display: true, text: 'Temperature (°C)', font: { size: 11, weight: 'bold' } },
+            grid: { color: 'rgba(0, 0, 0, 0.05)' }
+          },
+          x: { grid: { display: false } }
+        }
+      }
+    });
+
+  } else if (weather5YrActiveTab === 'comparison') {
+    const avgRain = weather5YrData.five_year_averages?.monthly_rainfall || [];
+    const curRain = weather5YrData.current_year_comparison?.monthly_rainfall || [];
+    const avgTemp = weather5YrData.five_year_averages?.monthly_temperature || [];
+    const curTemp = weather5YrData.current_year_comparison?.monthly_temperature || [];
+
+    weather5YrChartInstance = new Chart(canvas, {
+      type: 'bar',
+      data: {
+        labels: months,
+        datasets: [
+          {
+            type: 'bar',
+            label: '5-Yr Avg Rain (mm)',
+            data: avgRain,
+            backgroundColor: 'rgba(14, 165, 233, 0.65)',
+            borderColor: '#0ea5e9',
+            borderWidth: 1,
+            borderRadius: 4,
+            yAxisID: 'y'
+          },
+          {
+            type: 'bar',
+            label: '2026 Current Year Rain (mm)',
+            data: curRain,
+            backgroundColor: 'rgba(30, 64, 175, 0.85)',
+            borderColor: '#1e40af',
+            borderWidth: 1,
+            borderRadius: 4,
+            yAxisID: 'y'
+          },
+          {
+            type: 'line',
+            label: '5-Yr Avg Temp (°C)',
+            data: avgTemp,
+            borderColor: '#f59e0b',
+            backgroundColor: '#f59e0b',
+            borderWidth: 2,
+            borderDash: [5, 4],
+            tension: 0.3,
+            yAxisID: 'y1'
+          },
+          {
+            type: 'line',
+            label: '2026 Current Year Temp (°C)',
+            data: curTemp,
+            borderColor: '#ef4444',
+            backgroundColor: '#ef4444',
+            borderWidth: 2.5,
+            tension: 0.3,
+            yAxisID: 'y1'
+          }
+        ]
+      },
+      options: {
+        responsive: true,
+        maintainAspectRatio: false,
+        plugins: {
+          legend: { position: 'bottom', labels: { boxWidth: 12, font: { size: 11, weight: '600' } } }
+        },
+        scales: {
+          y: {
+            type: 'linear',
+            position: 'left',
+            beginAtZero: true,
+            title: { display: true, text: 'Rainfall (mm)', font: { size: 11, weight: 'bold' } },
+            grid: { color: 'rgba(0, 0, 0, 0.05)' }
+          },
+          y1: {
+            type: 'linear',
+            position: 'right',
+            title: { display: true, text: 'Temperature (°C)', font: { size: 11, weight: 'bold' } },
+            grid: { drawOnChartArea: false }
+          },
+          x: { grid: { display: false } }
+        }
+      }
+    });
+  }
 }
 
 // ============================================================================
@@ -2901,7 +3476,9 @@ async function renderResultsStepView(container) {
         soil_ph: farmContext.soil_ph !== null ? farmContext.soil_ph : 6.5,
         previous_crop: farmContext.previous_crop,
         state: farmContext.state || "Karnataka",
-        district: farmContext.district || "Bengaluru"
+        district: farmContext.district || "Bengaluru",
+        hist_5yr_rainfall: (weather5YrData && weather5YrData.five_year_averages) ? weather5YrData.five_year_averages.annual_rainfall_mm : undefined,
+        hist_5yr_temp: (weather5YrData && weather5YrData.five_year_averages) ? weather5YrData.five_year_averages.annual_temp_c : undefined
       };
 
       if (pBar) pBar.style.width = "75%";
@@ -3232,6 +3809,10 @@ async function renderResultsStepView(container) {
             <p class="text-xs text-slate-500">${t.subheading_top_crops}</p>
           </div>
           <div class="flex items-center gap-2">
+            <button type="button" id="btn-share-results" class="px-3.5 py-2 rounded-xl bg-blue-600 hover:bg-blue-700 text-white font-bold text-xs shadow-md flex items-center gap-2 transition cursor-pointer active:scale-95">
+              <i class="fa-solid fa-share-nodes"></i>
+              <span>Share Result</span>
+            </button>
             <button type="button" id="btn-download-pdf-report" class="px-4 py-2 rounded-xl bg-[#1b5e20] hover:bg-[#2e7d32] text-white font-bold text-xs shadow-md flex items-center gap-2 transition cursor-pointer">
               <i class="fa-solid fa-file-pdf text-amber-300"></i>
               <span>Download PDF Report</span>
@@ -3393,6 +3974,24 @@ function renderChatMessages() {
   container.scrollTop = container.scrollHeight;
 }
 
+let isVoiceMuted = localStorage.getItem('fdd_voice_muted') === 'true';
+
+function speakBotText(text) {
+  if (isVoiceMuted) return;
+  if (!('speechSynthesis' in window)) return;
+  try {
+    window.speechSynthesis.cancel();
+    const cleanText = text.replace(/[*_#`~]/g, '').replace(/\b(?:https?|ftp):\/\/\S+/gi, '').replace(/[()]/g, '');
+    const utter = new SpeechSynthesisUtterance(cleanText);
+    utter.lang = currentLang === 'kn' ? 'kn-IN' : (currentLang === 'hi' ? 'hi-IN' : 'en-IN');
+    utter.rate = 1.0;
+    utter.pitch = 1.0;
+    window.speechSynthesis.speak(utter);
+  } catch (e) {
+    console.warn("TTS Error:", e);
+  }
+}
+
 async function sendChatMessage(query) {
   if (!query) return;
 
@@ -3431,7 +4030,7 @@ async function sendChatMessage(query) {
       }
     };
 
-    const res = await fetch("/api/chat", {
+    const res = await fetch("/api/assistant", {
       method: "POST",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify(payload)
@@ -3444,7 +4043,10 @@ async function sendChatMessage(query) {
       chatMessagesHistory.push({ sender: "bot", text: data.reply });
       renderChatMessages();
 
-      // Trigger automatic navigation if detected
+      // Speak assistant response aloud unless muted
+      speakBotText(data.reply);
+
+      // Execute voice actions
       if (data.action) {
         if (data.action.type === "open_modal") {
           if (data.action.target === "disease-scanner") {
@@ -3456,22 +4058,59 @@ async function sendChatMessage(query) {
               modal.classList.remove("hidden");
               fetchSchemes();
             }
+          } else if (data.action.target === "history") {
+            if (typeof window.openHistoryModal === 'function') {
+              window.openHistoryModal();
+            } else {
+              const modal = document.getElementById("modal-history");
+              if (modal) modal.classList.remove("hidden");
+            }
+          } else if (data.action.target === "share") {
+            if (typeof window.openShareModal === 'function') {
+              window.openShareModal();
+            }
           }
         } else if (data.action.type === "navigate") {
           const match = data.action.target.match(/step-(\d+)/);
           if (match) {
             navigateToStep(parseInt(match[1]));
           }
+        } else if (data.action.type === "weather_tab") {
+          navigateToStep(2);
+          setTimeout(() => {
+            if (data.action.target === "rainfall") {
+              const tab = document.getElementById("tab-5yr-rain");
+              if (tab) tab.click();
+            } else if (data.action.target === "temp") {
+              const tab = document.getElementById("tab-5yr-temp");
+              if (tab) tab.click();
+            } else {
+              const tab = document.getElementById("tab-5yr-comp");
+              if (tab) tab.click();
+            }
+          }, 350);
+        } else if (data.action.type === "search_location") {
+          navigateToStep(1);
+          setTimeout(() => {
+            const locInp = document.getElementById("input-location-search");
+            if (locInp) {
+              locInp.value = data.action.target;
+              const btnSearch = document.getElementById("btn-geocode-search");
+              if (btnSearch) btnSearch.click();
+            }
+          }, 350);
         }
       }
     } else {
+      const errReply = currentLang === 'kn'
+        ? "ಕ್ಷಮಿಸಿ, ಪ್ರತಿಕ್ರಿಯೆ ಪಡೆಯಲು ಸಾಧ್ಯವಾಗಲಿಲ್ಲ. ದಯವಿಟ್ಟು ಮತ್ತೊಮ್ಮೆ ಪ್ರಯತ್ನಿಸಿ ಅಥವಾ ನಿಮ್ಮ ಸ್ಥಳೀಯ ಕೃಷಿ ಅಧಿಕಾರಿಯನ್ನು ಸಂಪರ್ಕಿಸಿ."
+        : "I'm not sure, please consult your local agriculture officer or try again.";
       chatMessagesHistory.push({
         sender: "bot",
-        text: currentLang === 'kn'
-          ? "ಕ್ಷಮಿಸಿ, ಪ್ರತಿಕ್ರಿಯೆ ಪಡೆಯಲು ಸಾಧ್ಯವಾಗಲಿಲ್ಲ. ದಯವಿಟ್ಟು ಮತ್ತೊಮ್ಮೆ ಪ್ರಯತ್ನಿಸಿ ಅಥವಾ ನಿಮ್ಮ ಸ್ಥಳೀಯ ಕೃಷಿ ಅಧಿಕಾರಿಯನ್ನು ಸಂಪರ್ಕಿಸಿ."
-          : "Sorry, I could not complete that request. Please try again or consult your local agriculture officer."
+        text: errReply
       });
       renderChatMessages();
+      speakBotText(errReply);
     }
   } catch (err) {
     if (loadingEl) loadingEl.classList.add("hidden");
@@ -3538,6 +4177,15 @@ function bindResultsStepListeners() {
       }
       await fetchMandiTrends();
       alert(`Target price alert set for ₹${farmContext.target_price_inr}/qtl!`);
+    };
+  }
+
+  const btnShare = document.getElementById("btn-share-results");
+  if (btnShare) {
+    btnShare.onclick = () => {
+      if (typeof window.openShareModal === 'function') {
+        window.openShareModal();
+      }
     };
   }
 }
@@ -3812,168 +4460,560 @@ function bindShellListeners() {
   }
   if (btnCloseSchemes && modalSchemes) btnCloseSchemes.onclick = () => modalSchemes.classList.add("hidden");
 
-  // History / Run Comparison Modal
+  // ============================================================================
+  // Features 3 & 4: Google History & Share Crop Advisory
+  // ============================================================================
   const btnHistory = document.getElementById("btn-history");
   const modalHistory = document.getElementById("modal-history");
   const btnCloseHistory = document.getElementById("btn-close-history");
+  const historyContent = document.getElementById("history-content-container");
+  const modalConfirmClear = document.getElementById("modal-confirm-clear");
+  const dropdownClear = document.getElementById("dropdown-clear-history");
+  const modalShare = document.getElementById("modal-share");
+  const btnCloseShare = document.getElementById("btn-close-share");
 
-  if (btnHistory && modalHistory) {
-    btnHistory.onclick = async () => {
-      modalHistory.classList.remove("hidden");
-      const content = document.getElementById("history-content-container");
-      content.innerHTML = `<div class="text-center py-6 text-slate-400">Loading saved farm runs...</div>`;
-      try {
-        const resp = await fetch("/api/history/runs");
-        if (resp.ok) {
-          const resData = await resp.json();
-          const runs = Array.isArray(resData) ? resData : (resData.history || []);
-          if (runs.length === 0) {
-            content.innerHTML = `<p class="text-center py-8 text-slate-400">No past runs saved yet. Completing recommendation runs will save them here.</p>`;
-            return;
-          }
+  let activeHistoryRuns = [];
+  let currentShareToken = null;
+  let clearTargetTimeframe = "all";
 
-          content.innerHTML = `
-            <div class="space-y-4">
-              <div class="flex items-center justify-between flex-wrap gap-2 pb-1 border-b border-slate-100">
-                <div class="flex items-center gap-2">
-                  <span class="font-bold text-slate-800 text-xs">Select runs to compare:</span>
-                  <span id="compare-count-badge" class="px-2 py-0.5 rounded-full bg-emerald-100 text-emerald-800 text-[10px] font-bold">2 selected</span>
-                </div>
-                <div class="flex items-center gap-2">
-                  <button type="button" id="btn-select-latest2" class="px-2.5 py-1 text-[11px] font-semibold text-slate-600 bg-slate-100 hover:bg-slate-200 rounded-lg transition cursor-pointer">
-                    Select Latest 2
-                  </button>
-                  <button type="button" id="btn-exec-compare" class="px-4 py-1.5 bg-[#1b5e20] text-white rounded-xl text-xs font-bold hover:bg-[#2e7d32] shadow-xs transition cursor-pointer flex items-center gap-1.5 active:scale-95">
-                    <i class="fa-solid fa-code-compare"></i>
-                    <span>Compare Selected</span>
-                  </button>
-                </div>
-              </div>
+  // Reopen result from history
+  window.reopenHistoryRun = async function(runId) {
+    try {
+      const res = await fetch(`/api/history/${runId}`);
+      if (res.ok) {
+        const data = await res.json();
+        const r = data.record || data;
+        if (r.inputs) {
+          farmContext.land_acres = r.inputs.land_acres || farmContext.land_acres;
+          farmContext.soil_n = r.inputs.soil_n !== undefined ? r.inputs.soil_n : farmContext.soil_n;
+          farmContext.soil_p = r.inputs.soil_p !== undefined ? r.inputs.soil_p : farmContext.soil_p;
+          farmContext.soil_k = r.inputs.soil_k !== undefined ? r.inputs.soil_k : farmContext.soil_k;
+          farmContext.soil_ph = r.inputs.soil_ph !== undefined ? r.inputs.soil_ph : farmContext.soil_ph;
+          farmContext.soil_type = r.inputs.soil_type || farmContext.soil_type;
+          farmContext.irrigation = r.inputs.irrigation || farmContext.irrigation;
+          farmContext.budget_inr = r.inputs.budget_inr || farmContext.budget_inr;
+        }
+        farmContext.lat = r.lat || farmContext.lat;
+        farmContext.lon = r.lon || farmContext.lon;
+        farmContext.village = r.location_name || farmContext.village;
+        farmContext.display_name = r.location_name || farmContext.display_name;
 
-              <!-- Inline Alert for Selection Validation -->
-              <div id="compare-msg-banner" class="hidden p-3 bg-amber-50 border border-amber-300 text-amber-900 rounded-xl text-xs font-semibold flex items-center gap-2 animate-fadeIn">
-                <i class="fa-solid fa-triangle-exclamation text-amber-600 text-sm"></i>
-                <span>Please select at least 2 runs from the list below to generate a side-by-side comparison.</span>
-              </div>
+        recommendData = {
+          top_crops: r.top_crops || [],
+          weather_fit_crops: (r.top_crops || []).slice(0, 3),
+          alternative_crops: (r.top_crops || []).slice(3, 6),
+          run_id: r.id,
+          timestamp: r.timestamp
+        };
 
-              <!-- Side-by-Side Comparison Output Container (Rendered prominently right here) -->
-              <div id="side-by-side-compare-table" class="space-y-3"></div>
+        if (modalHistory) modalHistory.classList.add("hidden");
+        navigateToStep(6);
+      }
+    } catch (e) {
+      console.error("Reopen history error:", e);
+    }
+  };
 
-              <!-- List of Saved Past Runs with Checkboxes -->
-              <div class="space-y-1.5">
-                <span class="text-[11px] font-bold uppercase tracking-wider text-slate-400 block pt-1">Saved Runs History (${runs.length} runs):</span>
-                <div class="grid grid-cols-1 md:grid-cols-2 gap-2.5" id="runs-checkbox-list">
-                  ${runs.map((r, idx) => {
-                    const runId = r.id !== undefined ? r.id : r.run_id;
-                    const loc = r.location_name || r.village || 'Karnataka Farm Plot';
-                    const acres = Number(r.land_acres !== undefined ? r.land_acres : (r.acres || (r.inputs && r.inputs.land_acres) || 1.0));
-                    const date = r.timestamp || r.created_at || 'Recent';
-                    const budget = Number(r.budget !== undefined ? r.budget : (r.budget_inr || (r.inputs && r.inputs.budget_inr) || 0));
-                    const topCrop = r.top_crop || (r.top_crops && r.top_crops[0] && r.top_crops[0].display_name) || 'Crop';
-                    const profit = Number(r.top_profit !== undefined ? r.top_profit : (r.net_profit_inr || (r.top_crops && r.top_crops[0] && r.top_crops[0].net_profit_inr) || 0));
-                    const isChecked = (idx < 2) ? 'checked' : '';
-                    return `
-                    <label class="p-3 bg-earth-50 rounded-xl border border-earth-200 flex items-start gap-3 cursor-pointer hover:bg-earth-100 transition select-none">
-                      <input type="checkbox" value="${runId}" ${isChecked} class="mt-1 run-compare-chk accent-emerald-700 w-4 h-4 rounded cursor-pointer" />
-                      <div class="flex-1">
-                        <div class="flex items-center justify-between">
-                          <span class="font-bold text-slate-800 text-xs">Run #${runId} • ${loc}</span>
-                          <span class="text-[10px] bg-slate-200 text-slate-700 px-1.5 py-0.5 rounded font-mono">${acres} ac</span>
-                        </div>
-                        <div class="text-[11px] text-slate-500 mt-0.5">Date: ${date} • Budget: ₹${budget.toLocaleString()}</div>
-                        <div class="text-[11px] text-emerald-800 font-semibold mt-0.5 flex items-center justify-between">
-                          <span>Top Crop: <strong>${topCrop}</strong></span>
-                          <span class="text-emerald-700 font-bold">₹${profit.toLocaleString()}</span>
+  // Delete single run
+  window.deleteSingleRun = async function(runId, e) {
+    if (e) e.stopPropagation();
+    if (!confirm(`Delete history entry #${runId}?`)) return;
+    try {
+      const res = await fetch(`/api/history/${runId}`, { method: 'DELETE' });
+      if (res.ok) {
+        loadAndRenderHistory();
+      }
+    } catch (err) {
+      console.error("Delete run error:", err);
+    }
+  };
+
+  // Group runs into Today, Yesterday, Last 7 Days, Earlier
+  function groupRuns(runs) {
+    const groups = { today: [], yesterday: [], last7days: [], earlier: [] };
+    const now = new Date();
+    const todayStart = new Date(now.getFullYear(), now.getMonth(), now.getDate()).getTime();
+    const yesterdayStart = todayStart - (24 * 60 * 60 * 1000);
+    const last7DaysStart = todayStart - (7 * 24 * 60 * 60 * 1000);
+
+    runs.forEach(r => {
+      const dt = new Date((r.timestamp || "").replace(/-/g, "/")).getTime() || Date.now();
+      if (dt >= todayStart) groups.today.push(r);
+      else if (dt >= yesterdayStart) groups.yesterday.push(r);
+      else if (dt >= last7DaysStart) groups.last7days.push(r);
+      else groups.earlier.push(r);
+    });
+    return groups;
+  }
+
+  // Load and render history with filters
+  async function loadAndRenderHistory() {
+    if (!historyContent) return;
+    historyContent.innerHTML = `<div class="py-8 text-center text-slate-400 space-y-2"><div class="text-2xl animate-spin text-emerald-600"><i class="fa-solid fa-spinner"></i></div><p>Loading history records...</p></div>`;
+
+    const q = document.getElementById("input-history-search")?.value.trim() || "";
+    const crop = document.getElementById("select-history-crop")?.value || "";
+    const fromDate = document.getElementById("input-history-from")?.value || "";
+    const toDate = document.getElementById("input-history-to")?.value || "";
+
+    const params = new URLSearchParams();
+    if (q) params.append("q", q);
+    if (crop) params.append("crop", crop);
+    if (fromDate) params.append("start_date", fromDate);
+    if (toDate) params.append("end_date", toDate);
+
+    try {
+      const res = await fetch(`/api/history?${params.toString()}`);
+      if (!res.ok) throw new Error("Failed to fetch history");
+      const data = await res.json();
+      const runs = Array.isArray(data) ? data : (data.history || []);
+      activeHistoryRuns = runs;
+
+      // Populate crop dropdown options dynamically
+      const cropSelect = document.getElementById("select-history-crop");
+      if (cropSelect && cropSelect.children.length <= 1) {
+        const cropSet = new Set();
+        runs.forEach(r => {
+          if (r.top_crop && r.top_crop !== "Unknown") cropSet.add(r.top_crop);
+          (r.top_crops_summary || []).forEach(c => { if (c) cropSet.add(c); });
+        });
+        cropSet.forEach(c => {
+          const opt = document.createElement("option");
+          opt.value = c;
+          opt.textContent = c;
+          cropSelect.appendChild(opt);
+        });
+        if (crop) cropSelect.value = crop;
+      }
+
+      if (runs.length === 0) {
+        historyContent.innerHTML = `
+          <div class="py-12 text-center space-y-3 bg-slate-50 rounded-2xl border border-dashed border-slate-200">
+            <div class="text-3xl text-slate-300"><i class="fa-solid fa-magnifying-glass"></i></div>
+            <h4 class="font-bold text-slate-700">No matching history found</h4>
+            <p class="text-xs text-slate-400">Search criteria didn't match any saved recommendation runs.</p>
+          </div>
+        `;
+        return;
+      }
+
+      const grouped = groupRuns(runs);
+      const groupLabels = [
+        { key: "today", title: "📅 Today" },
+        { key: "yesterday", title: "📅 Yesterday" },
+        { key: "last7days", title: "📅 Last 7 Days" },
+        { key: "earlier", title: "📅 Earlier" }
+      ];
+
+      let html = `<div class="space-y-6">`;
+
+      groupLabels.forEach(grp => {
+        const items = grouped[grp.key];
+        if (!items || items.length === 0) return;
+
+        html += `
+          <div class="space-y-2.5">
+            <div class="flex items-center gap-2 pb-1 border-b border-slate-200">
+              <span class="text-xs font-bold text-slate-800 uppercase tracking-wider">${grp.title}</span>
+              <span class="px-2 py-0.2 rounded-full bg-slate-200 text-slate-700 text-[10px] font-bold">${items.length}</span>
+            </div>
+            <div class="grid grid-cols-1 md:grid-cols-2 gap-3">
+              ${items.map(r => {
+                const runId = r.id;
+                const loc = r.location_name || "Plot Location";
+                const acres = Number(r.land_acres || 1.0);
+                const budget = Number(r.budget || 0);
+                const topCrop = r.top_crop || "Recommended Crop";
+                const profit = Number(r.top_profit || 0);
+
+                return `
+                  <div class="p-3.5 bg-white rounded-2xl border border-slate-200 shadow-2xs hover:border-emerald-400 transition space-y-2.5 group">
+                    <div class="flex items-start justify-between gap-2">
+                      <div class="flex items-start gap-2.5">
+                        <input type="checkbox" value="${runId}" class="history-item-chk mt-1 w-4 h-4 accent-emerald-700 rounded cursor-pointer" />
+                        <div>
+                          <div class="font-bold text-slate-900 text-xs flex items-center gap-1.5 flex-wrap">
+                            <span>📍 ${loc}</span>
+                            <span class="px-1.5 py-0.2 rounded bg-slate-100 text-slate-600 text-[10px] font-mono">${acres} ac</span>
+                          </div>
+                          <span class="text-[10px] text-slate-400">${r.timestamp}</span>
                         </div>
                       </div>
-                    </label>
-                    `;
-                  }).join('')}
-                </div>
-              </div>
+                      <div class="text-right shrink-0">
+                        <span class="text-xs font-black text-emerald-700">₹${profit.toLocaleString()}</span>
+                        <span class="block text-[10px] text-slate-400">Net Profit</span>
+                      </div>
+                    </div>
+
+                    <div class="p-2 bg-slate-50 rounded-xl flex items-center justify-between text-[11px] text-slate-600">
+                      <div>Top Crop: <strong class="text-slate-900">${topCrop}</strong></div>
+                      <div>Budget: <strong>₹${budget.toLocaleString()}</strong></div>
+                    </div>
+
+                    <div class="flex items-center justify-between pt-1 border-t border-slate-100 text-[11px]">
+                      <button type="button" onclick="reopenHistoryRun(${runId})" class="text-emerald-700 hover:text-emerald-900 font-bold flex items-center gap-1 cursor-pointer">
+                        <i class="fa-solid fa-eye"></i> <span>Reopen</span>
+                      </button>
+                      <div class="flex items-center gap-2">
+                        <button type="button" onclick="openShareModalForRun(${runId})" class="text-blue-600 hover:text-blue-800 font-semibold flex items-center gap-1 cursor-pointer">
+                          <i class="fa-solid fa-share-nodes"></i> <span>Share</span>
+                        </button>
+                        <button type="button" onclick="deleteSingleRun(${runId}, event)" class="text-slate-400 hover:text-rose-600 transition cursor-pointer p-0.5" title="Delete run">
+                          <i class="fa-solid fa-trash-can"></i>
+                        </button>
+                      </div>
+                    </div>
+                  </div>
+                `;
+              }).join('')}
             </div>
-          `;
+          </div>
+        `;
+      });
 
-          const updateCompareCount = () => {
-            const count = document.querySelectorAll(".run-compare-chk:checked").length;
-            const badge = document.getElementById("compare-count-badge");
-            if (badge) {
-              badge.innerText = `${count} selected`;
-              badge.className = count >= 2
-                ? "px-2 py-0.5 rounded-full bg-emerald-100 text-emerald-800 text-[10px] font-bold"
-                : "px-2 py-0.5 rounded-full bg-slate-200 text-slate-600 text-[10px] font-bold";
-            }
-          };
+      html += `</div>`;
+      historyContent.innerHTML = html;
 
-          document.querySelectorAll(".run-compare-chk").forEach(chk => {
-            chk.onchange = updateCompareCount;
-          });
-
-          const btnLatest2 = document.getElementById("btn-select-latest2");
-          if (btnLatest2) {
-            btnLatest2.onclick = () => {
-              const allChks = document.querySelectorAll(".run-compare-chk");
-              allChks.forEach((chk, idx) => { chk.checked = (idx < 2); });
-              updateCompareCount();
-            };
-          }
-
-          const btnCompare = document.getElementById("btn-exec-compare");
-          if (btnCompare) {
-            btnCompare.onclick = async () => {
-              const msgBanner = document.getElementById("compare-msg-banner");
-              const targetContainer = document.getElementById("side-by-side-compare-table");
-              const selected = Array.from(document.querySelectorAll(".run-compare-chk:checked")).map(cb => parseInt(cb.value));
-
-              if (selected.length < 2) {
-                if (msgBanner) {
-                  msgBanner.classList.remove("hidden");
-                  msgBanner.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
-                }
-                return;
-              }
-
-              if (msgBanner) msgBanner.classList.add("hidden");
-
-              btnCompare.disabled = true;
-              const originalBtnHtml = btnCompare.innerHTML;
-              btnCompare.innerHTML = `<i class="fa-solid fa-circle-notch fa-spin"></i> <span>Comparing...</span>`;
-
-              try {
-                const compResp = await fetch("/api/history/compare", {
-                  method: "POST",
-                  headers: { "Content-Type": "application/json" },
-                  body: JSON.stringify({ run_ids: selected })
-                });
-
-                if (compResp.ok) {
-                  const compData = await compResp.json();
-                  renderComparisonTable(targetContainer, compData);
-                  targetContainer.scrollIntoView({ behavior: 'smooth', block: 'start' });
-                } else {
-                  if (msgBanner) {
-                    msgBanner.classList.remove("hidden");
-                    msgBanner.innerHTML = `<i class="fa-solid fa-circle-exclamation text-rose-600 text-sm"></i><span>Server returned error comparing runs (${compResp.status}).</span>`;
-                  }
-                }
-              } catch (e) {
-                if (msgBanner) {
-                  msgBanner.classList.remove("hidden");
-                  msgBanner.innerHTML = `<i class="fa-solid fa-circle-exclamation text-rose-600 text-sm"></i><span>Network error while comparing runs.</span>`;
-                }
-              } finally {
-                btnCompare.disabled = false;
-                btnCompare.innerHTML = originalBtnHtml;
-              }
-            };
+      // Bind checkbox change listeners
+      const updateSelectionBar = () => {
+        const checked = document.querySelectorAll(".history-item-chk:checked");
+        const bar = document.getElementById("history-selection-bar");
+        const badge = document.getElementById("history-selected-count-badge");
+        if (bar && badge) {
+          if (checked.length > 0) {
+            bar.classList.remove("hidden");
+            badge.innerText = `${checked.length} selected`;
+          } else {
+            bar.classList.add("hidden");
           }
         }
+      };
+
+      document.querySelectorAll(".history-item-chk").forEach(chk => {
+        chk.onchange = updateSelectionBar;
+      });
+
+    } catch (e) {
+      historyContent.innerHTML = `<p class="py-6 text-center text-rose-600 text-xs">Failed to load history: ${e.message}</p>`;
+    }
+  }
+
+  // Clear History Dropdown & Dialog Triggers
+  const btnClearMenu = document.getElementById("btn-clear-history-menu");
+  if (btnClearMenu && dropdownClear) {
+    btnClearMenu.onclick = (e) => {
+      e.stopPropagation();
+      dropdownClear.classList.toggle("hidden");
+    };
+    document.addEventListener("click", () => dropdownClear.classList.add("hidden"));
+  }
+
+  document.querySelectorAll(".btn-clear-tf").forEach(btn => {
+    btn.onclick = () => {
+      clearTargetTimeframe = btn.getAttribute("data-tf") || "all";
+      const title = document.getElementById("confirm-clear-title");
+      const desc = document.getElementById("confirm-clear-desc");
+      if (title && desc) {
+        if (clearTargetTimeframe === "hour") {
+          title.innerText = "Delete Last Hour's History?";
+          desc.innerText = "All recommendations saved in the last 60 minutes will be deleted permanently.";
+        } else if (clearTargetTimeframe === "today") {
+          title.innerText = "Delete Today's History?";
+          desc.innerText = "All recommendation runs created today will be permanently deleted.";
+        } else {
+          title.innerText = "Clear Entire Recommendation History?";
+          desc.innerText = "Every saved farm run will be deleted from your database. This cannot be undone.";
+        }
+      }
+      if (modalConfirmClear) modalConfirmClear.classList.remove("hidden");
+      if (dropdownClear) dropdownClear.classList.add("hidden");
+    };
+  });
+
+  const btnCancelClear = document.getElementById("btn-cancel-clear");
+  if (btnCancelClear && modalConfirmClear) {
+    btnCancelClear.onclick = () => modalConfirmClear.classList.add("hidden");
+  }
+
+  const btnConfirmClear = document.getElementById("btn-confirm-clear");
+  if (btnConfirmClear && modalConfirmClear) {
+    btnConfirmClear.onclick = async () => {
+      btnConfirmClear.disabled = true;
+      btnConfirmClear.innerHTML = `<i class="fa-solid fa-spinner fa-spin"></i> Deleting...`;
+      try {
+        await fetch(`/api/history/clear?timeframe=${clearTargetTimeframe}`, { method: 'DELETE' });
+        modalConfirmClear.classList.add("hidden");
+        loadAndRenderHistory();
       } catch (err) {
-        content.innerHTML = `<p class="text-rose-600">Failed to load history runs.</p>`;
+        alert("Failed to clear history.");
+      } finally {
+        btnConfirmClear.disabled = false;
+        btnConfirmClear.innerText = "Delete";
       }
     };
   }
-  if (btnCloseHistory && modalHistory) btnCloseHistory.onclick = () => modalHistory.classList.add("hidden");
+
+  // Multi-Select Bulk Delete
+  const btnBulkDelete = document.getElementById("btn-history-bulk-delete");
+  if (btnBulkDelete) {
+    btnBulkDelete.onclick = async () => {
+      const selected = Array.from(document.querySelectorAll(".history-item-chk:checked")).map(cb => parseInt(cb.value));
+      if (selected.length === 0) return;
+      if (!confirm(`Delete ${selected.length} selected history record(s)?`)) return;
+      btnBulkDelete.disabled = true;
+      try {
+        await fetch("/api/history/bulk-delete", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ ids: selected })
+        });
+        loadAndRenderHistory();
+      } catch (err) {
+        alert("Bulk delete failed.");
+      } finally {
+        btnBulkDelete.disabled = false;
+      }
+    };
+  }
+
+  // Multi-Select Compare
+  const btnHistoryCompare = document.getElementById("btn-history-compare");
+  if (btnHistoryCompare) {
+    btnHistoryCompare.onclick = async () => {
+      const selected = Array.from(document.querySelectorAll(".history-item-chk:checked")).map(cb => parseInt(cb.value));
+      const targetContainer = document.getElementById("side-by-side-compare-table");
+      if (selected.length < 2) {
+        alert("Please select at least 2 runs to compare side-by-side.");
+        return;
+      }
+      try {
+        const compResp = await fetch("/api/history/compare", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ run_ids: selected })
+        });
+        if (compResp.ok) {
+          const compData = await compResp.json();
+          renderComparisonTable(targetContainer, compData);
+          targetContainer.scrollIntoView({ behavior: 'smooth', block: 'start' });
+        }
+      } catch (e) {
+        console.error("Compare error:", e);
+      }
+    };
+  }
+
+  const btnClearSelection = document.getElementById("btn-history-clear-selection");
+  if (btnClearSelection) {
+    btnClearSelection.onclick = () => {
+      document.querySelectorAll(".history-item-chk").forEach(chk => chk.checked = false);
+      const bar = document.getElementById("history-selection-bar");
+      if (bar) bar.classList.add("hidden");
+    };
+  }
+
+  // Search & Filter Listeners
+  let searchDebounceTimer = null;
+  const inputSearch = document.getElementById("input-history-search");
+  if (inputSearch) {
+    inputSearch.oninput = () => {
+      clearTimeout(searchDebounceTimer);
+      searchDebounceTimer = setTimeout(loadAndRenderHistory, 300);
+    };
+  }
+
+  const selectCrop = document.getElementById("select-history-crop");
+  if (selectCrop) {
+    selectCrop.onchange = loadAndRenderHistory;
+  }
+
+  const btnToggleDates = document.getElementById("btn-toggle-history-dates");
+  const dateFilterRow = document.getElementById("history-date-filter-row");
+  if (btnToggleDates && dateFilterRow) {
+    btnToggleDates.onclick = () => dateFilterRow.classList.toggle("hidden");
+  }
+
+  const btnApplyFilter = document.getElementById("btn-apply-history-filter");
+  if (btnApplyFilter) btnApplyFilter.onclick = loadAndRenderHistory;
+
+  const btnResetFilter = document.getElementById("btn-reset-history-filter");
+  if (btnResetFilter) {
+    btnResetFilter.onclick = () => {
+      if (inputSearch) inputSearch.value = "";
+      if (selectCrop) selectCrop.value = "";
+      const fFrom = document.getElementById("input-history-from");
+      const fTo = document.getElementById("input-history-to");
+      if (fFrom) fFrom.value = "";
+      if (fTo) fTo.value = "";
+      loadAndRenderHistory();
+    };
+  }
+
+  window.openHistoryModal = function() {
+    if (modalHistory) {
+      modalHistory.classList.remove("hidden");
+      loadAndRenderHistory();
+    }
+  };
+
+  if (btnHistory && modalHistory) {
+    btnHistory.onclick = window.openHistoryModal;
+  }
+  if (btnCloseHistory && modalHistory) {
+    btnCloseHistory.onclick = () => modalHistory.classList.add("hidden");
+  }
+
+  // ============================================================================
+  // Share Feature Implementation (Modal, Web Share API, WhatsApp, SMS, Revoke)
+  // ============================================================================
+  window.openShareModalForRun = async function(runId) {
+    const run = activeHistoryRuns.find(r => r.id === runId);
+    if (!run) return;
+    openShareModalWithPayload(run.id, {
+      location: run.location_name,
+      acres: run.land_acres,
+      budget: run.budget,
+      top_crops: run.top_crops || [],
+      top_profit: run.top_profit,
+      date: run.timestamp
+    });
+  };
+
+  const btnShareResults = document.getElementById("btn-share-results");
+  window.openShareModal = function() {
+    if (recommendData) {
+      openShareModalWithPayload(recommendData.run_id, {
+        location: farmContext.display_name || farmContext.village || "Bengaluru",
+        acres: farmContext.land_acres,
+        budget: farmContext.budget_inr,
+        top_crops: recommendData.top_crops || [],
+        top_profit: recommendData.top_crops?.[0]?.net_profit_inr || 0,
+        date: new Date().toLocaleDateString()
+      });
+    } else if (modalShare) {
+      modalShare.classList.remove("hidden");
+    }
+  };
+  if (btnShareResults) {
+    btnShareResults.onclick = window.openShareModal;
+  }
+
+  async function openShareModalWithPayload(runId, summary) {
+    if (!modalShare) return;
+    modalShare.classList.remove("hidden");
+
+    // Populate preview
+    const locEl = document.getElementById("share-preview-loc");
+    const dateEl = document.getElementById("share-preview-date");
+    const cropsEl = document.getElementById("share-preview-crops");
+    const profitEl = document.getElementById("share-preview-profit");
+
+    if (locEl) locEl.innerText = summary.location || "Farm Plot";
+    if (dateEl) dateEl.innerText = summary.date || new Date().toLocaleDateString();
+    if (profitEl) profitEl.innerText = `₹${Number(summary.top_profit || 0).toLocaleString()}`;
+
+    const top3 = (summary.top_crops || []).slice(0, 3);
+    if (cropsEl) {
+      cropsEl.innerHTML = top3.map((c, i) => `
+        <div class="flex justify-between">
+          <span>#${i+1} ${c.display_name || c.name} (${c.suitability_pct ? c.suitability_pct.toFixed(0) : 90}% match)</span>
+          <strong>₹${Number(c.net_profit_inr || 0).toLocaleString()}</strong>
+        </div>
+      `).join('');
+    }
+
+    // Call backend to generate token
+    const linkInput = document.getElementById("share-link-input");
+    if (linkInput) linkInput.value = "Generating secure share link...";
+
+    try {
+      const res = await fetch("/api/share/create", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ run_id: runId, summary: summary })
+      });
+      if (res.ok) {
+        const d = await res.json();
+        currentShareToken = d.token;
+        const fullUrl = window.location.origin + d.share_url;
+        if (linkInput) linkInput.value = fullUrl;
+
+        // Configure share channels
+        const shareText = `🌾 Crop Recommendation Advisory for ${summary.location}: Top Crops: ${top3.map(c => c.display_name).join(', ')}. Est. Profit: ₹${Number(summary.top_profit || 0).toLocaleString()}. View report: ${fullUrl}`;
+
+        const btnWa = document.getElementById("btn-share-whatsapp");
+        if (btnWa) btnWa.onclick = () => window.open(`https://api.whatsapp.com/send?text=${encodeURIComponent(shareText)}`, '_blank');
+
+        const btnSms = document.getElementById("btn-share-sms");
+        if (btnSms) btnSms.onclick = () => window.open(`sms:?body=${encodeURIComponent(shareText)}`, '_self');
+
+        const btnEmail = document.getElementById("btn-share-email");
+        if (btnEmail) btnEmail.onclick = () => window.open(`mailto:?subject=${encodeURIComponent("Crop Advisory Report - " + summary.location)}&body=${encodeURIComponent(shareText)}`, '_self');
+
+        const btnNative = document.getElementById("btn-share-native");
+        if (btnNative) {
+          btnNative.onclick = async () => {
+            if (navigator.share) {
+              try {
+                await navigator.share({
+                  title: `Crop Advisory - ${summary.location}`,
+                  text: shareText,
+                  url: fullUrl
+                });
+              } catch (e) {}
+            } else {
+              copyShareLink();
+            }
+          };
+        }
+      }
+    } catch (e) {
+      if (linkInput) linkInput.value = "Failed to create share link.";
+    }
+  }
+
+  function copyShareLink() {
+    const input = document.getElementById("share-link-input");
+    const toast = document.getElementById("copy-toast");
+    if (input && input.value) {
+      navigator.clipboard.writeText(input.value);
+      if (toast) {
+        toast.classList.remove("hidden");
+        setTimeout(() => toast.classList.add("hidden"), 3000);
+      }
+    }
+  }
+
+  const btnCopy = document.getElementById("btn-copy-share-link");
+  if (btnCopy) btnCopy.onclick = copyShareLink;
+
+  const btnRevoke = document.getElementById("btn-revoke-share");
+  if (btnRevoke) {
+    btnRevoke.onclick = async () => {
+      if (!currentShareToken) return;
+      if (!confirm("Revoke this public share link? Anyone with this link will no longer be able to view the result.")) return;
+      try {
+        await fetch("/api/share/revoke", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ token: currentShareToken })
+        });
+        alert("Share link revoked successfully.");
+        if (modalShare) modalShare.classList.add("hidden");
+      } catch (e) {
+        alert("Failed to revoke share link.");
+      }
+    };
+  }
+
+  const btnDownloadShareCard = document.getElementById("btn-download-share-card");
+  if (btnDownloadShareCard) {
+    btnDownloadShareCard.onclick = () => window.print();
+  }
+
+  if (btnCloseShare && modalShare) {
+    btnCloseShare.onclick = () => modalShare.classList.add("hidden");
+  }
 
   // ============================================================================
   // Krishi Mitra AI Chatbot Event Listeners & Voice Recognition
@@ -4039,6 +5079,32 @@ function bindShellListeners() {
     };
   }
 
+  // Mute / Voice Reply Toggle Button
+  const btnChatMute = document.getElementById("btn-chat-mute");
+  const iconChatMute = document.getElementById("icon-chat-mute");
+  function updateMuteBtnUI() {
+    if (iconChatMute) {
+      if (isVoiceMuted) {
+        iconChatMute.className = "fa-solid fa-volume-xmark text-xs text-rose-300";
+        if (btnChatMute) btnChatMute.title = "Voice Replies: Muted (Click to Unmute)";
+      } else {
+        iconChatMute.className = "fa-solid fa-volume-high text-xs text-emerald-100";
+        if (btnChatMute) btnChatMute.title = "Voice Replies: Active (Click to Mute)";
+      }
+    }
+  }
+  if (btnChatMute) {
+    updateMuteBtnUI();
+    btnChatMute.onclick = () => {
+      isVoiceMuted = !isVoiceMuted;
+      localStorage.setItem('fdd_voice_muted', isVoiceMuted ? 'true' : 'false');
+      if (isVoiceMuted && ('speechSynthesis' in window)) {
+        window.speechSynthesis.cancel();
+      }
+      updateMuteBtnUI();
+    };
+  }
+
   // Web Speech API Voice Input (English + Kannada)
   let voiceActive = false;
   let recognitionInstance = null;
@@ -4046,7 +5112,13 @@ function bindShellListeners() {
     btnChatMic.onclick = () => {
       const SpeechRecognition = window.SpeechRecognition || window.webkitSpeechRecognition;
       if (!SpeechRecognition) {
-        alert("Web Speech API voice recognition is not supported in this browser. Please use Chrome/Edge or type your question.");
+        chatMessagesHistory.push({
+          sender: "bot",
+          text: currentLang === 'kn'
+            ? "⚠️ ನಿಮ್ಮ ಬ್ರೌಸರ್‌ನಲ್ಲಿ Web Speech API ಧ್ವನಿ ಗುರುತಿಸುವಿಕೆ ಬೆಂಬಲಿತವಾಗಿಲ್ಲ. ದಯವಿಟ್ಟು Chrome ಅಥವಾ Edge ಬಳಸಿ, ಅಥವಾ ಕೆಳಗೆ ಟೈಪ್ ಮಾಡಿ."
+            : "⚠️ Web Speech API voice recognition is not supported in this browser. Please use Google Chrome or Edge, or type your question below."
+        });
+        renderChatMessages();
         return;
       }
 
@@ -4058,24 +5130,47 @@ function bindShellListeners() {
       try {
         recognitionInstance = new SpeechRecognition();
         recognitionInstance.continuous = false;
-        recognitionInstance.interimResults = false;
+        recognitionInstance.interimResults = true;
+        recognitionInstance.maxAlternatives = 1;
         recognitionInstance.lang = currentLang === 'kn' ? 'kn-IN' : (currentLang === 'hi' ? 'hi-IN' : 'en-IN');
 
         recognitionInstance.onstart = () => {
           voiceActive = true;
-          btnChatMic.className = "w-9 h-9 rounded-xl bg-rose-600 text-white flex items-center justify-center transition cursor-pointer shrink-0 animate-pulse";
-          inputChat.placeholder = currentLang === 'kn' ? "ಆಲಿಸುತ್ತಿದೆ... ಮಾತನಾಡಿ..." : "Listening... speak now...";
+          btnChatMic.className = "w-9 h-9 rounded-xl bg-rose-600 text-white flex items-center justify-center transition cursor-pointer shrink-0 animate-pulse shadow-md ring-2 ring-rose-400";
+          inputChat.placeholder = currentLang === 'kn' ? "🎙️ ಆಲಿಸುತ್ತಿದೆ... ಮಾತನಾಡಿ..." : "🎙️ Listening... speak now...";
         };
 
         recognitionInstance.onresult = (evt) => {
-          const transcript = evt.results[0][0].transcript;
-          inputChat.value = transcript;
-          sendChatMessage(transcript);
+          let interimTranscript = '';
+          let finalTranscript = '';
+          for (let i = evt.resultIndex; i < evt.results.length; ++i) {
+            if (evt.results[i].isFinal) {
+              finalTranscript += evt.results[i][0].transcript;
+            } else {
+              interimTranscript += evt.results[i][0].transcript;
+            }
+          }
+          if (interimTranscript && !finalTranscript) {
+            inputChat.value = interimTranscript;
+          }
+          if (finalTranscript) {
+            inputChat.value = finalTranscript;
+            sendChatMessage(finalTranscript);
+          }
         };
 
         recognitionInstance.onerror = (err) => {
           console.warn("Speech recognition error:", err);
           resetVoiceBtn();
+          if (err.error === 'not-allowed' || err.error === 'service-not-allowed') {
+            chatMessagesHistory.push({
+              sender: "bot",
+              text: currentLang === 'kn'
+                ? "⚠️ ಮೈಕ್ರೋಫೋನ್ ಅನುಮತಿ ನಿರಾಕರಿಸಲಾಗಿದೆ. ಧ್ವನಿ ಆಜ್ಞೆಗಳನ್ನು ಬಳಸಲು ಬ್ರೌಸರ್ ಸೆಟ್ಟಿಂಗ್‌ಗಳಲ್ಲಿ ಮೈಕ್ರೋಫೋನ್ ಅನುಮತಿಸಿ ಅಥವಾ ಕೆಳಗೆ ಟೈಪ್ ಮಾಡಿ."
+                : "⚠️ Microphone permission was denied. Please allow microphone access in your browser settings to use voice commands, or type your question below."
+            });
+            renderChatMessages();
+          }
         };
 
         recognitionInstance.onend = () => {
@@ -4095,7 +5190,7 @@ function bindShellListeners() {
         btnChatMic.className = "w-9 h-9 rounded-xl bg-slate-100 hover:bg-emerald-100 text-slate-600 hover:text-emerald-800 flex items-center justify-center transition cursor-pointer shrink-0";
       }
       if (inputChat) {
-        inputChat.placeholder = "Ask Krishi Mitra... / ಕೃಷಿ ಮಿತ್ರರನ್ನು ಕೇಳಿ...";
+        inputChat.placeholder = currentLang === 'kn' ? "ಕೃಷಿ ಮಿತ್ರರನ್ನು ಕೇಳಿ..." : "Ask Krishi Mitra...";
       }
     }
   }

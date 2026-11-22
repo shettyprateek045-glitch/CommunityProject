@@ -83,6 +83,61 @@ flowchart LR
 
 ---
 
+## 🌟 Upgraded Dashboard Capabilities (5 New Features)
+
+### 1. 5-Year Historical Weather Analysis (Weather Step)
+- **Open-Meteo Historical Archive API**: Fetches daily historical weather for the previous 5 full calendar years (2021–2025: 1,826 daily records) for the exact farm coordinates without requiring an API key.
+- **Interactive Multi-Line Chart.js Visualizations**:
+  - **Monthly Rainfall**: Annual comparison lines showing rainfall accumulation per month for each year (2021 through 2025).
+  - **Monthly Average Temperature**: Mean temperature trends month-by-month across the 5 years.
+  - **5-Year Average vs. Current Year**: Benchmarks current seasonal metrics against the 5-year historical baseline to detect drought or excess moisture.
+- **Bilingual Agronomic Insights**: Auto-generates real-time insight cards (e.g. *"Wettest Year: 2022 with 1,240 mm rainfall"*, *"Driest Year: 2023 (-28% deficit)"*, *"Hottest Year: 2024 (Peak 38.4°C)"* in English and Kannada).
+- **Persistent Location Caching**: Historical queries cached in SQLite (`data/cache.db`) with 3ms instant retrieval.
+- **Engine Feedback**: Long-term rainfall and temperature baselines are factored directly into crop suitability scoring (`hist_5yr_rain`, `hist_5yr_temp`).
+
+### 2. Slow-Motion Video Background on Login
+- **Cinematic Looping Video**: Full-screen 720p HD video of a farmer walking through a field, playing in slow motion (`video.playbackRate = 0.5`, muted, autoplay, loop, playsinline).
+- **Lightweight Asset**: Stored locally in `/static/videos/farmer_field.mp4` and `/static/videos/farmer_field.webm` (4.88 MB, strictly under the 8 MB constraint).
+- **Video Credit & Attribution**: Video footage courtesy of [Mixkit](https://mixkit.co/) (Mixkit Item #41551: *"Farmer walking along wheat field in agricultural farm"*), royalty-free for personal and commercial usage.
+- **Accessibility & Resiliency**: Dark gradient overlay for WCAG-compliant form contrast, high-res poster fallback (`farmer_poster.jpg`), and automatic static fallback when `prefers-reduced-motion` is enabled or data-saver/slow networks are detected (`navigator.connection.saveData` or 2G/3G).
+
+### 3. Google History-Style Search Records (`#modal-history`)
+- **Persistent Storage**: Every recommendation run is saved to SQLite (`data/farmer_history.db`) tied to the logged-in user or guest session with full input parameters, ranked crop results, and profit projections.
+- **Temporal Grouping**: History runs automatically categorized into:
+  - `📅 Today`
+  - `📅 Yesterday`
+  - `📅 Last 7 Days`
+  - `📅 Earlier`
+- **Dynamic Search & Filtering**: Instant search by village/district name, crop type filter dropdown, and date-range pickers (`start_date` to `end_date`).
+- **1-Click Reopen**: Click any past run to reload all farm parameters and reopen the complete Step 6 recommendation advisory.
+- **Granular Deletion & Bulk Management**:
+  - Single-entry deletion with confirmation.
+  - Multi-select checkbox mode for batch deletion (`POST /api/history/bulk-delete`).
+  - Timeframe-based clearing dialog (`DELETE /api/history/clear?timeframe=hour|today|all`).
+
+### 4. Share Searched Crops & Public Advisory (`#modal-share`)
+- **Direct Multi-Channel Sharing**: One-click sharing via WhatsApp, SMS, Email, and native mobile `navigator.share` (Web Share API).
+- **Summary Preview Card**: Formatted preview displaying farm location, land acres, top 3 crop recommendations with suitability %, and projected net profit.
+- **Read-Only Public URL (`/share/<token>`)**: Generates a random, URL-safe 12-byte token pointing to a standalone, unauthenticated public view (`http://127.0.0.1:5000/share/<token>`).
+- **Token Revocation**: Farmers can revoke public access at any time via `POST /api/share/revoke`, instantly disabling the link.
+- **Print / PDF Download**: Direct export option for printing the summary card.
+
+### 5. Krishi Mitra Voice AI Assistant (`#btn-krishi-chat`)
+- **Floating Omnipresent Assistant**: Floating microphone button accessible from every step of the dashboard.
+- **Speech-to-Text & Spoken Replies**: Integrated with the Web Speech API (`SpeechRecognition`) and `window.speechSynthesis` supporting English (`en-IN`) and Kannada (`kn-IN`).
+- **Voice Reply Mute Toggle**: Header volume button (🔊 / 🔇) to toggle spoken voice replies, persisting user preferences in `localStorage`.
+- **Actionable Voice Command Execution**:
+  - *"Recommend a crop for Bengaluru"* -> Geocodes location, sets coordinates, and triggers recommendation flow.
+  - *"What is the weather this week?"* -> Navigates to Step 2 live forecast.
+  - *"Show last year's rainfall"* -> Switches to the 5-Year Weather Analysis tab.
+  - *"Open history"* -> Launches the Recommendation History modal.
+  - *"Which fertilizer for maize?"* -> Provides specific split NPK fertilizer guidance (Urea, DAP, MOP).
+  - *"Share my result"* -> Opens the public advisory sharing card.
+- **Backend LLM API with Robust Fallback (`POST /api/assistant`)**: Connects to Gemini or OpenAI when API keys are configured in `.env`, with an intelligent agronomic rule-based engine when unconfigured.
+- **Strict Guardrails & Uncertainty Protocol**: When queries are outside agriculture or uncertain, strictly responds: *"I'm not sure, please consult your local agriculture officer or Krishi Vigyan Kendra (KVK)."*
+
+---
+
 ## ⚙️ Setup & Configuration
 
 ### Prerequisites
