@@ -46,6 +46,22 @@ if (fs.existsSync(loginSrc)) {
   console.log('Copied templates/login.html -> dist/login.html');
 }
 
+// 2b. Copy templates/share.html -> dist/share.html
+const shareSrc = path.join(rootDir, 'templates', 'share.html');
+const shareDest = path.join(distDir, 'share.html');
+if (fs.existsSync(shareSrc)) {
+  fs.copyFileSync(shareSrc, shareDest);
+  console.log('Copied templates/share.html -> dist/share.html');
+}
+
+// 2c. Copy templates/partials -> dist/partials
+const partialsSrc = path.join(rootDir, 'templates', 'partials');
+const partialsDest = path.join(distDir, 'partials');
+if (fs.existsSync(partialsSrc)) {
+  copyRecursiveSync(partialsSrc, partialsDest);
+  console.log('Copied templates/partials -> dist/partials');
+}
+
 // 3. Copy static folder -> dist/static
 const staticSrc = path.join(rootDir, 'static');
 const staticDest = path.join(distDir, 'static');

@@ -36,6 +36,7 @@ const I18N = {
     step_farm: "4. Farm Profile",
     step_last_crop: "5. Last Crop",
     step_results: "6. Recommendations",
+    step_verify: "7. Market & Verification",
     btn_next: "Next ➡️",
     btn_prev: "⬅️ Back",
 
@@ -151,6 +152,7 @@ const I18N = {
     step_farm: "೪. ಹೊಲದ ವಿವರ",
     step_last_crop: "೫. ಹಿಂದಿನ ಬೆಳೆ",
     step_results: "೬. ಬೆಳೆ ಶಿಫಾರಸುಗಳು",
+    step_verify: "೭. ಮಾರುಕಟ್ಟೆ ಮತ್ತು AI ಪರಿಶೀಲನೆ",
     btn_next: "ಮುಂದೆ ➡️",
     btn_prev: "⬅️ ಹಿಂದಕ್ಕೆ",
 
@@ -266,6 +268,7 @@ const I18N = {
     step_farm: "४. खेत का विवरण",
     step_last_crop: "५. पिछली फसल",
     step_results: "६. फसल सिफारिशें",
+    step_verify: "७. बाजार एवं AI सत्यापन",
     btn_next: "आगे ➡️",
     btn_prev: "⬅️ पीछे",
 
@@ -1362,6 +1365,12 @@ export function renderDashboardShell(container, lang) {
             <span class="w-5 h-5 rounded-full bg-slate-200 flex items-center justify-center text-[10px] text-slate-700">6</span>
             <span>${t.step_results}</span>
           </button>
+          <div class="h-0.5 w-4 bg-slate-200 shrink-0"></div>
+
+          <button type="button" data-step="7" class="step-btn flex items-center gap-2 px-3 py-1.5 rounded-xl text-xs font-semibold transition whitespace-nowrap cursor-pointer text-slate-600 hover:bg-slate-100">
+            <span class="w-5 h-5 rounded-full bg-slate-200 flex items-center justify-center text-[10px] text-slate-700">7</span>
+            <span>${t.step_verify || (currentLang === 'kn' ? '೭. ಮಾರುಕಟ್ಟೆ ಮತ್ತು AI ಪರಿಶೀಲನೆ' : '7. Market & AI Verification')}</span>
+          </button>
         </div>
       </div>
     </div>
@@ -1378,6 +1387,7 @@ export function renderDashboardShell(container, lang) {
         <section id="panel-step-4" class="step-panel space-y-6 hidden"></section>
         <section id="panel-step-5" class="step-panel space-y-6 hidden"></section>
         <section id="panel-step-6" class="step-panel space-y-6 hidden"></section>
+        <section id="panel-step-7" class="step-panel space-y-6 hidden"></section>
       </div>
 
       <!-- Stepper Bottom Navigation Bar -->
@@ -1391,6 +1401,21 @@ export function renderDashboardShell(container, lang) {
         </button>
       </div>
     </main>
+
+    <!-- Global Footer -->
+    <footer class="mt-auto py-5 border-t border-white/20 bg-black/50 backdrop-blur-md text-white/90 text-xs">
+      <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 flex flex-col sm:flex-row items-center justify-between gap-3">
+        <div class="flex items-center gap-2 text-slate-300">
+          <i class="fa-solid fa-leaf text-emerald-400"></i>
+          <span class="font-semibold">Farmer Decision Dashboard</span>
+          <span class="text-white/40">•</span>
+          <span>Precision Agronomy & AI Market Forecaster</span>
+        </div>
+        <div class="text-[11px] text-slate-300">
+          <span>AI Precision Agriculture Platform</span>
+        </div>
+      </div>
+    </footer>
 
     <!-- Foliar Leaf Disease Modal -->
     <div id="modal-leaf-scanner" class="fixed inset-0 z-50 bg-slate-900/60 backdrop-blur-xs hidden flex items-center justify-center p-4">
@@ -3885,12 +3910,691 @@ async function renderResultsStepView(container) {
         </div>
       </section>
 
+      <!-- Navigation Callout to Step 7 -->
+      <div class="p-6 rounded-3xl bg-gradient-to-r from-[#1b5e20] to-[#2e7d32] text-white shadow-xl flex flex-col sm:flex-row items-center justify-between gap-4 border border-white/20">
+        <div class="space-y-1">
+          <div class="flex items-center gap-2">
+            <span class="px-2.5 py-0.5 rounded-full text-[10px] font-extrabold bg-amber-400 text-slate-900">NEXT ACTION STEP</span>
+            <h4 class="text-base font-extrabold text-white">Step 7: 30-Day Market Prices & AI Verification Agent</h4>
+          </div>
+          <p class="text-xs text-emerald-100 max-w-xl">Inspect exact 30-day Mandi price trajectories (1 month ago vs today) for all recommended crops and verify feasibility with the Google Gemini / ChatGPT verification agent.</p>
+        </div>
+        <button type="button" id="btn-goto-step-7" class="shrink-0 px-6 py-3 rounded-2xl bg-white hover:bg-emerald-50 text-emerald-950 font-extrabold text-xs shadow-lg transition flex items-center gap-2 cursor-pointer active:scale-95">
+          <span>Proceed to Step 7</span>
+          <i class="fa-solid fa-arrow-right"></i>
+        </button>
+      </div>
+
     </div>
   `;
 
   bindResultsStepListeners();
   const mandiPrices = mandiTrendsData ? (mandiTrendsData.historical_prices_30d || mandiTrendsData.trend_30d || []) : [];
   renderMandiChart(mandiPrices);
+}
+
+// ============================================================================
+// Step 7: 30-Day Market Prices & AI Verification Agent State & Controllers
+// ============================================================================
+let step7PriceData = null;
+let step7PriceLoading = false;
+let step7ChartInstance = null;
+let step7LLMStatus = {
+  connected: false,
+  provider: "local_engine",
+  provider_name: "Local Agronomic Verification Engine",
+  message: "Local mode. Set GEMINI_API_KEY or OPENAI_API_KEY in .env for live cloud LLM."
+};
+
+let step7VerificationHistory = [
+  {
+    sender: "agent",
+    text: "Namaskara! I am your AI Agronomic & Market Verification Agent running on the Local Agronomic Intelligence Engine. Ask me to verify recommended crops, analyze 30-day Mandi market price trends, or upload a photo of your field/soil card. (To connect me live to Google Gemini or OpenAI ChatGPT, simply add GEMINI_API_KEY or OPENAI_API_KEY to your .env file!)",
+    text_kn: "ನಮಸ್ಕಾರ! ನಾನು ನಿಮ್ಮ AI ಕೃಷಿ ಮತ್ತು ಮಾರುಕಟ್ಟೆ ಪರಿಶೀಲನಾ ಸಹಾಯಕ. ಶಿಫಾರಸು ಮಾಡಿದ ಬೆಳೆಗಳ ಸೂಕ್ತತೆ, 30 ದಿನಗಳ ಮಾರುಕಟ್ಟೆ ಧಾರಣೆ ಮತ್ತು ನೀವು ಅಪ್‌ಲೋಡ್ ಮಾಡುವ ಮಣ್ಣಿನ ಕಾರ್ಡ್/ಫೋಟೋವನ್ನು ಪರಿಶೀಲಿಸುತ್ತೇನೆ. (ಲೈವ್ Google Gemini ಅಥವಾ ChatGPT ಗೆ ಸಂಪರ್ಕಿಸಲು .env ನಲ್ಲಿ API ಕೀ ಸೇರಿಸಿ!)",
+    model_name: "Local Agronomic Engine",
+    is_connected: false
+  }
+];
+let step7UploadedBase64 = null;
+let step7UploadedFileName = null;
+let step7VoiceMuted = localStorage.getItem('fdd_verify_voice_muted') === 'true';
+
+async function fetchStep7LLMStatus() {
+  try {
+    const res = await fetch("/api/verify/status");
+    if (res.ok) {
+      step7LLMStatus = await res.json();
+      if (step7LLMStatus.connected && step7VerificationHistory.length === 1 && step7VerificationHistory[0].sender === "agent") {
+        step7VerificationHistory[0].text = `Namaskara! I am your AI Agronomic & Market Verification Agent, live connected to ${step7LLMStatus.provider_name}. Ask me to verify recommended crops, analyze whether current Mandi prices are profitable, or upload field photos/documents for instant AI verification.`;
+        step7VerificationHistory[0].text_kn = `ನಮಸ್ಕಾರ! ನಾನು ನಿಮ್ಮ AI ಕೃಷಿ ಮತ್ತು ಮಾರುಕಟ್ಟೆ ಪರಿಶೀಲನಾ ಸಹಾಯಕ (${step7LLMStatus.provider_name} ಗೆ ಲೈವ್ ಸಂಪರ್ಕಿಸಲಾಗಿದೆ). ಬೆಳೆಗಳ ಸೂಕ್ತತೆ ಮತ್ತು 30 ದಿನಗಳ ಮಂಡಿ ಧಾರಣೆ ಪರಿಶೀಲಿಸಲು ಪ್ರಶ್ನಿಸಿ.`;
+        step7VerificationHistory[0].model_name = step7LLMStatus.provider_name;
+        step7VerificationHistory[0].is_connected = true;
+      }
+      const badge = document.getElementById("step7-llm-status-badge");
+      if (badge) {
+        if (step7LLMStatus.connected) {
+          badge.className = "px-2.5 py-0.5 rounded-full text-[10px] font-bold bg-emerald-100 text-emerald-800 border border-emerald-300 flex items-center gap-1.5";
+          badge.innerHTML = `<span class="w-2 h-2 rounded-full bg-emerald-500 animate-pulse"></span><span>Live Connected: ${step7LLMStatus.provider_name}</span>`;
+        } else {
+          badge.className = "px-2.5 py-0.5 rounded-full text-[10px] font-bold bg-amber-100 text-amber-900 border border-amber-300 flex items-center gap-1.5";
+          badge.innerHTML = `<span class="w-2 h-2 rounded-full bg-amber-500"></span><span>Local Agronomic Engine (Set Key in .env)</span>`;
+        }
+      }
+    }
+  } catch (e) {}
+}
+
+async function fetchStep7Prices(force = false) {
+  if (step7PriceData && !force) return step7PriceData;
+  step7PriceLoading = true;
+  try {
+    const cropsPayload = (recommendData && recommendData.top_crops && recommendData.top_crops.length > 0)
+      ? recommendData.top_crops.map(c => ({
+          name: (c.display_name || c.name || "maize").toLowerCase(),
+          display_name: c.display_name,
+          kannada_name: c.kannada_name,
+          yield_per_acre_qtl: c.yield_per_acre_qtl || 20.0,
+          suitability_pct: c.suitability_pct || 85.0
+        }))
+      : [
+          { name: "maize", display_name: "Maize", kannada_name: "ಮೆಕ್ಕೆಜೋಳ", yield_per_acre_qtl: 24.0, suitability_pct: 92.0 },
+          { name: "cotton", display_name: "Cotton", kannada_name: "ಹತ್ತಿ", yield_per_acre_qtl: 12.0, suitability_pct: 86.0 },
+          { name: "ragi", display_name: "Finger Millet (Ragi)", kannada_name: "ರಾಗಿ", yield_per_acre_qtl: 16.0, suitability_pct: 84.0 }
+        ];
+
+    const res = await fetch("/api/prices/compare-30d", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({
+        crops: cropsPayload,
+        lat: farmContext.lat,
+        lon: farmContext.lon,
+        land_acres: farmContext.land_acres || 3.0
+      })
+    });
+    if (res.ok) {
+      step7PriceData = await res.json();
+    }
+  } catch (e) {
+    console.error("Step 7 prices fetch error:", e);
+  } finally {
+    step7PriceLoading = false;
+  }
+  return step7PriceData;
+}
+
+async function renderStep7MarketVerificationView(container) {
+  if (!step7PriceData && !step7PriceLoading) {
+    container.innerHTML = `
+      <div class="py-16 text-center space-y-3 bg-white/90 backdrop-blur-md rounded-3xl border border-white/60 shadow-lg">
+        <div class="text-3xl text-emerald-700 animate-spin"><i class="fa-solid fa-spinner"></i></div>
+        <p class="text-xs text-slate-700 font-bold">Fetching 30-day historical Mandi prices & AI verification models...</p>
+        <p class="text-[11px] text-slate-500">Comparing current modal rates against 1-month-ago benchmarks across Karnataka APMC hubs.</p>
+      </div>
+    `;
+    await fetchStep7Prices();
+  }
+
+  const crops = step7PriceData ? step7PriceData.crops : [];
+  const mandiName = step7PriceData ? step7PriceData.mandi_name : "Hubballi-Dharwad / Karnataka APMC Mandi Hub";
+
+  container.innerHTML = `
+    <div class="space-y-6 animate-fadeIn">
+      
+      <!-- Step 7 Header Banner -->
+      <div class="bg-gradient-to-r from-[#1b5e20] to-[#2e7d32] rounded-3xl p-6 sm:p-8 text-white shadow-xl flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4 border border-white/20">
+        <div class="space-y-1.5">
+          <div class="flex items-center gap-2 flex-wrap">
+            <span class="px-3 py-1 rounded-full text-xs font-extrabold bg-amber-400 text-slate-900 shadow-xs">
+              STEP 7 • FINAL VERIFICATION
+            </span>
+            <span class="text-xs text-emerald-200 font-medium">30-Day Price Trajectory & Multi-Modal AI Agent</span>
+          </div>
+          <h2 class="text-xl sm:text-2xl font-extrabold tracking-tight">
+            ${currentLang === 'kn' ? '30 ದಿನಗಳ ಮಾರುಕಟ್ಟೆ ಧಾರಣೆ ಮತ್ತು AI ಪರಿಶೀಲನಾ ಸಹಾಯಕ' : '30-Day Market Prices & AI Verification Agent'}
+          </h2>
+          <p class="text-xs sm:text-sm text-emerald-100 max-w-2xl leading-relaxed">
+            ${currentLang === 'kn' 
+              ? 'ಶಿಫಾರಸು ಮಾಡಿದ ಬೆಳೆಗಳ 1 ತಿಂಗಳ ಹಿಂದಿನ ಬೆಲೆ vs ಇಂದಿನ ಧಾರಣೆಯನ್ನು ಪರಿಶೀಲಿಸಿ, ಮತ್ತು Google Gemini / ChatGPT ಪರಿಶೀಲನಾ ಸಹಾಯಕದೊಂದಿಗೆ ಧ್ವನಿ, ಪಠ್ಯ ಅಥವಾ ಫೋಟೋ ಅಪ್‌ಲೋಡ್ ಮೂಲಕ ದೃಢೀಕರಿಸಿ.'
+              : 'Analyze factual 30-day Mandi price changes (1 month ago vs. current day) for recommended crops, and verify farm feasibility via text, voice, or photo upload with our Google Gemini & ChatGPT verification agent.'}
+          </p>
+        </div>
+        <div class="flex items-center gap-2">
+          <button type="button" id="btn-refresh-step7-prices" class="px-4 py-2 rounded-xl bg-white/20 hover:bg-white/30 text-white font-bold text-xs backdrop-blur-sm transition flex items-center gap-1.5 cursor-pointer shadow-xs" title="Refresh market data">
+            <i class="fa-solid fa-arrows-rotate"></i>
+            <span>Refresh Prices</span>
+          </button>
+        </div>
+      </div>
+
+      <!-- SECTION 1: Recommended Crops 30-Day Market Price History (1 Month Ago vs Today) -->
+      <section class="bg-white/90 backdrop-blur-md rounded-3xl p-6 border border-white/60 shadow-lg space-y-5">
+        <div class="flex items-center justify-between flex-wrap gap-2 border-b border-slate-200/80 pb-3">
+          <div>
+            <h3 class="text-base sm:text-lg font-extrabold text-slate-900 flex items-center gap-2">
+              <i class="fa-solid fa-chart-line text-emerald-700"></i>
+              <span>${currentLang === 'kn' ? 'ಶಿಫಾರಸು ಮಾಡಿದ ಬೆಳೆಗಳ 30 ದಿನಗಳ ಮಾರುಕಟ್ಟೆ ಧಾರಣೆ ಹೋಲಿಕೆ' : 'Recommended Crops: 1 Month Ago vs. Current Day Prices'}</span>
+            </h3>
+            <p class="text-xs text-slate-500">Benchmark APMC: <strong>${mandiName}</strong> • Agmarknet & Data.gov.in Official Arrivals</p>
+          </div>
+          <span class="text-[11px] font-bold px-3 py-1 bg-emerald-100 text-emerald-800 rounded-full border border-emerald-200">
+            Factual Market History
+          </span>
+        </div>
+
+        <!-- 30-Day Price Comparison Metric Cards Grid -->
+        <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+          ${crops.map(c => `
+            <div class="p-4 rounded-2xl bg-white border border-slate-200/80 shadow-xs space-y-3 hover:shadow-md transition">
+              <div class="flex items-start justify-between">
+                <div>
+                  <h4 class="font-extrabold text-sm text-slate-900">${c.display_name}</h4>
+                  <span class="text-xs text-slate-500">${c.kannada_name}</span>
+                </div>
+                <span class="px-2.5 py-0.5 rounded-full text-[10px] font-bold ${
+                  c.direction === 'up' ? 'bg-emerald-100 text-emerald-800 border border-emerald-200' : 'bg-rose-100 text-rose-800 border border-rose-200'
+                }">
+                  ${c.direction === 'up' ? '📈 +' : '📉 '}${c.change_pct}% (30d)
+                </span>
+              </div>
+
+              <!-- Price Comparison Table Inside Card -->
+              <div class="grid grid-cols-2 gap-2 text-xs pt-1 border-t border-slate-100">
+                <div class="p-2.5 rounded-xl bg-slate-50 border border-slate-100">
+                  <span class="text-[10px] font-semibold text-slate-500 block uppercase">1 Month Ago</span>
+                  <div class="text-sm font-extrabold text-slate-700">₹${c.price_1m_ago_inr.toLocaleString()}</div>
+                  <span class="text-[10px] text-slate-400">per quintal</span>
+                </div>
+                <div class="p-2.5 rounded-xl bg-emerald-50/70 border border-emerald-100">
+                  <span class="text-[10px] font-semibold text-emerald-800 block uppercase">Current Day</span>
+                  <div class="text-sm font-extrabold text-emerald-900">₹${c.current_price_inr.toLocaleString()}</div>
+                  <span class="text-[10px] text-emerald-700 font-bold">${c.diff_inr >= 0 ? '+' : ''}₹${c.diff_inr}/qtl</span>
+                </div>
+              </div>
+
+              <!-- Revenue on Farmer's Land -->
+              <div class="p-2.5 rounded-xl bg-earth-50 border border-earth-100 text-xs flex items-center justify-between">
+                <span class="text-[11px] text-slate-600 font-medium">Est. Revenue (${c.total_yield_qtl.toFixed(0)} qtl):</span>
+                <strong class="text-emerald-950 font-bold">₹${c.current_revenue_inr.toLocaleString()}</strong>
+              </div>
+
+              <!-- Commentary -->
+              <p class="text-[11px] text-slate-600 leading-relaxed border-t border-slate-100 pt-2">
+                ${currentLang === 'kn' ? c.summary_kn : c.summary_en}
+              </p>
+            </div>
+          `).join('')}
+        </div>
+
+        <!-- 30-Day Multi-Line Chart -->
+        <div class="pt-2">
+          <div class="flex items-center justify-between pb-2 text-xs">
+            <span class="font-extrabold text-slate-700">30-Day Daily Modal Price Trajectory (₹/qtl)</span>
+            <span class="text-[11px] text-slate-400">Past 30 Days to Current Day</span>
+          </div>
+          <div class="h-64 sm:h-72 w-full rounded-2xl border border-slate-200 p-4 bg-slate-50">
+            <canvas id="chart-step7-compare-canvas"></canvas>
+          </div>
+        </div>
+      </section>
+
+      <!-- SECTION 2: AI Agronomic & Market Verification Agent (Connected to Gemini / ChatGPT) -->
+      <section class="bg-white/90 backdrop-blur-md rounded-3xl p-6 border border-white/60 shadow-lg space-y-5">
+        <div class="flex items-center justify-between flex-wrap gap-2 border-b border-slate-200/80 pb-3">
+          <div class="flex items-center gap-3">
+            <div class="w-10 h-10 rounded-full bg-gradient-to-tr from-emerald-600 to-green-500 text-white flex items-center justify-center text-xl shadow-md">
+              <i class="fa-solid fa-robot"></i>
+            </div>
+            <div>
+              <div class="flex items-center gap-2">
+                <h3 class="text-base sm:text-lg font-extrabold text-slate-900">
+                  ${currentLang === 'kn' ? 'AI ಬೆಳೆ ಮತ್ತು ಮಾರುಕಟ್ಟೆ ಪರಿಶೀಲನಾ ಸಹಾಯಕ' : 'AI Crop & Market Verification Agent'}
+                </h3>
+                <span id="step7-llm-status-badge" class="px-2.5 py-0.5 rounded-full text-[10px] font-bold ${
+                  step7LLMStatus.connected ? 'bg-emerald-100 text-emerald-800 border border-emerald-300' : 'bg-amber-100 text-amber-900 border border-amber-300'
+                } flex items-center gap-1.5" title="${step7LLMStatus.message}">
+                  <span class="w-2 h-2 rounded-full ${step7LLMStatus.connected ? 'bg-emerald-500 animate-pulse' : 'bg-amber-500'}"></span>
+                  <span>${step7LLMStatus.connected ? 'Live Connected: ' + step7LLMStatus.provider_name : 'Local Agronomic Engine (Set Key in .env)'}</span>
+                </span>
+              </div>
+              <p class="text-xs text-slate-500">Multi-Modal Agronomy Verification • Text, Speech & Document/Photo Upload</p>
+            </div>
+          </div>
+
+          <!-- Audio Mute / Unmute Toggle Button -->
+          <div class="flex items-center gap-2">
+            <button type="button" id="btn-step7-mute" class="px-3 py-1.5 rounded-xl border border-slate-200 text-slate-700 hover:bg-slate-100 font-semibold text-xs transition flex items-center gap-1.5 cursor-pointer" title="Toggle audio responses">
+              <i id="icon-step7-mute" class="fa-solid ${step7VoiceMuted ? 'fa-volume-xmark text-rose-500' : 'fa-volume-high text-emerald-700'}"></i>
+              <span id="text-step7-mute">${step7VoiceMuted ? 'Audio: Muted' : 'Audio: Active'}</span>
+            </button>
+          </div>
+        </div>
+
+        <!-- Verification Dialogue / History Stream -->
+        <div id="step7-dialogue-stream" class="space-y-3 p-4 rounded-2xl bg-slate-50 border border-slate-200 max-h-80 overflow-y-auto text-xs">
+          ${step7VerificationHistory.map(m => `
+            <div class="flex ${m.sender === 'user' ? 'justify-end' : 'justify-start'}">
+              <div class="max-w-[85%] rounded-2xl p-3.5 ${
+                m.sender === 'user'
+                  ? 'bg-emerald-700 text-white rounded-br-xs shadow-xs'
+                  : 'bg-white text-slate-800 border border-slate-200/80 rounded-bl-xs shadow-xs space-y-1'
+              }">
+                <div class="flex items-center gap-2 font-bold text-[11px] ${m.sender === 'user' ? 'text-emerald-100' : 'text-emerald-800'}">
+                  <i class="fa-solid ${m.sender === 'user' ? 'fa-user' : 'fa-certificate'}"></i>
+                  <span>${m.sender === 'user' ? 'Farmer' : (m.model_name || 'AI Verification Agent')}</span>
+                  ${m.is_connected ? '<span class="text-[9px] px-1.5 py-0.2 bg-emerald-100 text-emerald-700 rounded-full font-semibold">Live Cloud</span>' : ''}
+                </div>
+                <p class="leading-relaxed whitespace-pre-wrap">${currentLang === 'kn' && m.text_kn ? m.text_kn : m.text}</p>
+                ${m.image_name ? `
+                  <div class="mt-2 text-[10px] bg-slate-100 text-slate-700 px-2 py-1 rounded-lg border border-slate-200 flex items-center gap-1.5">
+                    <i class="fa-solid fa-file-image text-emerald-600"></i>
+                    <span>Attached Document: ${m.image_name}</span>
+                  </div>
+                ` : ''}
+              </div>
+            </div>
+          `).join('')}
+        </div>
+
+        <!-- Quick Verification Chips -->
+        <div class="flex items-center gap-1.5 overflow-x-auto no-scrollbar pb-1 text-xs">
+          <button type="button" class="step7-quick-chip whitespace-nowrap px-3 py-1.5 rounded-full bg-white hover:bg-emerald-50 border border-slate-200 hover:border-emerald-300 text-slate-700 font-medium transition cursor-pointer">
+            🤖 Have you connected or not?
+          </button>
+          <button type="button" class="step7-quick-chip whitespace-nowrap px-3 py-1.5 rounded-full bg-white hover:bg-emerald-50 border border-slate-200 hover:border-emerald-300 text-slate-700 font-medium transition cursor-pointer">
+            🔍 Verify 1-month price trend & best selling time
+          </button>
+          <button type="button" class="step7-quick-chip whitespace-nowrap px-3 py-1.5 rounded-full bg-white hover:bg-emerald-50 border border-slate-200 hover:border-emerald-300 text-slate-700 font-medium transition cursor-pointer">
+            🌱 Verify soil NPK suitability for top crop
+          </button>
+          <button type="button" class="step7-quick-chip whitespace-nowrap px-3 py-1.5 rounded-full bg-white hover:bg-emerald-50 border border-slate-200 hover:border-emerald-300 text-slate-700 font-medium transition cursor-pointer">
+            💰 Verify expected revenue on my farm acres
+          </button>
+        </div>
+
+        <!-- Uploaded Document Preview Bar (if file selected) -->
+        <div id="step7-upload-preview" class="${step7UploadedFileName ? '' : 'hidden'} p-2.5 rounded-xl bg-emerald-50 border border-emerald-200 text-xs flex items-center justify-between">
+          <div class="flex items-center gap-2">
+            <i class="fa-solid fa-file-circle-check text-emerald-700 text-base"></i>
+            <span id="step7-upload-filename" class="font-bold text-slate-800">${step7UploadedFileName || ''}</span>
+          </div>
+          <button type="button" id="btn-step7-remove-upload" class="text-rose-600 hover:text-rose-800 font-bold text-xs cursor-pointer">
+            Remove
+          </button>
+        </div>
+
+        <!-- Verification Input Controls: Photo/Document Upload + Mic + Text Form -->
+        <form id="form-step7-verify" class="flex items-center gap-2 pt-2">
+          <!-- Hidden File Upload Input -->
+          <input type="file" id="input-step7-upload" accept="image/*,.pdf" class="hidden" />
+          
+          <!-- Upload Button -->
+          <button type="button" id="btn-step7-choose-upload" class="px-3.5 py-2.5 rounded-xl bg-slate-100 hover:bg-emerald-100 text-slate-700 hover:text-emerald-900 border border-slate-200 font-bold text-xs flex items-center gap-1.5 transition cursor-pointer shrink-0" title="Upload Soil Card, Leaf Photo, or Mandi Receipt">
+            <i class="fa-solid fa-cloud-arrow-up text-sm text-emerald-700"></i>
+            <span class="hidden sm:inline">Upload Photo/Doc</span>
+          </button>
+
+          <!-- Voice Mic Button -->
+          <button type="button" id="btn-step7-mic" class="w-10 h-10 rounded-xl bg-slate-100 hover:bg-emerald-100 text-slate-700 hover:text-emerald-900 border border-slate-200 flex items-center justify-center transition cursor-pointer shrink-0" title="Speak your question (English or Kannada)">
+            <i class="fa-solid fa-microphone text-sm"></i>
+          </button>
+
+          <!-- Text Input -->
+          <input type="text" id="input-step7-msg" placeholder="${currentLang === 'kn' ? 'ಬೆಳೆ ಅಥವಾ ಧಾರಣೆ ಬಗ್ಗೆ ಪ್ರಶ್ನಿಸಿ / ಅಪ್‌ಲೋಡ್ ಮಾಡಿ...' : 'Ask to verify recommended crops or market trends...'}" class="flex-1 px-4 py-2.5 text-xs border border-slate-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-emerald-500 bg-white" />
+
+          <!-- Submit Button -->
+          <button type="submit" id="btn-step7-send" class="px-5 py-2.5 rounded-xl bg-[#1b5e20] hover:bg-[#2e7d32] text-white font-bold text-xs shadow-md transition flex items-center gap-1.5 cursor-pointer shrink-0">
+            <span>Verify</span>
+            <i class="fa-solid fa-paper-plane text-xs"></i>
+          </button>
+        </form>
+      </section>
+
+      <!-- Stepper Footer Action Navigation -->
+      <div class="flex items-center justify-between pt-4 border-t border-slate-200">
+        <button type="button" onclick="navigateToStep(6)" class="px-5 py-2.5 rounded-xl border border-slate-300 text-slate-700 hover:bg-slate-100 font-semibold text-sm transition cursor-pointer">
+          ⬅️ Back to Recommendations
+        </button>
+        <button type="button" onclick="window.print()" class="px-6 py-2.5 rounded-xl bg-blue-600 hover:bg-blue-700 text-white font-bold text-sm shadow-md transition flex items-center gap-2 cursor-pointer">
+          <i class="fa-solid fa-print"></i>
+          <span>Print Advisory</span>
+        </button>
+      </div>
+
+    </div>
+  `;
+
+  bindStep7Listeners(container);
+  renderStep7ComparisonChart(crops);
+  fetchStep7LLMStatus();
+}
+
+function renderStep7ComparisonChart(crops) {
+  const canvas = document.getElementById("chart-step7-compare-canvas");
+  if (!canvas || !crops || crops.length === 0 || typeof Chart === 'undefined') return;
+
+  if (step7ChartInstance) {
+    step7ChartInstance.destroy();
+  }
+
+  const sampleTrend = crops[0].trend_30d || [];
+  const labels = sampleTrend.map(d => d.display_date || d.date);
+
+  const colors = [
+    { border: '#10b981', bg: 'rgba(16, 185, 129, 0.1)' },
+    { border: '#3b82f6', bg: 'rgba(59, 130, 246, 0.1)' },
+    { border: '#f59e0b', bg: 'rgba(245, 158, 11, 0.1)' },
+    { border: '#8b5cf6', bg: 'rgba(139, 92, 246, 0.1)' },
+    { border: '#ec4899', bg: 'rgba(236, 72, 153, 0.1)' }
+  ];
+
+  const datasets = crops.slice(0, 4).map((c, idx) => {
+    const col = colors[idx % colors.length];
+    return {
+      label: `${c.display_name} (₹/qtl)`,
+      data: (c.trend_30d || []).map(d => d.price_inr),
+      borderColor: col.border,
+      backgroundColor: col.bg,
+      borderWidth: 2.5,
+      tension: 0.3,
+      pointRadius: 2,
+      pointHoverRadius: 5,
+      fill: false
+    };
+  });
+
+  step7ChartInstance = new Chart(canvas, {
+    type: 'line',
+    data: { labels, datasets },
+    options: {
+      responsive: true,
+      maintainAspectRatio: false,
+      interaction: { mode: 'index', intersect: false },
+      plugins: {
+        legend: { position: 'top', labels: { boxWidth: 12, font: { size: 11, weight: 'bold' } } },
+        tooltip: {
+          callbacks: {
+            label: (ctx) => ` ${ctx.dataset.label}: ₹${ctx.parsed.y.toLocaleString()}/qtl`
+          }
+        }
+      },
+      scales: {
+        x: { grid: { display: false }, ticks: { font: { size: 10 } } },
+        y: {
+          title: { display: true, text: 'Modal Price (₹/qtl)', font: { size: 10, weight: 'bold' } },
+          ticks: { callback: v => `₹${v.toLocaleString()}` }
+        }
+      }
+    }
+  });
+}
+
+function bindStep7Listeners(container) {
+  const btnRefresh = document.getElementById("btn-refresh-step7-prices");
+  if (btnRefresh) {
+    btnRefresh.onclick = async () => {
+      await fetchStep7Prices(true);
+      renderStep7MarketVerificationView(container);
+    };
+  }
+
+  // Audio Mute Toggle
+  const btnMute = document.getElementById("btn-step7-mute");
+  const iconMute = document.getElementById("icon-step7-mute");
+  const textMute = document.getElementById("text-step7-mute");
+  if (btnMute) {
+    btnMute.onclick = () => {
+      step7VoiceMuted = !step7VoiceMuted;
+      localStorage.setItem('fdd_verify_voice_muted', step7VoiceMuted ? 'true' : 'false');
+      if (step7VoiceMuted && ('speechSynthesis' in window)) {
+        window.speechSynthesis.cancel();
+      }
+      if (iconMute) iconMute.className = step7VoiceMuted ? "fa-solid fa-volume-xmark text-rose-500" : "fa-solid fa-volume-high text-emerald-700";
+      if (textMute) textMute.innerText = step7VoiceMuted ? "Audio: Muted" : "Audio: Active";
+    };
+  }
+
+  // Upload Handling
+  const btnChooseUpload = document.getElementById("btn-step7-choose-upload");
+  const inUpload = document.getElementById("input-step7-upload");
+  const previewUpload = document.getElementById("step7-upload-preview");
+  const fileNameEl = document.getElementById("step7-upload-filename");
+  const btnRemoveUpload = document.getElementById("btn-step7-remove-upload");
+
+  if (btnChooseUpload && inUpload) {
+    btnChooseUpload.onclick = () => inUpload.click();
+    inUpload.onchange = (e) => {
+      const file = e.target.files?.[0];
+      if (file) {
+        step7UploadedFileName = file.name;
+        const reader = new FileReader();
+        reader.onload = (re) => {
+          step7UploadedBase64 = re.target.result;
+          if (previewUpload && fileNameEl) {
+            fileNameEl.innerText = file.name;
+            previewUpload.classList.remove("hidden");
+          }
+        };
+        reader.readAsDataURL(file);
+      }
+    };
+  }
+
+  if (btnRemoveUpload && inUpload) {
+    btnRemoveUpload.onclick = () => {
+      step7UploadedBase64 = null;
+      step7UploadedFileName = null;
+      inUpload.value = "";
+      if (previewUpload) previewUpload.classList.add("hidden");
+    };
+  }
+
+  // Quick Chips
+  document.querySelectorAll(".step7-quick-chip").forEach(chip => {
+    chip.onclick = () => {
+      const query = chip.innerText.replace(/^[^\w]+/, '').trim();
+      executeStep7Verification(query, container);
+    };
+  });
+
+  // Voice Input (Speech Recognition)
+  const btnMic = document.getElementById("btn-step7-mic");
+  const inMsg = document.getElementById("input-step7-msg");
+  let sttActive = false;
+  let sttInstance = null;
+  if (btnMic && inMsg) {
+    btnMic.onclick = () => {
+      const SpeechRecognition = window.SpeechRecognition || window.webkitSpeechRecognition;
+      if (!SpeechRecognition) {
+        alert("Web Speech API voice input is not supported in this browser. Please use Chrome or Edge.");
+        return;
+      }
+      if (sttActive && sttInstance) {
+        sttInstance.stop();
+        return;
+      }
+      try {
+        sttInstance = new SpeechRecognition();
+        sttInstance.continuous = false;
+        sttInstance.interimResults = true;
+        sttInstance.lang = currentLang === 'kn' ? 'kn-IN' : (currentLang === 'hi' ? 'hi-IN' : 'en-IN');
+        sttInstance.onstart = () => {
+          sttActive = true;
+          btnMic.className = "w-10 h-10 rounded-xl bg-rose-600 text-white flex items-center justify-center transition cursor-pointer shrink-0 animate-pulse ring-2 ring-rose-400";
+          inMsg.placeholder = currentLang === 'kn' ? "🎙️ ಆಲಿಸುತ್ತಿದೆ... ಮಾತನಾಡಿ..." : "🎙️ Listening... speak now...";
+        };
+        sttInstance.onresult = (evt) => {
+          let interim = '';
+          let final = '';
+          for (let i = evt.resultIndex; i < evt.results.length; ++i) {
+            if (evt.results[i].isFinal) final += evt.results[i][0].transcript;
+            else interim += evt.results[i][0].transcript;
+          }
+          if (interim) inMsg.value = interim;
+          if (final) {
+            inMsg.value = final;
+            executeStep7Verification(final, container);
+          }
+        };
+        sttInstance.onerror = () => resetStep7Mic();
+        sttInstance.onend = () => resetStep7Mic();
+        sttInstance.start();
+      } catch (e) {
+        resetStep7Mic();
+      }
+    };
+    function resetStep7Mic() {
+      sttActive = false;
+      if (btnMic) btnMic.className = "w-10 h-10 rounded-xl bg-slate-100 hover:bg-emerald-100 text-slate-700 hover:text-emerald-900 border border-slate-200 flex items-center justify-center transition cursor-pointer shrink-0";
+      if (inMsg) inMsg.placeholder = currentLang === 'kn' ? "ಬೆಳೆ ಅಥವಾ ಧಾರಣೆ ಬಗ್ಗೆ ಪ್ರಶ್ನಿಸಿ / ಅಪ್‌ಲೋಡ್ ಮಾಡಿ..." : "Ask to verify recommended crops or market trends...";
+    }
+  }
+
+  // Form Submit
+  const formVerify = document.getElementById("form-step7-verify");
+  if (formVerify && inMsg) {
+    formVerify.onsubmit = (e) => {
+      e.preventDefault();
+      const txt = inMsg.value.trim();
+      if (!txt && !step7UploadedBase64) return;
+      inMsg.value = "";
+      executeStep7Verification(txt || "Verify uploaded document with current recommendations", container);
+    };
+  }
+}
+
+async function executeStep7Verification(query, container) {
+  if (!query && !step7UploadedBase64) return;
+
+  step7VerificationHistory.push({
+    sender: "user",
+    text: query,
+    image_name: step7UploadedFileName
+  });
+
+  const streamEl = document.getElementById("step7-dialogue-stream");
+  if (streamEl) {
+    streamEl.innerHTML = step7VerificationHistory.map(m => `
+      <div class="flex ${m.sender === 'user' ? 'justify-end' : 'justify-start'}">
+        <div class="max-w-[85%] rounded-2xl p-3.5 ${
+          m.sender === 'user'
+            ? 'bg-emerald-700 text-white rounded-br-xs shadow-xs'
+            : 'bg-white text-slate-800 border border-slate-200/80 rounded-bl-xs shadow-xs space-y-1'
+        }">
+          <div class="flex items-center gap-2 font-bold text-[11px] ${m.sender === 'user' ? 'text-emerald-100' : 'text-emerald-800'}">
+            <i class="fa-solid ${m.sender === 'user' ? 'fa-user' : 'fa-certificate'}"></i>
+            <span>${m.sender === 'user' ? 'Farmer' : 'AI Verification Agent'}</span>
+          </div>
+          <p class="leading-relaxed whitespace-pre-wrap">${currentLang === 'kn' && m.text_kn ? m.text_kn : m.text}</p>
+          ${m.image_name ? `
+            <div class="mt-2 text-[10px] bg-slate-100 text-slate-700 px-2 py-1 rounded-lg border border-slate-200 flex items-center gap-1.5">
+              <i class="fa-solid fa-file-image text-emerald-600"></i>
+              <span>Attached Document: ${m.image_name}</span>
+            </div>
+          ` : ''}
+        </div>
+      </div>
+    `).join('') + `
+      <div id="step7-thinking" class="flex justify-start">
+        <div class="bg-white rounded-2xl p-3 border border-slate-200 text-slate-400 text-xs flex items-center gap-2">
+          <div class="w-1.5 h-1.5 bg-emerald-600 rounded-full animate-bounce"></div>
+          <div class="w-1.5 h-1.5 bg-emerald-600 rounded-full animate-bounce [animation-delay:0.2s]"></div>
+          <div class="w-1.5 h-1.5 bg-emerald-600 rounded-full animate-bounce [animation-delay:0.4s]"></div>
+          <span>Verifying agronomic viability & 30-day Mandi prices...</span>
+        </div>
+      </div>
+    `;
+    streamEl.scrollTop = streamEl.scrollHeight;
+  }
+
+  try {
+    const payload = {
+      message: query,
+      crops: step7PriceData ? step7PriceData.crops : [],
+      context: {
+        district: farmContext.district || "Bengaluru",
+        land_acres: farmContext.land_acres || 3.0,
+        budget: farmContext.budget_inr || 65000,
+        soil_n: farmContext.soil_n,
+        soil_p: farmContext.soil_p,
+        soil_k: farmContext.soil_k
+      },
+      lang: currentLang,
+      image_base64: step7UploadedBase64
+    };
+
+    const res = await fetch("/api/verify/agent", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify(payload)
+    });
+
+    const thinkingEl = document.getElementById("step7-thinking");
+    if (thinkingEl) thinkingEl.remove();
+
+    if (res.ok) {
+      const data = await res.json();
+      step7VerificationHistory.push({
+        sender: "agent",
+        text: data.reply,
+        text_kn: data.reply,
+        model_name: data.model_name,
+        is_connected: data.is_connected
+      });
+
+      // Clear upload after successful submission
+      step7UploadedBase64 = null;
+      step7UploadedFileName = null;
+      const previewUpload = document.getElementById("step7-upload-preview");
+      if (previewUpload) previewUpload.classList.add("hidden");
+
+      if (streamEl) {
+        streamEl.innerHTML = step7VerificationHistory.map(m => `
+          <div class="flex ${m.sender === 'user' ? 'justify-end' : 'justify-start'}">
+            <div class="max-w-[85%] rounded-2xl p-3.5 ${
+              m.sender === 'user'
+                ? 'bg-emerald-700 text-white rounded-br-xs shadow-xs'
+                : 'bg-white text-slate-800 border border-slate-200/80 rounded-bl-xs shadow-xs space-y-1'
+            }">
+              <div class="flex items-center gap-2 font-bold text-[11px] ${m.sender === 'user' ? 'text-emerald-100' : 'text-emerald-800'}">
+                <i class="fa-solid ${m.sender === 'user' ? 'fa-user' : 'fa-certificate'}"></i>
+                <span>${m.sender === 'user' ? 'Farmer' : (m.model_name || 'AI Verification Agent')}</span>
+                ${m.is_connected ? '<span class="text-[9px] px-1.5 py-0.2 bg-emerald-100 text-emerald-700 rounded-full font-semibold">Live Cloud</span>' : ''}
+              </div>
+              <p class="leading-relaxed whitespace-pre-wrap">${currentLang === 'kn' && m.text_kn ? m.text_kn : m.text}</p>
+              ${m.image_name ? `
+                <div class="mt-2 text-[10px] bg-slate-100 text-slate-700 px-2 py-1 rounded-lg border border-slate-200 flex items-center gap-1.5">
+                  <i class="fa-solid fa-file-image text-emerald-600"></i>
+                  <span>Attached Document: ${m.image_name}</span>
+                </div>
+              ` : ''}
+            </div>
+          </div>
+        `).join('');
+        streamEl.scrollTop = streamEl.scrollHeight;
+      }
+
+      // Voice Readout if not muted
+      if (!step7VoiceMuted && ('speechSynthesis' in window)) {
+        try {
+          window.speechSynthesis.cancel();
+          const cleanSpeech = data.reply.replace(/[*_#`~]/g, '').replace(/\b(?:https?|ftp):\/\/\S+/gi, '');
+          const utter = new SpeechSynthesisUtterance(cleanSpeech);
+          utter.lang = currentLang === 'kn' ? 'kn-IN' : (currentLang === 'hi' ? 'hi-IN' : 'en-IN');
+          utter.rate = 1.0;
+          window.speechSynthesis.speak(utter);
+        } catch (e) {}
+      }
+    }
+  } catch (err) {
+    const thinkingEl = document.getElementById("step7-thinking");
+    if (thinkingEl) thinkingEl.remove();
+    step7VerificationHistory.push({
+      sender: "agent",
+      text: "Connection error verifying with AI agent. Please check network.",
+      text_kn: "ನೆಟ್‌ವರ್ಕ್ ದೋಷ: ಪರಿಶೀಲನಾ ಸಹಾಯಕ ಸಂಪರ್ಕ ಸಾಧಿಸಲು ಸಾಧ್ಯವಾಗಲಿಲ್ಲ."
+    });
+  }
 }
 
 async function downloadAdvisoryPdf() {
@@ -4188,6 +4892,11 @@ function bindResultsStepListeners() {
       }
     };
   }
+
+  const btnGoStep7 = document.getElementById("btn-goto-step-7");
+  if (btnGoStep7) {
+    btnGoStep7.onclick = () => navigateToStep(7);
+  }
 }
 
 function renderMandiChart(prices) {
@@ -4242,7 +4951,7 @@ export function navigateToStep(step) {
     }
   });
 
-  for (let i = 1; i <= 6; i++) {
+  for (let i = 1; i <= 7; i++) {
     const p = document.getElementById(`panel-step-${i}`);
     if (p) {
       if (i === currentStep) {
@@ -4260,7 +4969,7 @@ export function navigateToStep(step) {
     else prevBtn.classList.add("hidden");
   }
   if (nextBtn) {
-    if (currentStep === 6) nextBtn.classList.add("hidden");
+    if (currentStep === 7) nextBtn.classList.add("hidden");
     else nextBtn.classList.remove("hidden");
   }
 
@@ -4277,6 +4986,7 @@ function renderCurrentStepView() {
   else if (currentStep === 4) renderFarmStepView(container);
   else if (currentStep === 5) renderRotationStepView(container);
   else if (currentStep === 6) renderResultsStepView(container);
+  else if (currentStep === 7) renderStep7MarketVerificationView(container);
 }
 
 function bindShellListeners() {
@@ -4292,7 +5002,7 @@ function bindShellListeners() {
   const btnPrev = document.getElementById("btn-step-prev");
   const btnNext = document.getElementById("btn-step-next");
   if (btnPrev) btnPrev.onclick = () => { if (currentStep > 1) navigateToStep(currentStep - 1); };
-  if (btnNext) btnNext.onclick = () => { if (currentStep < 6) navigateToStep(currentStep + 1); };
+  if (btnNext) btnNext.onclick = () => { if (currentStep < 7) navigateToStep(currentStep + 1); };
 
   // Language buttons (EN, KN, HI)
   const lEn = document.getElementById("lang-en");

@@ -60,6 +60,11 @@ flowchart LR
    - **Crop Calendar**: Complete lifecycle roadmap per crop with Sowing window, 3-stage Fertilizer schedule, Smart Irrigation schedule, Harvest date, and next-season rotation suggestion.
    - **APMC Mandi Price Trends & Forecast**: Nearest mandi 30-day modal price trend chart and simple 30-day modal forecast with expected price ranges.
    - **Download PDF Report Button**: Exports a formatted, printable farm advisory PDF containing all results.
+7. **Step 7: 30-Day Market Price History & AI Verification Agent**:
+   - **Factual 30-Day Price Trajectory**: Compares market prices exactly 1 month ago vs. current day prices across Karnataka APMC Mandi hubs with ₹ diff, % change, and revenue projection on farmer's acreage.
+   - **Interactive 30-Day Price Trendline**: Daily modal price curve powered by Chart.js.
+   - **Multi-Modal AI Verification Agent**: Verify crop recommendations and prices via text, Web Speech voice input/output, or field document/photo upload.
+   - **Dual Engine Architecture**: Connects live to Google Gemini (`GEMINI_API_KEY`) or OpenAI ChatGPT (`OPENAI_API_KEY`) when configured in `.env`, with automatic fallback to high-precision Local Agronomic Intelligence Engine.
 
 ---
 
@@ -95,11 +100,23 @@ flowchart LR
 - **Persistent Location Caching**: Historical queries cached in SQLite (`data/cache.db`) with 3ms instant retrieval.
 - **Engine Feedback**: Long-term rainfall and temperature baselines are factored directly into crop suitability scoring (`hist_5yr_rain`, `hist_5yr_temp`).
 
-### 2. Slow-Motion Video Background on Login
-- **Cinematic Looping Video**: Full-screen 720p HD video of a farmer walking through a field, playing in slow motion (`video.playbackRate = 0.5`, muted, autoplay, loop, playsinline).
-- **Lightweight Asset**: Stored locally in `/static/videos/farmer_field.mp4` and `/static/videos/farmer_field.webm` (4.88 MB, strictly under the 8 MB constraint).
-- **Video Credit & Attribution**: Video footage courtesy of [Mixkit](https://mixkit.co/) (Mixkit Item #41551: *"Farmer walking along wheat field in agricultural farm"*), royalty-free for personal and commercial usage.
-- **Accessibility & Resiliency**: Dark gradient overlay for WCAG-compliant form contrast, high-res poster fallback (`farmer_poster.jpg`), and automatic static fallback when `prefers-reduced-motion` is enabled or data-saver/slow networks are detected (`navigator.connection.saveData` or 2G/3G).
+### 2. Full-Screen Looping Video Background Across All Pages
+- **Shared Component (`templates/partials/background.html`)**: Included across the Login page, Main Dashboard (Steps 1–7), History modal, Leaf Scanner, and Public Share page without code duplication.
+- **YouTube IFrame Player API Integration**:
+  - Video ID: `85kTHwJ1Ju8` (*"Video Banner Stock Videos - Rural, Farming, Agriculture, Nature"* by Engagement Hub).
+  - Parameters: `autoplay=1, mute=1, loop=1 with playlist=85kTHwJ1Ju8, controls=0, modestbranding=1, rel=0, playsinline=1, disablekb=1`.
+  - Slow-Motion: `player.setPlaybackRate(0.5)`.
+  - Full-Screen Coverage: Scaled without black bars (`position: fixed, inset: 0, z-index: -1, pointer-events: none, width: 177.78vh, height: 56.25vw, min-width: 100vw, min-height: 100vh`).
+- **Session Continuity**: Video playback position is automatically tracked in `sessionStorage` (`fdd_bg_video_time`) and resumed with `player.seekTo()` across separate page routes.
+- **Readability & Glassmorphism**: Dark gradient overlay (`rgba(0,0,0,0.45)`) paired with glassmorphic cards (`background: rgba(255, 255, 255, 0.92); backdrop-filter: blur(12px)`) ensuring forms, charts, and tables stay readable on every screen.
+- **Fallbacks & Resiliency**:
+  - High-res poster fallback (`static/img/bg-poster.jpg`) while loading or if embedding is blocked.
+  - Reduced motion (`prefers-reduced-motion`) and mobile data saver (`saveData` / 2G) detection: shows only the static poster image.
+  - Page Visibility API (`visibilitychange`): Automatically pauses video when tab is hidden, resumes when active.
+  - Automatic licensed HTML5 fallback video (`farmer_field.mp4` / `farmer_field.webm`) if YouTube API throws error 101/150.
+- **Footer Controls & Attribution**:
+  - Small "Pause background" / "Play background" toggle in the footer, remembered in `localStorage` (`fdd_bg_paused`).
+  - Credit line: *"Background video: Video Banner Stock Videos - Rural, Farming, Agriculture, Nature by Engagement Hub (YouTube: 85kTHwJ1Ju8)"*.
 
 ### 3. Google History-Style Search Records (`#modal-history`)
 - **Persistent Storage**: Every recommendation run is saved to SQLite (`data/farmer_history.db`) tied to the logged-in user or guest session with full input parameters, ranked crop results, and profit projections.
@@ -135,6 +152,18 @@ flowchart LR
   - *"Share my result"* -> Opens the public advisory sharing card.
 - **Backend LLM API with Robust Fallback (`POST /api/assistant`)**: Connects to Gemini or OpenAI when API keys are configured in `.env`, with an intelligent agronomic rule-based engine when unconfigured.
 - **Strict Guardrails & Uncertainty Protocol**: When queries are outside agriculture or uncertain, strictly responds: *"I'm not sure, please consult your local agriculture officer or Krishi Vigyan Kendra (KVK)."*
+
+### 6. Step 7: 30-Day Market Prices & AI Verification Agent
+- **30-Day Market Price History (1 Month Ago vs Current Day)**:
+  - Compares the exact Mandi prices for all recommended crops: Current Day modal price vs 1-Month-Ago (30 days ago) price (`POST /api/prices/compare-30d`).
+  - Metric cards display absolute difference (`₹/qtl`), percentage growth/decline (`%`), 30-day volatility rating (Low / Moderate / High), and projected harvest revenue comparison on the farmer's acreage.
+  - Interactive multi-line Chart.js trajectory graph rendering day-by-day prices for each recommended crop.
+- **AI Agronomic Verification Agent (Google Gemini & ChatGPT Connected)**:
+  - **Multi-Modal Interaction**:
+    - **Text Chat**: Farmer can type questions or click quick verification chips (`"Verify 1-month price trend & best selling time"`, `"Verify soil NPK suitability for top crop"`).
+    - **Voice Verification**: Web Speech API speech-to-text (`SpeechRecognition`) in English and Kannada with live listening pulse animation, plus spoken audio responses via `speechSynthesis` with an audio mute toggle (🔊 / 🔇).
+    - **Document & Photo Upload**: Upload Soil Health Card, Field Photo, Crop/Leaf Photo, or Mandi Receipt (`#input-step7-upload`) to receive a certified AI verification assessment.
+  - **Backend Multi-Modal Endpoint (`POST /api/verify/agent`)**: Connects to Google Gemini 1.5/2.0 API or OpenAI GPT-4o when `.env` keys are configured, falling back to local deep-learning diagnostics (PlantVillage YOLOv11 leaf classifier and MobileNetV2 soil classifier).
 
 ---
 

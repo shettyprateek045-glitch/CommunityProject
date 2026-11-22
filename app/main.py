@@ -16,6 +16,7 @@ from fastapi import FastAPI, Request, Depends
 from fastapi.responses import HTMLResponse, FileResponse, RedirectResponse
 from fastapi.staticfiles import StaticFiles
 from fastapi.middleware.cors import CORSMiddleware
+from fastapi.templating import Jinja2Templates
 
 from app.config import settings
 from app.models.loaders import preload_all_models
@@ -62,8 +63,10 @@ app.include_router(auth.router)
 app.include_router(chat.router)
 app.include_router(report.router)
 
+templates = Jinja2Templates(directory="templates")
+
 @app.get("/", response_class=HTMLResponse)
-async def serve_index(user: Optional[User] = Depends(get_current_user_optional)):
+async def serve_index(request: Request, user: Optional[User] = Depends(get_current_user_optional)):
     """
     Serves the primary Farmer Decision Dashboard.
     Redirects unauthenticated visitors to /login.
@@ -71,13 +74,10 @@ async def serve_index(user: Optional[User] = Depends(get_current_user_optional))
     if user is None:
         return RedirectResponse(url="/login?next=/", status_code=303)
 
-    index_path = os.path.join("templates", "index.html")
-    if os.path.exists(index_path):
-        return FileResponse(index_path)
-    return HTMLResponse("<h1>Farmer Decision Dashboard</h1><div id='app'></div>")
+    return templates.TemplateResponse(request=request, name="index.html", context={"user": user})
 
 @app.get("/login", response_class=HTMLResponse)
-async def serve_login(next: str = "/", user: Optional[User] = Depends(get_current_user_optional)):
+async def serve_login(request: Request, next: str = "/", user: Optional[User] = Depends(get_current_user_optional)):
     """
     Serves the Login & Registration page.
     If already authenticated, redirects back to the dashboard or destination.
@@ -86,20 +86,14 @@ async def serve_login(next: str = "/", user: Optional[User] = Depends(get_curren
         target = next if (next and next.startswith("/") and not next.startswith("//")) else "/"
         return RedirectResponse(url=target, status_code=303)
 
-    login_path = os.path.join("templates", "login.html")
-    if os.path.exists(login_path):
-        return FileResponse(login_path)
-    return HTMLResponse("<h1>Sign In</h1>")
+    return templates.TemplateResponse(request=request, name="login.html")
 
 @app.get("/share/{token}", response_class=HTMLResponse)
-async def serve_share_page(token: str):
+async def serve_share_page(request: Request, token: str):
     """
     Serves the public, read-only crop advisory view without requiring user login.
     """
-    share_path = os.path.join("templates", "share.html")
-    if os.path.exists(share_path):
-        return FileResponse(share_path)
-    return HTMLResponse("<h1>Shared Crop Advisory</h1>")
+    return templates.TemplateResponse(request=request, name="share.html", context={"token": token})
 
 
 @app.get("/logout")

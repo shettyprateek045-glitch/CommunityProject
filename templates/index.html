@@ -74,7 +74,21 @@
     }
   </style>
 </head>
-<body class="bg-earth-50 text-slate-800 min-h-screen font-sans flex flex-col antialiased">
+<body class="bg-transparent text-slate-800 min-h-screen font-sans flex flex-col antialiased relative">
+  <!-- Persistent Looping Background Video (YouTube 85kTHwJ1Ju8 with HTML5 Fallback) -->
+  <div id="persistent-bg-container" class="fixed inset-0 w-full h-full overflow-hidden pointer-events-none -z-10" style="background-color: #0b150c;">
+    <div id="bg-poster-fallback" class="absolute inset-0 w-full h-full bg-cover bg-center transition-opacity duration-700" style="background-image: url('/static/img/bg-poster.jpg'); opacity: 1;"></div>
+    <div id="yt-bg-wrapper" class="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 pointer-events-none transition-opacity duration-1000 opacity-0 overflow-hidden" style="width: 177.78vh; height: 56.25vw; min-width: 100vw; min-height: 100vh;">
+      <div id="yt-bg-player" class="w-full h-full pointer-events-none"></div>
+    </div>
+    <video id="html5-bg-fallback-video" autoplay muted loop playsinline poster="/static/img/bg-poster.jpg" class="hidden absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 min-w-full min-h-full w-auto h-auto object-cover transition-opacity duration-1000 opacity-0 pointer-events-none">
+      <source src="/static/videos/farmer_field.mp4" type="video/mp4">
+      <source src="/static/videos/farmer_field.webm" type="video/webm">
+    </video>
+    <div id="bg-gradient-overlay" class="absolute inset-0 bg-gradient-to-b from-black/55 via-black/45 to-black/60 backdrop-blur-[1px]"></div>
+  </div>
+  <script src="/static/js/bg-video.js"></script>
+
   <!-- Dynamic Mount Point for Pure TypeScript Application with Zero-CLS Skeleton Shell -->
   <div id="app">
     <!-- Inline Skeleton Header: Renders in 0ms before JS runs to eliminate CLS and boost FDS -->

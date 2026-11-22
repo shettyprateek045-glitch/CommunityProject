@@ -45,25 +45,21 @@
     }
   </style>
 </head>
-<body class="bg-slate-950 text-slate-800 min-h-screen flex flex-col items-center justify-center p-4 antialiased relative overflow-x-hidden">
+<body class="bg-transparent text-slate-800 min-h-screen flex flex-col items-center justify-between p-4 antialiased relative overflow-x-hidden">
 
-  <!-- Full-Screen Looping Background Video with Poster Fallback -->
-  <div class="fixed inset-0 w-full h-full overflow-hidden pointer-events-none -z-10 video-bg-container">
-    <video
-      id="bg-video"
-      autoplay
-      muted
-      loop
-      playsinline
-      poster="/static/videos/farmer_poster.jpg"
-      class="w-full h-full object-cover object-center transition-opacity duration-1000 opacity-0"
-    >
+  <!-- Persistent Looping Background Video (YouTube 85kTHwJ1Ju8 with HTML5 Fallback) -->
+  <div id="persistent-bg-container" class="fixed inset-0 w-full h-full overflow-hidden pointer-events-none -z-10" style="background-color: #0b150c;">
+    <div id="bg-poster-fallback" class="absolute inset-0 w-full h-full bg-cover bg-center transition-opacity duration-700" style="background-image: url('/static/img/bg-poster.jpg'); opacity: 1;"></div>
+    <div id="yt-bg-wrapper" class="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 pointer-events-none transition-opacity duration-1000 opacity-0 overflow-hidden" style="width: 177.78vh; height: 56.25vw; min-width: 100vw; min-height: 100vh;">
+      <div id="yt-bg-player" class="w-full h-full pointer-events-none"></div>
+    </div>
+    <video id="html5-bg-fallback-video" autoplay muted loop playsinline poster="/static/img/bg-poster.jpg" class="hidden absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 min-w-full min-h-full w-auto h-auto object-cover transition-opacity duration-1000 opacity-0 pointer-events-none">
       <source src="/static/videos/farmer_field.mp4" type="video/mp4">
       <source src="/static/videos/farmer_field.webm" type="video/webm">
     </video>
-    <!-- Dark Gradient Overlay for Maximum Legibility -->
-    <div class="absolute inset-0 bg-gradient-to-t from-black/85 via-black/60 to-black/75 backdrop-blur-[2px]"></div>
+    <div id="bg-gradient-overlay" class="absolute inset-0 bg-gradient-to-b from-black/55 via-black/45 to-black/60 backdrop-blur-[1px]"></div>
   </div>
+  <script src="/static/js/bg-video.js"></script>
 
   <div class="w-full max-w-md bg-white/95 backdrop-blur-md rounded-3xl shadow-2xl border border-white/30 overflow-hidden relative z-10 my-6">
     
@@ -404,25 +400,17 @@ GOOGLE_CLIENT_SECRET=your-client-secret</pre>
         showError(err.message);
       }
     };
-
-    // Video slow motion playback and progressive load
-    const bgVideo = document.getElementById('bg-video');
-    if (bgVideo) {
-      const isSlowNetwork = (navigator.connection && (navigator.connection.saveData || navigator.connection.effectiveType === '2g' || navigator.connection.effectiveType === '3g'));
-      const prefersReducedMotion = window.matchMedia && window.matchMedia('(prefers-reduced-motion: reduce)').matches;
-
-      if (isSlowNetwork || prefersReducedMotion) {
-        bgVideo.remove();
-      } else {
-        bgVideo.playbackRate = 0.5;
-        const reveal = () => {
-          bgVideo.classList.remove('opacity-0');
-          bgVideo.classList.add('opacity-100');
-        };
-        if (bgVideo.readyState >= 2) reveal();
-        else bgVideo.addEventListener('loadeddata', reveal);
-      }
-    }
   </script>
+
+  <!-- Login Footer -->
+  <footer class="w-full max-w-2xl py-3 px-4 mt-auto text-center text-xs text-white/80 flex flex-col sm:flex-row items-center justify-between gap-2 relative z-10 bg-black/40 backdrop-blur-sm rounded-2xl border border-white/20">
+    <div class="flex items-center gap-2 text-slate-200">
+      <i class="fa-solid fa-seedling text-emerald-400"></i>
+      <span class="font-semibold">Farmer Decision Dashboard</span>
+    </div>
+    <div class="text-[11px] text-white/70">
+      Precision Agronomy & Market Intelligence
+    </div>
+  </footer>
 </body>
 </html>

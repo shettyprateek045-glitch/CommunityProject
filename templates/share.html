@@ -8,7 +8,20 @@
   <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.1/css/all.min.css" />
   <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.1/dist/chart.umd.min.js"></script>
 </head>
-<body class="bg-slate-50 text-slate-800 min-h-screen antialiased flex flex-col justify-between">
+<body class="bg-transparent text-slate-800 min-h-screen antialiased flex flex-col justify-between relative">
+  <!-- Persistent Looping Background Video (YouTube 85kTHwJ1Ju8 with HTML5 Fallback) -->
+  <div id="persistent-bg-container" class="fixed inset-0 w-full h-full overflow-hidden pointer-events-none -z-10" style="background-color: #0b150c;">
+    <div id="bg-poster-fallback" class="absolute inset-0 w-full h-full bg-cover bg-center transition-opacity duration-700" style="background-image: url('/static/img/bg-poster.jpg'); opacity: 1;"></div>
+    <div id="yt-bg-wrapper" class="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 pointer-events-none transition-opacity duration-1000 opacity-0 overflow-hidden" style="width: 177.78vh; height: 56.25vw; min-width: 100vw; min-height: 100vh;">
+      <div id="yt-bg-player" class="w-full h-full pointer-events-none"></div>
+    </div>
+    <video id="html5-bg-fallback-video" autoplay muted loop playsinline poster="/static/img/bg-poster.jpg" class="hidden absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 min-w-full min-h-full w-auto h-auto object-cover transition-opacity duration-1000 opacity-0 pointer-events-none">
+      <source src="/static/videos/farmer_field.mp4" type="video/mp4">
+      <source src="/static/videos/farmer_field.webm" type="video/webm">
+    </video>
+    <div id="bg-gradient-overlay" class="absolute inset-0 bg-gradient-to-b from-black/55 via-black/45 to-black/60 backdrop-blur-[1px]"></div>
+  </div>
+  <script src="/static/js/bg-video.js"></script>
 
   <!-- Header -->
   <header class="bg-[#1b5e20] text-white py-4 px-6 shadow-md">
@@ -227,5 +240,18 @@
 
     loadShareData();
   </script>
+
+  <!-- Share Public Footer -->
+  <footer class="w-full py-4 px-6 text-center text-xs text-white/90 border-t border-white/20 bg-black/40 backdrop-blur-md flex flex-col sm:flex-row items-center justify-between gap-3 relative z-10">
+    <div class="flex items-center gap-2">
+      <i class="fa-solid fa-leaf text-emerald-400"></i>
+      <span class="font-bold">Farmer Decision Dashboard</span>
+      <span class="text-white/40">•</span>
+      <span>Public Agronomic Advisory Record</span>
+    </div>
+    <div class="text-[11px] text-white/70">
+      <span>AI Precision Agriculture Platform</span>
+    </div>
+  </footer>
 </body>
 </html>

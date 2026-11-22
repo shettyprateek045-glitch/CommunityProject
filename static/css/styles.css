@@ -64,3 +64,30 @@ body {
   margin-top: 1rem;
   background: #f56565; /* red‑500 */
 }
+
+/* Glassmorphism System for Maximum Readability over Video Background */
+body {
+  background-color: transparent !important;
+}
+
+.glass-card,
+.step-panel > div {
+  background: rgba(255, 255, 255, 0.92) !important;
+  backdrop-filter: blur(12px) !important;
+  -webkit-backdrop-filter: blur(12px) !important;
+  border: 1px solid rgba(255, 255, 255, 0.6) !important;
+  border-radius: 1.5rem !important;
+}
+
+/* High-Contrast Modals, Panels & Drawers */
+#modal-history > div,
+#modal-share > div,
+#modal-schemes > div,
+#modal-leaf-scanner > div,
+#panel-krishi-chat {
+  background: rgba(255, 255, 255, 0.97) !important;
+  backdrop-filter: blur(16px) !important;
+  -webkit-backdrop-filter: blur(16px) !important;
+  box-shadow: 0 25px 50px -12px rgba(0, 0, 0, 0.5) !important;
+  border: 1px solid rgba(255, 255, 255, 0.8) !important;
+}

@@ -1,15 +1,15 @@
-from pydantic import BaseModel, EmailStr, Field
+from pydantic import BaseModel, Field
 from typing import Optional
 
 class RegisterRequest(BaseModel):
     phone: Optional[str] = Field(None, min_length=10, max_length=15, description="User phone (optional)")
-    email: EmailStr = Field(..., description="User Gmail address")
+    email: str = Field(..., description="User email address")
     password: str = Field(..., min_length=6)
     name: Optional[str] = None
     language: Optional[str] = "en"
 
 class LoginRequest(BaseModel):
-    email: EmailStr = Field(..., description="User email for login")
+    email: str = Field(..., description="User email for login")
     password: str = Field(..., min_length=6)
 
 class TokenResponse(BaseModel):
