@@ -3943,15 +3943,15 @@ let step7LLMStatus = {
   connected: false,
   provider: "local_engine",
   provider_name: "Local Agronomic Verification Engine",
-  message: "Local mode. Set GEMINI_API_KEY or OPENAI_API_KEY in .env for live cloud LLM."
+  message: ""
 };
 
 let step7VerificationHistory = [
   {
     sender: "agent",
-    text: "Namaskara! I am your AI Agronomic & Market Verification Agent running on the Local Agronomic Intelligence Engine. Ask me to verify recommended crops, analyze 30-day Mandi market price trends, or upload a photo of your field/soil card. (To connect me live to Google Gemini or OpenAI ChatGPT, simply add GEMINI_API_KEY or OPENAI_API_KEY to your .env file!)",
-    text_kn: "ನಮಸ್ಕಾರ! ನಾನು ನಿಮ್ಮ AI ಕೃಷಿ ಮತ್ತು ಮಾರುಕಟ್ಟೆ ಪರಿಶೀಲನಾ ಸಹಾಯಕ. ಶಿಫಾರಸು ಮಾಡಿದ ಬೆಳೆಗಳ ಸೂಕ್ತತೆ, 30 ದಿನಗಳ ಮಾರುಕಟ್ಟೆ ಧಾರಣೆ ಮತ್ತು ನೀವು ಅಪ್‌ಲೋಡ್ ಮಾಡುವ ಮಣ್ಣಿನ ಕಾರ್ಡ್/ಫೋಟೋವನ್ನು ಪರಿಶೀಲಿಸುತ್ತೇನೆ. (ಲೈವ್ Google Gemini ಅಥವಾ ChatGPT ಗೆ ಸಂಪರ್ಕಿಸಲು .env ನಲ್ಲಿ API ಕೀ ಸೇರಿಸಿ!)",
-    model_name: "Local Agronomic Engine",
+    text: "Namaskara! I am your AI Agronomic & Market Verification Agent. Ask me to verify recommended crops, analyze 30-day Mandi market price trends, or upload a photo of your field, soil card, or crop leaf.",
+    text_kn: "ನಮಸ್ಕಾರ! ನಾನು ನಿಮ್ಮ AI ಕೃಷಿ ಮತ್ತು ಮಾರುಕಟ್ಟೆ ಪರಿಶೀಲನಾ ಸಹಾಯಕ. ಶಿಫಾರಸು ಮಾಡಿದ ಬೆಳೆಗಳ ಸೂಕ್ತತೆ, 30 ದಿನಗಳ ಮಾರುಕಟ್ಟೆ ಧಾರಣೆ ಮತ್ತು ನೀವು ಅಪ್‌ಲೋಡ್ ಮಾಡುವ ಮಣ್ಣಿನ ಕಾರ್ಡ್/ಫೋಟೋವನ್ನು ಪರಿಶೀಲಿಸುತ್ತೇನೆ.",
+    model_name: "AI Verification Agent",
     is_connected: false
   }
 ];
@@ -3975,9 +3975,10 @@ async function fetchStep7LLMStatus() {
         if (step7LLMStatus.connected) {
           badge.className = "px-2.5 py-0.5 rounded-full text-[10px] font-bold bg-emerald-100 text-emerald-800 border border-emerald-300 flex items-center gap-1.5";
           badge.innerHTML = `<span class="w-2 h-2 rounded-full bg-emerald-500 animate-pulse"></span><span>Live Connected: ${step7LLMStatus.provider_name}</span>`;
+          badge.classList.remove("hidden");
         } else {
-          badge.className = "px-2.5 py-0.5 rounded-full text-[10px] font-bold bg-amber-100 text-amber-900 border border-amber-300 flex items-center gap-1.5";
-          badge.innerHTML = `<span class="w-2 h-2 rounded-full bg-amber-500"></span><span>Local Agronomic Engine (Set Key in .env)</span>`;
+          badge.className = "hidden";
+          badge.innerHTML = "";
         }
       }
     }
@@ -4150,11 +4151,9 @@ async function renderStep7MarketVerificationView(container) {
                 <h3 class="text-base sm:text-lg font-extrabold text-slate-900">
                   ${currentLang === 'kn' ? 'AI ಬೆಳೆ ಮತ್ತು ಮಾರುಕಟ್ಟೆ ಪರಿಶೀಲನಾ ಸಹಾಯಕ' : 'AI Crop & Market Verification Agent'}
                 </h3>
-                <span id="step7-llm-status-badge" class="px-2.5 py-0.5 rounded-full text-[10px] font-bold ${
-                  step7LLMStatus.connected ? 'bg-emerald-100 text-emerald-800 border border-emerald-300' : 'bg-amber-100 text-amber-900 border border-amber-300'
-                } flex items-center gap-1.5" title="${step7LLMStatus.message}">
-                  <span class="w-2 h-2 rounded-full ${step7LLMStatus.connected ? 'bg-emerald-500 animate-pulse' : 'bg-amber-500'}"></span>
-                  <span>${step7LLMStatus.connected ? 'Live Connected: ' + step7LLMStatus.provider_name : 'Local Agronomic Engine (Set Key in .env)'}</span>
+                <span id="step7-llm-status-badge" class="${step7LLMStatus.connected ? 'px-2.5 py-0.5 rounded-full text-[10px] font-bold bg-emerald-100 text-emerald-800 border border-emerald-300 flex items-center gap-1.5' : 'hidden'}">
+                  <span class="w-2 h-2 rounded-full bg-emerald-500 animate-pulse"></span>
+                  <span>Live Connected: ${step7LLMStatus.provider_name}</span>
                 </span>
               </div>
               <p class="text-xs text-slate-500">Multi-Modal Agronomy Verification • Text, Speech & Document/Photo Upload</p>

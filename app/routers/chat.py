@@ -468,14 +468,14 @@ Answer in {'Kannada' if is_kn else 'English'}. Keep your answer concise (under 9
     else:
         if is_kn:
             if p_diff >= 0:
-                reply_txt = f"ಪರಿಶೀಲನೆ ಯಶಸ್ವಿಯಾಗಿದೆ: {top_name} ಬೆಳೆಗೆ ನಿಮ್ಮ ಜಮೀನಿನ ಮಣ್ಣು ಮತ್ತು ಹವಾಮಾನ ಸೂಕ್ತವಾಗಿದೆ. ಪ್ರಸ್ತುತ ಮಾರುಕಟ್ಟೆ ಬೆಲೆ ₹{cur_p:,.0f}/ಕ್ವಿಂಟಾಲ್ ಆಗಿದ್ದು, 1 ತಿಂಗಳ ಹಿಂದಿನ ಬೆಲೆಗಿಂತ (₹{prev_p:,.0f}) +{p_pct}% ಹೆಚ್ಚಳ ಕಂಡಿದೆ. {image_verdict_note} ಬೆಳೆ ಬೆಳೆಯಲು ಇದು ಉತ್ತಮ ಕಾಲ.\n(ಮೂಲ: ಸ್ಥಳೀಯ ಕೃಷಿ ಪರಿಶೀಲನಾ ಎಂಜಿನ್)"
+                reply_txt = f"ಪರಿಶೀಲನೆ ಯಶಸ್ವಿಯಾಗಿದೆ: {top_name} ಬೆಳೆಗೆ ನಿಮ್ಮ ಜಮೀನಿನ ಮಣ್ಣು ಮತ್ತು ಹವಾಮಾನ ಸೂಕ್ತವಾಗಿದೆ. ಪ್ರಸ್ತುತ ಮಾರುಕಟ್ಟೆ ಬೆಲೆ ₹{cur_p:,.0f}/ಕ್ವಿಂಟಾಲ್ ಆಗಿದ್ದು, 1 ತಿಂಗಳ ಹಿಂದಿನ ಬೆಲೆಗಿಂತ (₹{prev_p:,.0f}) +{p_pct}% ಹೆಚ್ಚಳ ಕಂಡಿದೆ. {image_verdict_note} ಬೆಳೆ ಬೆಳೆಯಲು ಇದು ಉತ್ತಮ ಕಾಲ."
             else:
-                reply_txt = f"ಪರಿಶೀಲನೆ ಪೂರ್ಣಗೊಂಡಿದೆ: {top_name} ಬೆಳೆಯು ನಿಮ್ಮ ಜಮೀನಿಗೆ ಕೃಷಿ ದೃಷ್ಟಿಯಿಂದ ಸೂಕ್ತವಾಗಿದೆ. ಪ್ರಸ್ತುತ ಧಾರಣೆ ₹{cur_p:,.0f}/ಕ್ವಿಂಟಾಲ್ ಆಗಿದ್ದು, ಕಳೆದ ತಿಂಗಳಿಗಿಂತ {p_pct}% ಕುಸಿತ ಕಂಡಿದೆ. {image_verdict_note} ಕೊಯ್ಲಿನ ನಂತರ ಇ-ಎನ್‌ಡಬ್ಲ್ಯೂಆರ್ ಗೋದಾಮು ರಶೀದಿ ಬಳಸಿ ಧಾರಣೆ ಹೆಚ್ಚಿದಾಗ ಮಾರಾಟ ಮಾಡುವುದು ಸೂಕ್ತ.\n(ಮೂಲ: ಸ್ಥಳೀಯ ಕೃಷಿ ಪರಿಶೀಲನಾ ಎಂಜಿನ್)"
+                reply_txt = f"ಪರಿಶೀಲನೆ ಪೂರ್ಣಗೊಂಡಿದೆ: {top_name} ಬೆಳೆಯು ನಿಮ್ಮ ಜಮೀನಿಗೆ ಕೃಷಿ ದೃಷ್ಟಿಯಿಂದ ಸೂಕ್ತವಾಗಿದೆ. ಪ್ರಸ್ತುತ ಧಾರಣೆ ₹{cur_p:,.0f}/ಕ್ವಿಂಟಾಲ್ ಆಗಿದ್ದು, ಕಳೆದ ತಿಂಗಳಿಗಿಂತ {p_pct}% ಕುಸಿತ ಕಂಡಿದೆ. {image_verdict_note} ಕೊಯ್ಲಿನ ನಂತರ ಇ-ಎನ್‌ಡಬ್ಲ್ಯೂಆರ್ ಗೋದಾಮು ರಶೀದಿ ಬಳಸಿ ಧಾರಣೆ ಹೆಚ್ಚಿದಾಗ ಮಾರಾಟ ಮಾಡುವುದು ಸೂಕ್ತ."
         else:
             if p_diff >= 0:
-                reply_txt = f"Verification Confirmed: {top_name} shows high agronomic suitability for your plot. Current Mandi price of ₹{cur_p:,.0f}/qtl is ₹{p_diff:,.0f} (+{p_pct}%) higher than 1 month ago (₹{prev_p:,.0f}/qtl). {image_verdict_note} Planting this cycle is projected to maximize returns.\n(Source: Local Agronomic Verification Engine)"
+                reply_txt = f"Verification Confirmed: {top_name} shows high agronomic suitability for your plot. Current Mandi price of ₹{cur_p:,.0f}/qtl is ₹{p_diff:,.0f} (+{p_pct}%) higher than 1 month ago (₹{prev_p:,.0f}/qtl). {image_verdict_note} Planting this cycle is projected to maximize returns."
             else:
-                reply_txt = f"Verification Advisory: {top_name} matches your soil and climate metrics. Current modal price ₹{cur_p:,.0f}/qtl is {p_pct}% lower than 1 month ago (₹{prev_p:,.0f}/qtl). {image_verdict_note} We recommend staggered harvesting or utilizing e-NWR warehouse pledge financing if market supply peaks.\n(Source: Local Agronomic Verification Engine)"
+                reply_txt = f"Verification Advisory: {top_name} matches your soil and climate metrics. Current modal price ₹{cur_p:,.0f}/qtl is {p_pct}% lower than 1 month ago (₹{prev_p:,.0f}/qtl). {image_verdict_note} We recommend staggered harvesting or utilizing e-NWR warehouse pledge financing if market supply peaks."
 
     return VerificationResponse(
         verdict="VERIFIED_OPTIMAL" if p_diff >= 0 else "VERIFIED_ADVISORY",
@@ -484,7 +484,7 @@ Answer in {'Kannada' if is_kn else 'English'}. Keep your answer concise (under 9
         reply=reply_txt,
         is_connected=False,
         connection_status="LOCAL_ENGINE",
-        model_name="Local Agronomic Verification Engine",
+        model_name="AI Verification Agent",
         price_validation={
             "crop": top_name,
             "current_price": cur_p,
