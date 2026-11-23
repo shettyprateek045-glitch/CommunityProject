@@ -890,4 +890,4 @@ pytest -v tests/
 | **All 18 Automated Tests** | `pytest -v tests/` | 18 passed in < 30s. No errors, no warnings. | ✅ PASS |
 
 ---
-*Created as part of the Community / Societal Engineering Project (Multi-Domain Tech Forge).*
+*Created as part of the Community / Societal Engineering Project.*
