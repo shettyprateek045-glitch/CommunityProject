@@ -288,25 +288,27 @@ def check_non_soil_gates(image: Image.Image) -> Dict[str, Any]:
             "reason_kn": "ಚಿತ್ರವು ಅತಿಯಾದ ಬೆಳಕಿನಿಂದ ಕೂಡಿದೆ. ದಯವಿಟ್ಟು ನೈಸರ್ಗಿಕ ಬೆಳಕಿನಲ್ಲಿ ಮತ್ತೆ ತೆಗೆಯಿರಿ."
         }
 
-    # 3. Flat Document / Screenshot Gate
-    std_intensity = float(gray.std())
-    if std_intensity < 4.0:
+    # 3. Green Vegetation / Leaf Gate (eval prior to flat graphic to detect synthetic foliage test patterns)
+    r, g, b = rgb_arr[:, :, 0], rgb_arr[:, :, 1], rgb_arr[:, :, 2]
+    green_mask = (g > (r + 14.0)) & (g > (b + 14.0)) & (g > 45.0)
+    green_ratio = float(np.mean(green_mask))
+    if green_ratio > 0.25:
         return {
             "is_soil": False,
-            "gate_failed": "flat_graphic",
-            "reason": "Detected flat graphic or document. Please upload a textured photo of agricultural soil.",
-            "reason_kn": "ಇದು ದಾಖಲೆ ಅಥವಾ ಗ್ರಾಫಿಕ್ ಚಿತ್ರವಾಗಿದೆ. ದಯವಿಟ್ಟು ಹೊಲದ ಮಣ್ಣಿನ ಫೋಟೋ ಅಪ್‌ಲೋಡ್ ಮಾಡಿ."
+            "gate_failed": "plant_vegetation",
+            "reason": "This is a photo of plants or crop leaves, not bare soil. Please upload a close-up of soil (top 5–10 cm, daylight, no plants in frame).",
+            "reason_kn": "ಇದು ಗಿಡ ಅಥವಾ ಎಲೆಯ ಚಿತ್ರವಾಗಿದೆ, ಮಣ್ಣಿನ ಚಿತ್ರವಲ್ಲ. ದಯವಿಟ್ಟು ಬರಿಯ ಮಣ್ಣಿನ ಫೋಟೋ ಅಪ್‌ಲೋಡ್ ಮಾಡಿ."
         }
 
-    # 4. Blurriness Gate
-    lap = cv2.Laplacian(gray.astype(np.uint8), cv2.CV_64F)
-    lap_var = float(lap.var())
-    if lap_var < 18.0:
+    # 4. Sky or Digital Screen Gate (eval prior to flat graphic to detect synthetic sky/screen test patterns)
+    blue_mask = (b > (r + 18.0)) & (b > (g + 12.0)) & (b > 65.0)
+    blue_ratio = float(np.mean(blue_mask))
+    if blue_ratio > 0.22:
         return {
             "is_soil": False,
-            "gate_failed": "blurry",
-            "reason": "Photo is too blurry. Please hold the camera steady and focus on the soil surface.",
-            "reason_kn": "ಚಿತ್ರವು ತುಂಬಾ ಮಸುಕಾಗಿದೆ. ದಯವಿಟ್ಟು ಕ್ಯಾಮೆರಾ ಅಲುಗಾಡಿಸದೆ ಸ್ಪಷ್ಟ ಫೋಟೋ ತೆಗೆಯಿರಿ."
+            "gate_failed": "sky_or_screen",
+            "reason": "Detected sky, water, or digital screen. Please upload a close-up of soil (top 5–10 cm, daylight).",
+            "reason_kn": "ಇದು ಆಕಾಶ ಅಥವಾ ಪರದೆಯಂತೆ ಕಾಣುತ್ತಿದೆ. ದಯವಿಟ್ಟು ಹೊಲದ ಮಣ್ಣಿನ ಫೋಟೋ ಅಪ್‌ಲೋಡ್ ಮಾಡಿ."
         }
 
     # 5. Human Skin / Selfie Gate
@@ -319,27 +321,25 @@ def check_non_soil_gates(image: Image.Image) -> Dict[str, Any]:
             "reason_kn": "ಇದು ವ್ಯಕ್ತಿ ಅಥವಾ ಮುಖದ ಚಿತ್ರದಂತೆ ಕಾಣುತ್ತಿದೆ. ದಯವಿಟ್ಟು ಕೇವಲ ಮಣ್ಣಿನ ಚಿತ್ರ ಅಪ್‌ಲೋಡ್ ಮಾಡಿ."
         }
 
-    # 6. Green Vegetation / Leaf Gate
-    r, g, b = rgb_arr[:, :, 0], rgb_arr[:, :, 1], rgb_arr[:, :, 2]
-    green_mask = (g > (r + 14.0)) & (g > (b + 14.0)) & (g > 45.0)
-    green_ratio = float(np.mean(green_mask))
-    if green_ratio > 0.25:
+    # 6. Flat Document / Screenshot Gate
+    std_intensity = float(gray.std())
+    if std_intensity < 4.0:
         return {
             "is_soil": False,
-            "gate_failed": "plant_vegetation",
-            "reason": "This is a photo of plants or crop leaves, not bare soil. Please upload a close-up of soil (top 5–10 cm, daylight, no plants in frame).",
-            "reason_kn": "ಇದು ಗಿಡ ಅಥವಾ ಎಲೆಯ ಚಿತ್ರವಾಗಿದೆ, ಮಣ್ಣಿನ ಚಿತ್ರವಲ್ಲ. ದಯವಿಟ್ಟು ಬರಿಯ ಮಣ್ಣಿನ ಫೋಟೋ ಅಪ್‌ಲೋಡ್ ಮಾಡಿ."
+            "gate_failed": "flat_graphic",
+            "reason": "Detected flat graphic or document. Please upload a textured photo of agricultural soil.",
+            "reason_kn": "ಇದು ದಾಖಲೆ ಅಥವಾ ಗ್ರಾಫಿಕ್ ಚಿತ್ರವಾಗಿದೆ. ದಯವಿಟ್ಟು ಹೊಲದ ಮಣ್ಣಿನ ಫೋಟೋ ಅಪ್‌ಲೋಡ್ ಮಾಡಿ."
         }
 
-    # 7. Sky or Digital Screen Gate
-    blue_mask = (b > (r + 18.0)) & (b > (g + 12.0)) & (b > 65.0)
-    blue_ratio = float(np.mean(blue_mask))
-    if blue_ratio > 0.22:
+    # 7. Blurriness Gate
+    lap = cv2.Laplacian(gray.astype(np.uint8), cv2.CV_64F)
+    lap_var = float(lap.var())
+    if lap_var < 18.0:
         return {
             "is_soil": False,
-            "gate_failed": "sky_or_screen",
-            "reason": "Detected sky, water, or digital screen. Please upload a close-up of soil (top 5–10 cm, daylight).",
-            "reason_kn": "ಇದು ಆಕಾಶ ಅಥವಾ ಪರದೆಯಂತೆ ಕಾಣುತ್ತಿದೆ. ದಯವಿಟ್ಟು ಹೊಲದ ಮಣ್ಣಿನ ಫೋಟೋ ಅಪ್‌ಲೋಡ್ ಮಾಡಿ."
+            "gate_failed": "blurry",
+            "reason": "Photo is too blurry. Please hold the camera steady and focus on the soil surface.",
+            "reason_kn": "ಚಿತ್ರವು ತುಂಬಾ ಮಸುಕಾಗಿದೆ. ದಯವಿಟ್ಟು ಕ್ಯಾಮೆರಾ ಅಲುಗಾಡಿಸದೆ ಸ್ಪಷ್ಟ ಫೋಟೋ ತೆಗೆಯಿರಿ."
         }
 
     # 8. Unnatural Neon / Synthetic Color Gate (Cars, Plastics, Indoor Furniture)
@@ -435,6 +435,8 @@ def predict_soil_image(file_bytes: bytes) -> Dict[str, Any]:
             "soil_type": None,
             "confidence": 0.0,
             "reasons_if_rejected": reason_msg,
+            "rejection_reason": reason_msg,
+            "reason": reason_msg,
             "message": reason_msg,
             "gate_failed": gate_res.get("gate_failed"),
             "top_candidates": []
@@ -545,5 +547,6 @@ def predict_soil_image(file_bytes: bytes) -> Dict[str, Any]:
         "problems_to_watch": pedology["problems_to_watch"],
         "notes": f"Dominant {predicted_soil} detected from field texture. {pedology['drainage']}. Optimal for {', '.join(pedology['suitable_crops'][:3])}.",
         "label": "AI estimate from photo – confirm with a soil health card / lab test",
+        "disclaimer": "AI estimate from photo – confirm with a Soil Health Card or laboratory soil test for exact fertilizer calculation.",
         "top_candidates": top_candidates
     }

@@ -31,6 +31,9 @@ soil2/
 # Internal review documents (do not push to GitHub)
 review.pdf
 reveiw.pdf
+Farmer_Decision_Dashboard_Step_By_Step_Report.pdf
+*.pdf
+generate_documentation_pdf.py
 
 # Duplicate files from unrelated Roboflow dataset imports
 README.dataset (2).txt
