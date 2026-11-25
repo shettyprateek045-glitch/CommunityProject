@@ -2250,7 +2250,7 @@ export function renderDashboardShell(container, lang) {
 }
 
 // ============================================================================
-// 7. Step 1: Location with 3D Rotating Earth & Leaflet OpenStreetMap
+// 7. Step 1: Location with Photorealistic 3D Rotating Earth & Orbital Dive
 // ============================================================================
 function renderLocationStepView(container) {
   const t = I18N[currentLang];
@@ -2258,114 +2258,113 @@ function renderLocationStepView(container) {
   container.innerHTML = `
     <div class="bg-white rounded-3xl shadow-sm border border-slate-200 p-6 sm:p-8 space-y-6">
       
-      <div class="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
+      <!-- Clean Minimal Header with ONLY 2 Primary Actions -->
+      <div class="flex flex-col lg:flex-row lg:items-center justify-between gap-4">
         <div class="flex items-center gap-3">
           <div class="w-12 h-12 rounded-2xl bg-emerald-100 text-[#1b5e20] text-2xl flex items-center justify-center shadow-inner">
-            <i class="fa-solid fa-location-dot"></i>
+            <i class="fa-solid fa-earth-americas"></i>
           </div>
           <div>
             <h2 class="text-lg sm:text-xl font-bold text-slate-900">${t.card_current_loc}</h2>
-            <p class="text-xs text-slate-500">${t.pin_drag_hint}</p>
+            <p class="text-xs text-slate-500">Interactive 3D Orbital Earth · Detect GPS or enter location manually</p>
           </div>
         </div>
-        <div class="flex flex-col items-start sm:items-end gap-1">
-          <button type="button" id="btn-use-browser-gps" class="px-4 py-2.5 rounded-xl bg-gradient-to-r from-[#1b5e20] to-[#2e7d32] hover:from-[#2e7d32] hover:to-[#33691e] text-white text-xs font-bold flex items-center gap-2 shadow-md transition active:scale-[0.98] cursor-pointer">
-            <i class="fa-solid fa-location-crosshairs text-amber-300"></i>
+
+        <!-- The ONLY 2 controls: Detect My Location & Manually Enter Location -->
+        <div class="flex flex-wrap items-center gap-3">
+          <button type="button" id="btn-use-browser-gps" class="px-5 py-3 rounded-2xl bg-gradient-to-r from-[#1b5e20] to-[#2e7d32] hover:from-[#2e7d32] hover:to-[#33691e] text-white text-xs font-bold flex items-center gap-2.5 shadow-lg transition transform hover:-translate-y-0.5 active:scale-[0.98] cursor-pointer">
+            <i class="fa-solid fa-location-crosshairs text-amber-300 text-sm animate-pulse"></i>
             <span>Detect My Location</span>
           </button>
-          <span class="text-[10px] text-slate-500 flex items-center gap-1">
-            <span>🔒</span> <span>Used only for real-time weather & crop planning (never tracked).</span>
-          </span>
-        </div>
-      </div>
 
-      <!-- Current Location Display Card & Text Element with id="location" -->
-      <div class="p-5 rounded-2xl bg-earth-50 border border-earth-200 space-y-3">
-        <div class="space-y-2 w-full">
-          <div class="flex items-center justify-between">
-            <label class="block text-[11px] font-bold text-slate-700 uppercase tracking-wider">Detected Farm Location (Full Address)</label>
-            <span class="text-[10px] text-emerald-800 font-semibold bg-emerald-100 px-2 py-0.5 rounded-md flex items-center gap-1">
-              <i class="fa-solid fa-circle-check text-emerald-600"></i> Full Address
-            </span>
-          </div>
-          <div class="flex items-start gap-2.5">
-            <span class="text-xl pt-1 text-emerald-700">📍</span>
-            <textarea id="location" rows="3" readonly class="w-full px-3.5 py-2 text-xs sm:text-sm font-bold text-slate-800 bg-white border border-slate-300 rounded-xl focus:outline-none resize-none shadow-xs leading-relaxed" placeholder="Detecting full address...">${farmContext.display_name}</textarea>
-          </div>
-          <div class="text-xs text-slate-500 font-mono flex items-center flex-wrap gap-3 pt-0.5">
-            <span>Lat: <strong id="loc-display-lat" class="text-slate-700">${farmContext.lat.toFixed(4)}° N</strong></span>
-            <span>Lon: <strong id="loc-display-lon" class="text-slate-700">${farmContext.lon.toFixed(4)}° E</strong></span>
-            <span>Accuracy: <strong id="loc-display-acc" class="text-emerald-700">±${(farmContext.accuracy_meters || 20).toFixed(0)}m</strong></span>
-            <span class="text-[10px] text-slate-400">⚡ Geolocation requires HTTPS or localhost</span>
-          </div>
-        </div>
-
-        <!-- Real-time Location Detection Status Banner -->
-        <div id="location-detect-status"></div>
-      </div>
-
-      <!-- 3D Earth Globe & 2D Map Dual-Mode Stage -->
-      <div class="space-y-3">
-        <div class="flex items-center justify-between flex-wrap gap-2">
-          <div class="inline-flex rounded-xl bg-slate-100 p-1 border border-slate-200 shadow-inner">
-            <button type="button" id="btn-toggle-view-3d" class="px-3.5 py-1.5 text-xs font-bold rounded-lg transition cursor-pointer flex items-center gap-1.5 shadow-xs ${activeLocationViewMode === 'earth3d' ? 'bg-[#1b5e20] text-white' : 'text-slate-600 hover:text-slate-900'}">
-              <i class="fa-solid fa-earth-americas text-amber-300"></i>
-              <span>3D Earth Orbit (ಉಪಗ್ರಹ ಗ್ಲೋಬ್)</span>
-            </button>
-            <button type="button" id="btn-toggle-view-2d" class="px-3.5 py-1.5 text-xs font-bold rounded-lg transition cursor-pointer flex items-center gap-1.5 ${activeLocationViewMode === 'leaflet' ? 'bg-[#1b5e20] text-white' : 'text-slate-600 hover:text-slate-900'}">
-              <i class="fa-solid fa-map-location-dot text-emerald-600"></i>
-              <span>2D Field Map (ಕ್ಷೇತ್ರ ನಕ್ಷೆ)</span>
-            </button>
-          </div>
-          <div class="text-[11px] text-slate-500 font-medium flex items-center gap-1.5">
-            <span class="inline-block w-2 h-2 rounded-full bg-emerald-500 animate-ping"></span>
-            <span id="earth-telemetry-status">Orbital Telemetry Active</span>
-          </div>
-        </div>
-
-        <!-- 3D Rotating Earth Container -->
-        <div id="earth-3d-stage" class="${activeLocationViewMode === 'earth3d' ? '' : 'hidden'} relative rounded-2xl overflow-hidden border border-slate-700 shadow-xl bg-[#03060a]" style="height: 380px;">
-          <div id="earth-3d-viewport" class="w-full h-full cursor-grab active:cursor-grabbing"></div>
-
-          <!-- Top-Left Floating Telemetry HUD -->
-          <div class="absolute top-3 left-3 pointer-events-none z-10 flex flex-col gap-1.5">
-            <div class="px-3 py-1.5 rounded-xl bg-black/60 backdrop-blur-md border border-white/20 text-white text-[11px] font-semibold flex items-center gap-2 shadow-lg">
-              <span class="text-amber-400">🌍</span>
-              <span>Photorealistic 3D Earth Orbit</span>
-              <span class="text-emerald-400 font-mono text-[10px]" id="earth-hud-coords">${farmContext.lat.toFixed(2)}°N, ${farmContext.lon.toFixed(2)}°E</span>
-            </div>
-            <div class="text-[10px] text-white/70 bg-black/40 px-2.5 py-1 rounded-lg backdrop-blur-xs max-w-xs leading-tight">
-              Drag to rotate globe · Click <strong>Detect My Location</strong> to plunge from orbit into farm field
-            </div>
-          </div>
-
-          <!-- Dive Status Alert Overlay -->
-          <div id="earth-dive-banner" class="hidden absolute bottom-4 inset-x-4 z-20 mx-auto max-w-md px-4 py-2.5 rounded-2xl bg-emerald-950/90 backdrop-blur-md border border-emerald-400/60 text-white text-xs font-semibold flex items-center justify-between shadow-2xl transition-all">
-            <div class="flex items-center gap-2.5">
-              <i class="fa-solid fa-shuttle-space text-amber-300 text-sm animate-bounce"></i>
-              <span id="earth-dive-text">Aligning orbital trajectory to coordinates...</span>
-            </div>
-            <span class="text-[10px] text-emerald-300 font-mono bg-emerald-900/60 px-2 py-0.5 rounded border border-emerald-400/40">HYPER-ZOOM</span>
-          </div>
-        </div>
-
-        <!-- 2D Leaflet Map Container -->
-        <div id="leaflet-map-stage" class="${activeLocationViewMode === 'leaflet' ? '' : 'hidden'} space-y-2">
-          <div id="farm-leaflet-map" style="height: 380px; width: 100%; border-radius: 1rem; border: 1px solid #cbd5e1; z-index: 10;"></div>
-        </div>
-      </div>
-
-      <!-- Manual Village Search Bar (Full Width) -->
-      <div class="p-4 rounded-2xl bg-slate-50 border border-slate-200 space-y-2">
-        <label class="block text-xs font-bold text-slate-700 uppercase tracking-wider">${t.lbl_village_search}</label>
-        <div class="flex gap-2">
-          <input type="text" id="input-search-place" class="w-full px-3 py-2 text-xs border border-slate-300 rounded-xl bg-white" placeholder="e.g. Dharwad, Mandya, Belagavi, Davanagere" />
-          <button type="button" id="btn-exec-search" class="px-4 bg-[#1b5e20] hover:bg-[#2e7d32] text-white text-xs font-bold rounded-xl transition cursor-pointer">
-            ${t.btn_search}
+          <button type="button" id="btn-toggle-manual-input" class="px-5 py-3 rounded-2xl bg-slate-100 hover:bg-slate-200 text-slate-800 text-xs font-bold flex items-center gap-2 border border-slate-300 transition cursor-pointer">
+            <i class="fa-solid fa-keyboard text-emerald-700 text-sm"></i>
+            <span>Manually Enter Location</span>
           </button>
         </div>
-        <div id="place-search-results" class="space-y-1 max-h-36 overflow-y-auto text-xs"></div>
       </div>
+
+      <!-- Manual Entry Location Drawer (Toggles open when clicked) -->
+      <div id="manual-location-panel" class="hidden p-4 rounded-2xl bg-emerald-50/70 border border-emerald-200 space-y-2 transition-all">
+        <label class="block text-xs font-bold text-emerald-950 uppercase tracking-wider">
+          <i class="fa-solid fa-magnifying-glass-location text-emerald-700 mr-1"></i> Enter Village, Town, or District Manually
+        </label>
+        <div class="flex gap-2">
+          <input type="text" id="input-search-place" class="w-full px-4 py-2.5 text-xs sm:text-sm border border-slate-300 rounded-xl bg-white focus:outline-none focus:ring-2 focus:ring-emerald-600 shadow-xs" placeholder="e.g. Dharwad, Mandya, Belagavi, Davanagere, Mysuru" />
+          <button type="button" id="btn-exec-search" class="px-5 bg-[#1b5e20] hover:bg-[#2e7d32] text-white text-xs font-bold rounded-xl transition cursor-pointer flex items-center gap-1.5 shrink-0">
+            <i class="fa-solid fa-arrow-right"></i>
+            <span>Find & Dive</span>
+          </button>
+        </div>
+        <div id="place-search-results" class="space-y-1 max-h-36 overflow-y-auto text-xs pt-1"></div>
+      </div>
+
+      <!-- 3D Earth Full-Stage Canvas (The Main Visual Stage) -->
+      <div class="relative rounded-3xl overflow-hidden border border-slate-800 shadow-2xl bg-[#03060a]" style="min-height: 480px; height: 520px;">
+        <div id="earth-3d-viewport" class="w-full h-full cursor-grab active:cursor-grabbing"></div>
+
+        <!-- Floating Minimal HUD Telemetry Badge (Top-Left) -->
+        <div class="absolute top-4 left-4 pointer-events-none z-10 flex flex-col gap-1.5">
+          <div class="px-3.5 py-2 rounded-2xl bg-black/65 backdrop-blur-md border border-white/20 text-white text-xs font-semibold flex items-center gap-2.5 shadow-xl">
+            <span class="text-amber-400">🌍</span>
+            <span>3D Earth Orbit</span>
+            <span class="text-emerald-400 font-mono text-[11px]" id="earth-hud-coords">${farmContext.lat.toFixed(2)}°N, ${farmContext.lon.toFixed(2)}°E</span>
+          </div>
+          <div class="text-[10px] text-white/70 bg-black/45 px-3 py-1.5 rounded-xl backdrop-blur-xs max-w-xs leading-relaxed">
+            Drag to rotate globe · Click <strong>Detect My Location</strong> or <strong>Manually Enter Location</strong> to plunge into field
+          </div>
+        </div>
+
+        <!-- Dive Status Alert Overlay (Appears during hyper-zoom plunge) -->
+        <div id="earth-dive-banner" class="hidden absolute bottom-20 inset-x-4 z-20 mx-auto max-w-md px-5 py-3 rounded-2xl bg-emerald-950/95 backdrop-blur-md border border-emerald-400/60 text-white text-xs font-semibold flex items-center justify-between shadow-2xl transition-all">
+          <div class="flex items-center gap-2.5">
+            <i class="fa-solid fa-shuttle-space text-amber-300 text-sm animate-bounce"></i>
+            <span id="earth-dive-text">Aligning orbital trajectory to coordinates...</span>
+          </div>
+          <span class="text-[10px] text-emerald-300 font-mono bg-emerald-900/60 px-2.5 py-1 rounded-lg border border-emerald-400/40">HYPER-ZOOM</span>
+        </div>
+
+        <!-- Bottom Confirmed Location Pill Overlay -->
+        <div id="earth-confirmed-loc-pill" class="absolute bottom-4 left-4 right-4 z-10 pointer-events-auto flex items-center justify-between flex-wrap gap-2 px-4 py-2.5 rounded-2xl bg-black/65 backdrop-blur-md border border-white/20 text-white text-xs shadow-xl">
+          <div class="flex items-center gap-2 truncate">
+            <span class="text-emerald-400 text-base">📍</span>
+            <span class="font-bold text-white truncate" id="loc-display-short">${farmContext.village || 'Bengaluru'}, ${farmContext.district || 'Karnataka'}</span>
+            <span class="text-emerald-300 font-mono text-[10px] hidden sm:inline" id="loc-display-coords">(${farmContext.lat.toFixed(4)}°N, ${farmContext.lon.toFixed(4)}°E)</span>
+          </div>
+          <div class="flex items-center gap-2">
+            <button type="button" id="btn-toggle-field-map" class="px-3 py-1.5 rounded-xl bg-white/20 hover:bg-white/30 text-white text-[11px] font-semibold transition cursor-pointer flex items-center gap-1.5">
+              <i class="fa-solid fa-map-location-dot text-amber-300"></i>
+              <span id="field-map-toggle-text">Show 2D Field Map</span>
+            </button>
+          </div>
+        </div>
+
+        <!-- Embedded 2D Field Map Overlay -->
+        <div id="leaflet-map-stage" class="hidden absolute inset-0 z-20 bg-slate-900/90 backdrop-blur-sm p-4 flex flex-col justify-between">
+          <div class="flex items-center justify-between pb-2 text-white">
+            <div class="flex items-center gap-2 text-xs font-bold">
+              <i class="fa-solid fa-map-location-dot text-emerald-400"></i>
+              <span>2D Field Cadastral Map (Drag green pin to adjust field)</span>
+            </div>
+            <button type="button" id="btn-close-2d-map" class="px-3 py-1.5 rounded-xl bg-emerald-800 hover:bg-emerald-700 text-white text-xs font-semibold flex items-center gap-1.5 cursor-pointer">
+              <i class="fa-solid fa-earth-americas text-amber-300"></i>
+              <span>Return to 3D Orbit</span>
+            </button>
+          </div>
+          <div id="farm-leaflet-map" style="height: 420px; width: 100%; border-radius: 1rem; border: 1px solid #cbd5e1;"></div>
+        </div>
+      </div>
+
+      <!-- Real-time Location Detection Status Banner -->
+      <div id="location-detect-status"></div>
+
+      <!-- Hidden backward-compatibility elements for reactive context & test suites -->
+      <input type="hidden" id="location" value="${farmContext.display_name}" />
+      <span id="loc-display-lat" class="hidden">${farmContext.lat.toFixed(4)}° N</span>
+      <span id="loc-display-lon" class="hidden">${farmContext.lon.toFixed(4)}° E</span>
+      <span id="loc-display-acc" class="hidden">±${(farmContext.accuracy_meters || 20).toFixed(0)}m</span>
+      <span id="loc-display-village" class="hidden">${farmContext.village || 'Bengaluru'}</span>
+      <span id="loc-display-state" class="hidden">${farmContext.state || 'Karnataka'}</span>
 
     </div>
   `;
@@ -2383,62 +2382,68 @@ function renderLocationStepView(container) {
     });
   }
 
-  // Setup mode switchers
-  const btn3D = document.getElementById("btn-toggle-view-3d");
-  const btn2D = document.getElementById("btn-toggle-view-2d");
-  const stage3D = document.getElementById("earth-3d-stage");
-  const stage2D = document.getElementById("leaflet-map-stage");
-
-  if (btn3D && btn2D && stage3D && stage2D) {
-    btn3D.onclick = () => {
-      activeLocationViewMode = "earth3d";
-      stage3D.classList.remove("hidden");
-      stage2D.classList.add("hidden");
-      btn3D.className = "px-3.5 py-1.5 text-xs font-bold rounded-lg transition cursor-pointer flex items-center gap-1.5 shadow-xs bg-[#1b5e20] text-white";
-      btn2D.className = "px-3.5 py-1.5 text-xs font-bold rounded-lg transition cursor-pointer flex items-center gap-1.5 text-slate-600 hover:text-slate-900";
-      if (earthGlobeInstance) earthGlobeInstance.resetOrbitalView();
-    };
-    btn2D.onclick = () => {
-      activeLocationViewMode = "leaflet";
-      stage3D.classList.add("hidden");
-      stage2D.classList.remove("hidden");
-      btn2D.className = "px-3.5 py-1.5 text-xs font-bold rounded-lg transition cursor-pointer flex items-center gap-1.5 shadow-xs bg-[#1b5e20] text-white";
-      btn3D.className = "px-3.5 py-1.5 text-xs font-bold rounded-lg transition cursor-pointer flex items-center gap-1.5 text-slate-600 hover:text-slate-900";
-      setTimeout(() => {
-        if (farmMap) farmMap.invalidateSize();
-        else initOrUpdateFarmMap();
-      }, 60);
-    };
-  }
-
   bindLocationStepListeners();
-  if (activeLocationViewMode === 'leaflet') {
-    setTimeout(initOrUpdateFarmMap, 100);
-  }
 }
 
 function bindLocationStepListeners() {
   const statusEl = document.getElementById("location-detect-status");
+  const manualPanel = document.getElementById("manual-location-panel");
+  const btnToggleManual = document.getElementById("btn-toggle-manual-input");
+  const btnToggleFieldMap = document.getElementById("btn-toggle-field-map");
+  const btnClose2DMap = document.getElementById("btn-close-2d-map");
+  const leafletStage = document.getElementById("leaflet-map-stage");
+
+  // Toggle manual search drawer
+  if (btnToggleManual && manualPanel) {
+    btnToggleManual.onclick = () => {
+      manualPanel.classList.toggle("hidden");
+      if (!manualPanel.classList.contains("hidden")) {
+        const input = document.getElementById("input-search-place");
+        if (input) input.focus();
+      }
+    };
+  }
+
+  // Toggle 2D field map overlay
+  const show2DMap = () => {
+    if (leafletStage) {
+      leafletStage.classList.remove("hidden");
+      setTimeout(() => {
+        initOrUpdateFarmMap();
+        if (farmMap) farmMap.invalidateSize();
+      }, 60);
+    }
+  };
+
+  const hide2DMap = () => {
+    if (leafletStage) {
+      leafletStage.classList.add("hidden");
+    }
+    if (earthGlobeInstance) {
+      earthGlobeInstance.resetOrbitalView();
+    }
+  };
+
+  if (btnToggleFieldMap) btnToggleFieldMap.onclick = show2DMap;
+  if (btnClose2DMap) btnClose2DMap.onclick = hide2DMap;
 
   const performOrbitalDive = async (lat, lon, accuracy, source) => {
-    const stage3D = document.getElementById("earth-3d-stage");
-    const stage2D = document.getElementById("leaflet-map-stage");
-    const btn3D = document.getElementById("btn-toggle-view-3d");
-    const btn2D = document.getElementById("btn-toggle-view-2d");
     const diveBanner = document.getElementById("earth-dive-banner");
     const diveText = document.getElementById("earth-dive-text");
 
-    // Ensure 3D stage is active so user sees orbital dive
-    activeLocationViewMode = "earth3d";
-    if (stage3D) stage3D.classList.remove("hidden");
-    if (stage2D) stage2D.classList.add("hidden");
-    if (btn3D) btn3D.className = "px-3.5 py-1.5 text-xs font-bold rounded-lg transition cursor-pointer flex items-center gap-1.5 shadow-xs bg-[#1b5e20] text-white";
-    if (btn2D) btn2D.className = "px-3.5 py-1.5 text-xs font-bold rounded-lg transition cursor-pointer flex items-center gap-1.5 text-slate-600 hover:text-slate-900";
+    // Close 2D map if open so 3D orbital dive is visible
+    if (leafletStage) leafletStage.classList.add("hidden");
 
     await updateFarmPosition(lat, lon, accuracy, source);
 
     const hudCoords = document.getElementById("earth-hud-coords");
     if (hudCoords) hudCoords.innerText = `${lat.toFixed(4)}°N, ${lon.toFixed(4)}°E`;
+
+    const locShort = document.getElementById("loc-display-short");
+    if (locShort) locShort.innerText = `${farmContext.village || 'Bengaluru'}, ${farmContext.district || 'Karnataka'}`;
+
+    const locCoords = document.getElementById("loc-display-coords");
+    if (locCoords) locCoords.innerText = `(${lat.toFixed(4)}°N, ${lon.toFixed(4)}°E)`;
 
     if (diveBanner && diveText) {
       diveBanner.classList.remove("hidden");
@@ -2447,39 +2452,21 @@ function bindLocationStepListeners() {
 
     if (earthGlobeInstance) {
       earthGlobeInstance.zoomToLocation(lat, lon, () => {
-        // On zoom completion: smoothly switch to 2D Leaflet map
-        if (stage3D) stage3D.classList.add("hidden");
-        if (stage2D) stage2D.classList.remove("hidden");
-        activeLocationViewMode = "leaflet";
-        if (btn2D) btn2D.className = "px-3.5 py-1.5 text-xs font-bold rounded-lg transition cursor-pointer flex items-center gap-1.5 shadow-xs bg-[#1b5e20] text-white";
-        if (btn3D) btn3D.className = "px-3.5 py-1.5 text-xs font-bold rounded-lg transition cursor-pointer flex items-center gap-1.5 text-slate-600 hover:text-slate-900";
         if (diveBanner) diveBanner.classList.add("hidden");
-
-        setTimeout(() => {
-          initOrUpdateFarmMap();
-          if (farmMap) {
-            farmMap.invalidateSize();
-            farmMap.flyTo([lat, lon], 16, { duration: 1.2 });
-          }
-        }, 80);
 
         if (statusEl) {
           statusEl.innerHTML = `
-            <div class="p-3 bg-emerald-50 border border-emerald-200 text-emerald-900 rounded-xl text-xs flex items-center justify-between flex-wrap gap-2">
+            <div class="p-3 bg-emerald-50 border border-emerald-200 text-emerald-900 rounded-2xl text-xs flex items-center justify-between flex-wrap gap-2 shadow-xs">
               <span>✅ Descended from orbit to farm field: <strong>${farmContext.display_name}</strong> (±${Math.round(accuracy)}m).</span>
-              <button type="button" id="btn-revisit-3d" class="px-3 py-1 rounded-lg bg-emerald-800 hover:bg-emerald-900 text-white font-semibold text-[11px] transition flex items-center gap-1.5 cursor-pointer">
-                <i class="fa-solid fa-earth-americas text-amber-300"></i> View 3D Globe
+              <button type="button" id="btn-open-field-map-direct" class="px-3.5 py-1.5 rounded-xl bg-emerald-800 hover:bg-emerald-900 text-white font-semibold text-xs transition flex items-center gap-1.5 cursor-pointer">
+                <i class="fa-solid fa-map-location-dot text-amber-300"></i> Open 2D Field Map
               </button>
             </div>
           `;
-          const revisitBtn = document.getElementById("btn-revisit-3d");
-          if (revisitBtn && btn3D) revisitBtn.onclick = () => btn3D.click();
+          const openMapBtn = document.getElementById("btn-open-field-map-direct");
+          if (openMapBtn) openMapBtn.onclick = show2DMap;
         }
       });
-    } else {
-      if (stage3D) stage3D.classList.add("hidden");
-      if (stage2D) stage2D.classList.remove("hidden");
-      initOrUpdateFarmMap();
     }
   };
 
@@ -2573,7 +2560,7 @@ function bindLocationStepListeners() {
           if (statusEl) {
             statusEl.innerHTML = `
               <div class="p-3 bg-rose-50 border border-rose-200 text-rose-900 rounded-xl text-xs">
-                ⚠️ Could not detect position. Please drag the pin on the map or type your village below.
+                ⚠️ Could not detect position. Please click <strong>Manually Enter Location</strong> above to type your village.
               </div>
             `;
           }
@@ -2584,7 +2571,7 @@ function bindLocationStepListeners() {
       if (statusEl) {
         statusEl.innerHTML = `
           <div class="p-3 bg-amber-50 border border-amber-200 text-amber-900 rounded-xl text-xs">
-            ⚠️ Geolocation is not supported by your browser. Please type your location manually in the search box below.
+            ⚠️ Geolocation is not supported by your browser. Click <strong>Manually Enter Location</strong> above to type your village.
           </div>
         `;
       }
@@ -2625,8 +2612,11 @@ function bindLocationStepListeners() {
             return;
           }
           resContainer.innerHTML = results.map(r => `
-            <div class="p-2 bg-white rounded-lg border border-slate-200 hover:bg-emerald-50 cursor-pointer search-pick-item" data-lat="${r.lat}" data-lon="${r.lon}" data-name="${r.display_name}">
-              <strong>${r.display_name.split(',')[0]}</strong> <span class="text-slate-400">(${r.display_name.split(',').slice(1, 3).join(',')})</span>
+            <div class="p-2.5 bg-white rounded-xl border border-slate-200 hover:bg-emerald-50 cursor-pointer search-pick-item flex items-center justify-between" data-lat="${r.lat}" data-lon="${r.lon}" data-name="${r.display_name}">
+              <div>
+                <strong class="text-slate-900">${r.display_name.split(',')[0]}</strong> <span class="text-slate-500 text-[11px]">(${r.display_name.split(',').slice(1, 3).join(',')})</span>
+              </div>
+              <span class="text-[10px] text-emerald-700 font-bold bg-emerald-100 px-2 py-0.5 rounded">Select & Dive →</span>
             </div>
           `).join('');
 
@@ -2635,18 +2625,20 @@ function bindLocationStepListeners() {
               const lat = parseFloat(item.getAttribute("data-lat"));
               const lon = parseFloat(item.getAttribute("data-lon"));
               resContainer.innerHTML = '';
+              if (manualPanel) manualPanel.classList.add("hidden");
               await performOrbitalDive(lat, lon, 25.0, "search");
             };
           });
         }
       } catch (err) {
-        resContainer.innerHTML = `<span class="text-rose-600">Search error. Try map pin.</span>`;
+        resContainer.innerHTML = `<span class="text-rose-600">Search error. Please try again.</span>`;
       }
     };
     btnSearch.onclick = doSearch;
     inputSearch.onkeydown = (e) => { if (e.key === 'Enter') doSearch(); };
   }
 }
+
 
 function renderLocationDisplayCards() {
   const v = document.getElementById("loc-display-village");
