@@ -35,7 +35,7 @@ async def lifespan(app: FastAPI):
 app = FastAPI(
     title=settings.app_name,
     version=settings.app_version,
-    description="Precision Agronomic Planning, Market Forecasting & Smart Irrigation System",
+    description="Crop Recommendation & Farmer Decision Support System",
     lifespan=lifespan
 )
 

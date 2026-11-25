@@ -22,7 +22,7 @@
 const I18N = {
   en: {
     app_title: "Farmer Decision Dashboard",
-    app_subtitle: "Precision Agronomic Planning, Market Forecasting & Smart Irrigation",
+    app_subtitle: "",
     nav_history: "Past Runs",
     nav_schemes: "Govt Schemes",
     nav_leaf_scanner: "Leaf Disease Scanner",
@@ -138,7 +138,7 @@ const I18N = {
   },
   kn: {
     app_title: "ರೈತ ನಿರ್ಧಾರ ಬೆಂಬಲ ವ್ಯವಸ್ಥೆ",
-    app_subtitle: "ನಿಖರ ಕೃಷಿ ಯೋಜನೆ, ಮಾರುಕಟ್ಟೆ ಮುನ್ಸೂಚನೆ ಮತ್ತು ಸ್ಮಾರ್ಟ್ ನೀರಾವರಿ",
+    app_subtitle: "",
     nav_history: "ಹಿಂದಿನ ದಾಖಲೆಗಳು",
     nav_schemes: "ಸರ್ಕಾರಿ ಯೋಜನೆಗಳು",
     nav_leaf_scanner: "ಎಲೆ ರೋಗ ತಪಾಸಣೆ",
@@ -254,7 +254,7 @@ const I18N = {
   },
   hi: {
     app_title: "किसान निर्णय सहायता डैशबोर्ड",
-    app_subtitle: "सटीक कृषि योजना, बाजार पूर्वानुमान और स्मार्ट सिंचाई",
+    app_subtitle: "",
     nav_history: "पुराने रिकॉर्ड",
     nav_schemes: "सरकारी योजनाएं",
     nav_leaf_scanner: "पत्ती रोग जांच",
@@ -1280,7 +1280,6 @@ export function renderDashboardShell(container, lang) {
             <h1 class="text-base sm:text-lg font-bold tracking-tight text-white flex items-center gap-2">
               <span id="txt-app-title">${t.app_title}</span>
             </h1>
-            <p class="text-[11px] text-emerald-200 hidden sm:block" id="txt-app-subtitle">${t.app_subtitle}</p>
           </div>
         </div>
 

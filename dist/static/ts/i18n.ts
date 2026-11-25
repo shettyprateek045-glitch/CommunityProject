@@ -5,7 +5,7 @@
 export const I18N: Record<string, Record<string, string>> = {
   en: {
     app_title: "Farmer Decision Dashboard",
-    app_subtitle: "Precision Agronomic Planning, Market Forecasting & Smart Irrigation",
+    app_subtitle: "",
     nav_history: "Past Runs",
     btn_export_pdf: "Export PDF",
 

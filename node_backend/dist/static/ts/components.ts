@@ -22,7 +22,6 @@ export function renderDashboardShell(container: HTMLElement, lang: LangCode) {
               <span id="txt-app-title">${t.app_title}</span>
               <span class="text-[10px] bg-[#2e7d32] text-emerald-100 px-2 py-0.5 rounded-full font-medium">Precision AI</span>
             </h1>
-            <p class="text-[11px] text-emerald-200 hidden sm:block" id="txt-app-subtitle">${t.app_subtitle}</p>
           </div>
         </div>
 
