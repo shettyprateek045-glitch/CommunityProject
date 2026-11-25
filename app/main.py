@@ -90,15 +90,11 @@ async def serve_overview(request: Request, user: Optional[User] = Depends(get_cu
     return templates.TemplateResponse(request=request, name="overview.html", context={"user": user})
 
 @app.get("/login", response_class=HTMLResponse)
-async def serve_login(request: Request, next: str = "/", user: Optional[User] = Depends(get_current_user_optional)):
+async def serve_login(request: Request, next: str = "/"):
     """
     Serves the Login & Registration page.
-    If already authenticated, redirects back to the dashboard or destination.
+    Always renders the login page so users can sign in, register, or switch accounts.
     """
-    if user is not None:
-        target = next if (next and next.startswith("/") and not next.startswith("//")) else "/"
-        return RedirectResponse(url=target, status_code=303)
-
     return templates.TemplateResponse(request=request, name="login.html")
 
 @app.get("/share/{token}", response_class=HTMLResponse)
