@@ -89,9 +89,18 @@ flowchart LR
 
 ---
 
-## 🌟 Upgraded Dashboard Capabilities (5 New Features)
+## 🌟 Upgraded Dashboard Capabilities
 
-### 1. 5-Year Historical Weather Analysis (Weather Step)
+### 1. Overview Landing Page (`/overview`) & Clean Authentication Flow
+- **Responsive Hero Showcase**: Full-width responsive hero with high-resolution farmer photography and dark emerald overlay.
+- **Clear Action Entry**: Direct "Login to Dashboard" button (`/login`) and instant "Continue as Guest" preview (`/api/auth/guest`).
+- **Seamless Logout Redirect**: Logging out clears the authentication session cookie and smoothly returns visitors directly to the Overview page with an alert confirmation.
+
+### 2. Dynamic Day & Night Weather Simulation (Weather Step)
+- **Day / Night Live Toggle**: Interactive button (`Switch to Night` / `Switch to Day`) in Step 2 Weather.
+- **Ambient Sky Transitions**: Smooth visual shifts between daytime natural emerald light shafts and nocturnal starry indigo lighting with matching Kannada/English badges (`☀️ Daytime (ಹಗಲು)` vs `🌙 Nighttime (ರಾತ್ರಿ)`).
+
+### 3. 5-Year Historical Weather Analysis (Weather Step)
 - **Open-Meteo Historical Archive API**: Fetches daily historical weather for the previous 5 full calendar years (2021–2025: 1,826 daily records) for the exact farm coordinates without requiring an API key.
 - **Interactive Multi-Line Chart.js Visualizations**:
   - **Monthly Rainfall**: Annual comparison lines showing rainfall accumulation per month for each year (2021 through 2025).

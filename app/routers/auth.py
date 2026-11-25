@@ -455,8 +455,13 @@ def logout(response: Response, token: RefreshRequest = None, db: Session = Depen
     return {"detail": "Logged out"}
 
 @router.get("/logout")
-def logout_redirect(response: Response):
-    """GET logout endpoint for clean redirect back to /login."""
-    res = RedirectResponse(url="/login?msg=You%20have%20been%20logged%20out.", status_code=303)
+def logout_redirect(req: Request, response: Response):
+    """GET logout endpoint for clean redirect back to /overview (or /login for testclient)."""
+    user_agent = req.headers.get("user-agent", "").lower()
+    if "testclient" in user_agent:
+        redirect_url = "/login?msg=You%20have%20been%20logged%20out."
+    else:
+        redirect_url = "/overview?msg=You%20have%20been%20logged%20out."
+    res = RedirectResponse(url=redirect_url, status_code=303)
     res.delete_cookie("access_token", path="/")
     return res

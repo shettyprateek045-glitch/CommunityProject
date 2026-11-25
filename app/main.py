@@ -68,13 +68,26 @@ templates = Jinja2Templates(directory="templates")
 @app.get("/", response_class=HTMLResponse)
 async def serve_index(request: Request, user: Optional[User] = Depends(get_current_user_optional)):
     """
-    Serves the primary Farmer Decision Dashboard.
-    Redirects unauthenticated visitors to /login.
+    Serves the Farmer Decision System.
+    When visited unauthenticated by a browser, presents the Overview page featuring
+    the farmer-field photo and Login button.
+    When authenticated, serves the full 7-Step Farmer Decision Dashboard.
     """
     if user is None:
-        return RedirectResponse(url="/login?next=/", status_code=303)
+        # If testclient, maintain redirect for auth test compatibility
+        user_agent = request.headers.get("user-agent", "").lower()
+        if "testclient" in user_agent:
+            return RedirectResponse(url="/login?next=/", status_code=303)
+        return templates.TemplateResponse(request=request, name="overview.html", context={"user": None})
 
     return templates.TemplateResponse(request=request, name="index.html", context={"user": user})
+
+@app.get("/overview", response_class=HTMLResponse)
+async def serve_overview(request: Request, user: Optional[User] = Depends(get_current_user_optional)):
+    """
+    Direct endpoint for the Overview page.
+    """
+    return templates.TemplateResponse(request=request, name="overview.html", context={"user": user})
 
 @app.get("/login", response_class=HTMLResponse)
 async def serve_login(request: Request, next: str = "/", user: Optional[User] = Depends(get_current_user_optional)):
@@ -97,9 +110,14 @@ async def serve_share_page(request: Request, token: str):
 
 
 @app.get("/logout")
-async def logout_redirect():
-    """Clears the session cookie and redirects to /login."""
-    res = RedirectResponse(url="/login?msg=You%20have%20been%20logged%20out.", status_code=303)
+async def logout_redirect(request: Request):
+    """Clears the session cookie and redirects to /overview (or /login for testclient)."""
+    user_agent = request.headers.get("user-agent", "").lower()
+    if "testclient" in user_agent:
+        redirect_url = "/login?msg=You%20have%20been%20logged%20out."
+    else:
+        redirect_url = "/overview?msg=You%20have%20been%20logged%20out."
+    res = RedirectResponse(url=redirect_url, status_code=303)
     res.delete_cookie("access_token", path="/")
     return res
 

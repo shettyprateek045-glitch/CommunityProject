@@ -1736,6 +1736,12 @@ export function renderDashboardShell(container, lang) {
         </div>
 
         <div class="flex items-center space-x-2 sm:space-x-3">
+          <!-- Overview Page Button -->
+          <a href="/overview" class="px-2.5 py-1.5 rounded-lg bg-emerald-800 hover:bg-emerald-700 text-emerald-100 text-xs font-semibold flex items-center gap-1.5 transition cursor-pointer" title="System Overview & Workflow">
+            <i class="fa-solid fa-house-chimney text-amber-300"></i>
+            <span class="hidden md:inline">Overview</span>
+          </a>
+
           <!-- Foliar Disease Scanner Button -->
           <button id="btn-open-leaf-scanner" class="px-2.5 py-1.5 rounded-lg bg-emerald-800 hover:bg-emerald-700 text-emerald-100 text-xs font-semibold flex items-center gap-1.5 transition cursor-pointer">
             <i class="fa-solid fa-virus-covid"></i>
@@ -2591,10 +2597,15 @@ async function renderWeatherStepView(container) {
 
   const cur = weatherData.current || {};
   const daily = weatherData.daily_7d || [];
-  const isDay = cur.is_day !== undefined ? cur.is_day : 1;
+  const forcedDayNight = window._fdd_forced_daynight !== undefined ? window._fdd_forced_daynight : null;
+  const isDay = forcedDayNight !== null ? forcedDayNight : (cur.is_day !== undefined ? cur.is_day : 1);
+  const heroGradient = isDay === 1
+    ? "bg-gradient-to-br from-[#1b5e20] via-emerald-800 to-[#2e7d32]"
+    : "bg-gradient-to-br from-slate-950 via-indigo-950 to-[#0b1b10]";
+  const weatherIcon = isDay === 1 ? (cur.icon || "☀️") : "🌙";
   const dayNightBadge = isDay === 1
-    ? `<span class="inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full bg-amber-200/30 text-amber-100 text-[10px] font-bold">☀️ Daytime</span>`
-    : `<span class="inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full bg-indigo-900/40 text-indigo-100 text-[10px] font-bold">🌙 Nighttime</span>`;
+    ? `<span class="inline-flex items-center gap-1 px-3 py-1 rounded-full bg-amber-400/30 text-amber-100 text-xs font-bold border border-amber-300/30 shadow-xs">☀️ Daytime (ಹಗಲು)</span>`
+    : `<span class="inline-flex items-center gap-1 px-3 py-1 rounded-full bg-indigo-500/30 text-indigo-100 text-xs font-bold border border-indigo-400/30 shadow-xs">🌙 Nighttime (ರಾತ್ರಿ)</span>`;
 
   const lastUpdated = cur.last_updated || new Date().toLocaleTimeString();
 
@@ -2610,24 +2621,30 @@ async function renderWeatherStepView(container) {
     <div class="bg-white rounded-3xl shadow-sm border border-slate-200 p-6 sm:p-8 space-y-6">
       
       <!-- Current Weather Hero Card -->
-      <div class="bg-gradient-to-br from-[#1b5e20] to-[#2e7d32] rounded-3xl p-6 sm:p-8 text-white space-y-5 shadow-md">
+      <div class="${heroGradient} rounded-3xl p-6 sm:p-8 text-white space-y-5 shadow-md transition-all duration-700">
         <div class="flex items-center justify-between flex-wrap gap-4">
           <div class="flex items-center space-x-4">
-            <span class="text-5xl">${cur.icon || "⛅"}</span>
+            <span class="text-5xl">${weatherIcon}</span>
             <div>
               <div class="flex items-center gap-2">
                 <span class="text-3xl sm:text-4xl font-extrabold tracking-tight">${(cur.temperature || 24).toFixed(1)}°C</span>
                 ${dayNightBadge}
               </div>
-              <p class="text-sm text-emerald-100 font-medium">${cur.description || "Clear sky"}</p>
+              <p class="text-sm text-emerald-100 font-medium">${cur.description || (isDay === 1 ? "Clear daylight sky" : "Clear starry night")}</p>
               <span class="text-[10px] text-emerald-200/80">Location: ${farmContext.village || "Bengaluru"} • Updated: ${lastUpdated}</span>
             </div>
           </div>
 
-          <button type="button" id="btn-refresh-weather-step" class="px-3.5 py-1.5 rounded-xl bg-white/20 hover:bg-white/30 text-white text-xs font-bold transition cursor-pointer flex items-center gap-1.5">
-            <i class="fa-solid fa-arrows-rotate"></i>
-            <span>${t.btn_refresh_weather}</span>
-          </button>
+          <div class="flex items-center gap-2">
+            <button type="button" id="btn-toggle-daynight-view" class="px-3.5 py-1.5 rounded-xl bg-white/20 hover:bg-white/30 text-white text-xs font-bold transition cursor-pointer flex items-center gap-1.5 shadow-sm border border-white/20" title="Click to toggle Day and Night weather mode">
+              <i class="fa-solid ${isDay === 1 ? 'fa-moon text-indigo-200' : 'fa-sun text-amber-300'}"></i>
+              <span>${isDay === 1 ? 'Switch to Night' : 'Switch to Day'}</span>
+            </button>
+            <button type="button" id="btn-refresh-weather-step" class="px-3.5 py-1.5 rounded-xl bg-white/20 hover:bg-white/30 text-white text-xs font-bold transition cursor-pointer flex items-center gap-1.5">
+              <i class="fa-solid fa-arrows-rotate"></i>
+              <span>${t.btn_refresh_weather}</span>
+            </button>
+          </div>
         </div>
 
         <!-- Metrics Grid -->
@@ -2887,6 +2904,22 @@ async function renderWeatherStepView(container) {
 
     </div>
   `;
+
+  const btnToggleDayNight = document.getElementById("btn-toggle-daynight-view");
+  if (btnToggleDayNight) {
+    btnToggleDayNight.onclick = () => {
+      window._fdd_forced_daynight = (isDay === 1 ? 0 : 1);
+      const bgOverlay = document.getElementById("bg-gradient-overlay");
+      if (bgOverlay) {
+        if (window._fdd_forced_daynight === 0) {
+          bgOverlay.style.background = "linear-gradient(to bottom, rgba(5, 8, 20, 0.75), rgba(15, 23, 42, 0.75), rgba(0, 0, 0, 0.85))";
+        } else {
+          bgOverlay.style.background = "";
+        }
+      }
+      renderWeatherStepView(container);
+    };
+  }
 
   const btnRefresh = document.getElementById("btn-refresh-weather-step");
   if (btnRefresh) {
