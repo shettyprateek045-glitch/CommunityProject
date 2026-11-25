@@ -91,7 +91,14 @@ flowchart LR
 
 ## 🌟 Upgraded Dashboard Capabilities
 
-### 1. Overview Landing Page (`/overview`) & Clean Authentication Flow
+### 1. Interactive 3D Rotating Earth Globe & Orbital Dive (Step 1: Location)
+- **Photorealistic Three.js WebGL Globe**: Features 2048px NASA Blue Marble day continents, nocturnal city lights, drifting cloud layers, and a Rayleigh atmospheric scattering halo.
+- **Deep Space Starfield**: Multi-layer 3D particle starfield with color temperatures (blue-white, solar amber, and rose stars).
+- **Cinematic Orbital Dive ("Goes into Earth")**: When "Detect My Location" is clicked, the 3D Earth calculates the spherical coordinate vector, smoothly rotates to center on the farm coordinates, pulses the laser beacon, and executes an orbital camera zoom dive plunging from space through the clouds down into the ground surface.
+- **Seamless 2D Map Transition**: Dissolves smoothly into the 2D Leaflet satellite/street field map centered on the detected coordinates with the draggable farm pin.
+- **Dual-Mode Switcher**: 1-click toggle between `🌍 3D Earth Orbit (ಉಪಗ್ರಹ ಗ್ಲೋಬ್)` and `🗺️ 2D Field Map (ಕ್ಷೇತ್ರ ನಕ್ಷೆ)` at any time.
+
+### 2. Overview Landing Page (`/overview`) & Clean Authentication Flow
 - **Responsive Hero Showcase**: Full-width responsive hero with high-resolution farmer photography and dark emerald overlay.
 - **Clear Action Entry**: Direct "Login to Dashboard" button (`/login`) and instant "Continue as Guest" preview (`/api/auth/guest`).
 - **Seamless Logout Redirect**: Logging out clears the authentication session cookie and smoothly returns visitors directly to the Overview page with an alert confirmation.

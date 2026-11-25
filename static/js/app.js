@@ -1,3 +1,5 @@
+import { Earth3DGlobe } from './earth3d.js';
+
 /**
  * Farmer Decision Dashboard - Enhanced Client Application (ES Module)
  * Incorporates:
@@ -418,6 +420,8 @@ let currentUser = null;
 let farmMap = null;
 let farmMarker = null;
 let farmCircle = null;
+let earthGlobeInstance = null;
+let activeLocationViewMode = "earth3d";
 let climateChartInstance = null;
 let mandiChartInstance = null;
 let weather5YrChartInstance = null;
@@ -2246,7 +2250,7 @@ export function renderDashboardShell(container, lang) {
 }
 
 // ============================================================================
-// 7. Step 1: Location with Leaflet OpenStreetMap
+// 7. Step 1: Location with 3D Rotating Earth & Leaflet OpenStreetMap
 // ============================================================================
 function renderLocationStepView(container) {
   const t = I18N[currentLang];
@@ -2265,8 +2269,8 @@ function renderLocationStepView(container) {
           </div>
         </div>
         <div class="flex flex-col items-start sm:items-end gap-1">
-          <button type="button" id="btn-use-browser-gps" class="px-4 py-2 rounded-xl bg-[#1b5e20] hover:bg-[#2e7d32] text-white text-xs font-bold flex items-center gap-2 shadow-sm transition active:scale-[0.98] cursor-pointer">
-            <i class="fa-solid fa-location-crosshairs"></i>
+          <button type="button" id="btn-use-browser-gps" class="px-4 py-2.5 rounded-xl bg-gradient-to-r from-[#1b5e20] to-[#2e7d32] hover:from-[#2e7d32] hover:to-[#33691e] text-white text-xs font-bold flex items-center gap-2 shadow-md transition active:scale-[0.98] cursor-pointer">
+            <i class="fa-solid fa-location-crosshairs text-amber-300"></i>
             <span>Detect My Location</span>
           </button>
           <span class="text-[10px] text-slate-500 flex items-center gap-1">
@@ -2300,9 +2304,55 @@ function renderLocationStepView(container) {
         <div id="location-detect-status"></div>
       </div>
 
-      <!-- Interactive Leaflet Map Container -->
-      <div class="space-y-2">
-        <div id="farm-leaflet-map" style="height: 340px; width: 100%; border-radius: 1.25rem; border: 1px solid #cbd5e1; z-index: 10;"></div>
+      <!-- 3D Earth Globe & 2D Map Dual-Mode Stage -->
+      <div class="space-y-3">
+        <div class="flex items-center justify-between flex-wrap gap-2">
+          <div class="inline-flex rounded-xl bg-slate-100 p-1 border border-slate-200 shadow-inner">
+            <button type="button" id="btn-toggle-view-3d" class="px-3.5 py-1.5 text-xs font-bold rounded-lg transition cursor-pointer flex items-center gap-1.5 shadow-xs ${activeLocationViewMode === 'earth3d' ? 'bg-[#1b5e20] text-white' : 'text-slate-600 hover:text-slate-900'}">
+              <i class="fa-solid fa-earth-americas text-amber-300"></i>
+              <span>3D Earth Orbit (ಉಪಗ್ರಹ ಗ್ಲೋಬ್)</span>
+            </button>
+            <button type="button" id="btn-toggle-view-2d" class="px-3.5 py-1.5 text-xs font-bold rounded-lg transition cursor-pointer flex items-center gap-1.5 ${activeLocationViewMode === 'leaflet' ? 'bg-[#1b5e20] text-white' : 'text-slate-600 hover:text-slate-900'}">
+              <i class="fa-solid fa-map-location-dot text-emerald-600"></i>
+              <span>2D Field Map (ಕ್ಷೇತ್ರ ನಕ್ಷೆ)</span>
+            </button>
+          </div>
+          <div class="text-[11px] text-slate-500 font-medium flex items-center gap-1.5">
+            <span class="inline-block w-2 h-2 rounded-full bg-emerald-500 animate-ping"></span>
+            <span id="earth-telemetry-status">Orbital Telemetry Active</span>
+          </div>
+        </div>
+
+        <!-- 3D Rotating Earth Container -->
+        <div id="earth-3d-stage" class="${activeLocationViewMode === 'earth3d' ? '' : 'hidden'} relative rounded-2xl overflow-hidden border border-slate-700 shadow-xl bg-[#03060a]" style="height: 380px;">
+          <div id="earth-3d-viewport" class="w-full h-full cursor-grab active:cursor-grabbing"></div>
+
+          <!-- Top-Left Floating Telemetry HUD -->
+          <div class="absolute top-3 left-3 pointer-events-none z-10 flex flex-col gap-1.5">
+            <div class="px-3 py-1.5 rounded-xl bg-black/60 backdrop-blur-md border border-white/20 text-white text-[11px] font-semibold flex items-center gap-2 shadow-lg">
+              <span class="text-amber-400">🌍</span>
+              <span>Photorealistic 3D Earth Orbit</span>
+              <span class="text-emerald-400 font-mono text-[10px]" id="earth-hud-coords">${farmContext.lat.toFixed(2)}°N, ${farmContext.lon.toFixed(2)}°E</span>
+            </div>
+            <div class="text-[10px] text-white/70 bg-black/40 px-2.5 py-1 rounded-lg backdrop-blur-xs max-w-xs leading-tight">
+              Drag to rotate globe · Click <strong>Detect My Location</strong> to plunge from orbit into farm field
+            </div>
+          </div>
+
+          <!-- Dive Status Alert Overlay -->
+          <div id="earth-dive-banner" class="hidden absolute bottom-4 inset-x-4 z-20 mx-auto max-w-md px-4 py-2.5 rounded-2xl bg-emerald-950/90 backdrop-blur-md border border-emerald-400/60 text-white text-xs font-semibold flex items-center justify-between shadow-2xl transition-all">
+            <div class="flex items-center gap-2.5">
+              <i class="fa-solid fa-shuttle-space text-amber-300 text-sm animate-bounce"></i>
+              <span id="earth-dive-text">Aligning orbital trajectory to coordinates...</span>
+            </div>
+            <span class="text-[10px] text-emerald-300 font-mono bg-emerald-900/60 px-2 py-0.5 rounded border border-emerald-400/40">HYPER-ZOOM</span>
+          </div>
+        </div>
+
+        <!-- 2D Leaflet Map Container -->
+        <div id="leaflet-map-stage" class="${activeLocationViewMode === 'leaflet' ? '' : 'hidden'} space-y-2">
+          <div id="farm-leaflet-map" style="height: 380px; width: 100%; border-radius: 1rem; border: 1px solid #cbd5e1; z-index: 10;"></div>
+        </div>
       </div>
 
       <!-- Manual Village Search Bar (Full Width) -->
@@ -2320,63 +2370,155 @@ function renderLocationStepView(container) {
     </div>
   `;
 
+  // Initialize 3D Earth Globe
+  const viewport = document.getElementById("earth-3d-viewport");
+  if (viewport && typeof THREE !== 'undefined') {
+    if (earthGlobeInstance) {
+      earthGlobeInstance.destroy();
+      earthGlobeInstance = null;
+    }
+    earthGlobeInstance = new Earth3DGlobe(viewport, {
+      initialLat: farmContext.lat,
+      initialLon: farmContext.lon,
+    });
+  }
+
+  // Setup mode switchers
+  const btn3D = document.getElementById("btn-toggle-view-3d");
+  const btn2D = document.getElementById("btn-toggle-view-2d");
+  const stage3D = document.getElementById("earth-3d-stage");
+  const stage2D = document.getElementById("leaflet-map-stage");
+
+  if (btn3D && btn2D && stage3D && stage2D) {
+    btn3D.onclick = () => {
+      activeLocationViewMode = "earth3d";
+      stage3D.classList.remove("hidden");
+      stage2D.classList.add("hidden");
+      btn3D.className = "px-3.5 py-1.5 text-xs font-bold rounded-lg transition cursor-pointer flex items-center gap-1.5 shadow-xs bg-[#1b5e20] text-white";
+      btn2D.className = "px-3.5 py-1.5 text-xs font-bold rounded-lg transition cursor-pointer flex items-center gap-1.5 text-slate-600 hover:text-slate-900";
+      if (earthGlobeInstance) earthGlobeInstance.resetOrbitalView();
+    };
+    btn2D.onclick = () => {
+      activeLocationViewMode = "leaflet";
+      stage3D.classList.add("hidden");
+      stage2D.classList.remove("hidden");
+      btn2D.className = "px-3.5 py-1.5 text-xs font-bold rounded-lg transition cursor-pointer flex items-center gap-1.5 shadow-xs bg-[#1b5e20] text-white";
+      btn3D.className = "px-3.5 py-1.5 text-xs font-bold rounded-lg transition cursor-pointer flex items-center gap-1.5 text-slate-600 hover:text-slate-900";
+      setTimeout(() => {
+        if (farmMap) farmMap.invalidateSize();
+        else initOrUpdateFarmMap();
+      }, 60);
+    };
+  }
+
   bindLocationStepListeners();
-  setTimeout(initOrUpdateFarmMap, 100);
+  if (activeLocationViewMode === 'leaflet') {
+    setTimeout(initOrUpdateFarmMap, 100);
+  }
 }
 
 function bindLocationStepListeners() {
   const statusEl = document.getElementById("location-detect-status");
 
+  const performOrbitalDive = async (lat, lon, accuracy, source) => {
+    const stage3D = document.getElementById("earth-3d-stage");
+    const stage2D = document.getElementById("leaflet-map-stage");
+    const btn3D = document.getElementById("btn-toggle-view-3d");
+    const btn2D = document.getElementById("btn-toggle-view-2d");
+    const diveBanner = document.getElementById("earth-dive-banner");
+    const diveText = document.getElementById("earth-dive-text");
+
+    // Ensure 3D stage is active so user sees orbital dive
+    activeLocationViewMode = "earth3d";
+    if (stage3D) stage3D.classList.remove("hidden");
+    if (stage2D) stage2D.classList.add("hidden");
+    if (btn3D) btn3D.className = "px-3.5 py-1.5 text-xs font-bold rounded-lg transition cursor-pointer flex items-center gap-1.5 shadow-xs bg-[#1b5e20] text-white";
+    if (btn2D) btn2D.className = "px-3.5 py-1.5 text-xs font-bold rounded-lg transition cursor-pointer flex items-center gap-1.5 text-slate-600 hover:text-slate-900";
+
+    await updateFarmPosition(lat, lon, accuracy, source);
+
+    const hudCoords = document.getElementById("earth-hud-coords");
+    if (hudCoords) hudCoords.innerText = `${lat.toFixed(4)}°N, ${lon.toFixed(4)}°E`;
+
+    if (diveBanner && diveText) {
+      diveBanner.classList.remove("hidden");
+      diveText.innerHTML = `🚀 Locking coordinates! Diving from orbit into <strong>${farmContext.village || 'Farm Field'}</strong>...`;
+    }
+
+    if (earthGlobeInstance) {
+      earthGlobeInstance.zoomToLocation(lat, lon, () => {
+        // On zoom completion: smoothly switch to 2D Leaflet map
+        if (stage3D) stage3D.classList.add("hidden");
+        if (stage2D) stage2D.classList.remove("hidden");
+        activeLocationViewMode = "leaflet";
+        if (btn2D) btn2D.className = "px-3.5 py-1.5 text-xs font-bold rounded-lg transition cursor-pointer flex items-center gap-1.5 shadow-xs bg-[#1b5e20] text-white";
+        if (btn3D) btn3D.className = "px-3.5 py-1.5 text-xs font-bold rounded-lg transition cursor-pointer flex items-center gap-1.5 text-slate-600 hover:text-slate-900";
+        if (diveBanner) diveBanner.classList.add("hidden");
+
+        setTimeout(() => {
+          initOrUpdateFarmMap();
+          if (farmMap) {
+            farmMap.invalidateSize();
+            farmMap.flyTo([lat, lon], 16, { duration: 1.2 });
+          }
+        }, 80);
+
+        if (statusEl) {
+          statusEl.innerHTML = `
+            <div class="p-3 bg-emerald-50 border border-emerald-200 text-emerald-900 rounded-xl text-xs flex items-center justify-between flex-wrap gap-2">
+              <span>✅ Descended from orbit to farm field: <strong>${farmContext.display_name}</strong> (±${Math.round(accuracy)}m).</span>
+              <button type="button" id="btn-revisit-3d" class="px-3 py-1 rounded-lg bg-emerald-800 hover:bg-emerald-900 text-white font-semibold text-[11px] transition flex items-center gap-1.5 cursor-pointer">
+                <i class="fa-solid fa-earth-americas text-amber-300"></i> View 3D Globe
+              </button>
+            </div>
+          `;
+          const revisitBtn = document.getElementById("btn-revisit-3d");
+          if (revisitBtn && btn3D) revisitBtn.onclick = () => btn3D.click();
+        }
+      });
+    } else {
+      if (stage3D) stage3D.classList.add("hidden");
+      if (stage2D) stage2D.classList.remove("hidden");
+      initOrUpdateFarmMap();
+    }
+  };
+
   const triggerLocationDetection = () => {
-    // 2. Show loading state while detecting
+    const diveBanner = document.getElementById("earth-dive-banner");
+    const diveText = document.getElementById("earth-dive-text");
+    if (diveBanner && diveText) {
+      diveBanner.classList.remove("hidden");
+      diveText.innerHTML = `<i class="fa-solid fa-spinner fa-spin text-amber-300"></i> Locking GPS satellite orbital trajectory...`;
+    }
+
     if (statusEl) {
       statusEl.innerHTML = `
         <div class="p-3 bg-blue-50 border border-blue-200 text-blue-900 rounded-xl text-xs flex items-center gap-2">
           <i class="fa-solid fa-spinner fa-spin text-blue-600"></i>
-          <span>Detecting your location...</span>
+          <span>Detecting your location via GPS satellite telemetry...</span>
         </div>
       `;
     }
 
-    // 1. Browser Geolocation API with enableHighAccuracy: true and 10s timeout
     if ("geolocation" in navigator) {
       navigator.geolocation.getCurrentPosition(
         async (pos) => {
-          // 3 & 4. On success: get lat/lon, reverse geocode, display in #location and store in farmContext
           const lat = pos.coords.latitude;
           const lon = pos.coords.longitude;
           const accuracy = pos.coords.accuracy;
 
-          await updateFarmPosition(lat, lon, accuracy, "gps");
-
-          if (statusEl) {
-            if (accuracy > 1000) {
-              statusEl.innerHTML = `
-                <div class="p-3 bg-amber-50 border border-amber-200 text-amber-900 rounded-xl text-xs flex items-center justify-between">
-                  <span>⚠️ Approximate GPS location (±${(accuracy / 1000).toFixed(1)} km). Drag the green pin on the map to pinpoint your exact field.</span>
-                </div>
-              `;
-            } else {
-              statusEl.innerHTML = `
-                <div class="p-3 bg-emerald-50 border border-emerald-200 text-emerald-900 rounded-xl text-xs flex items-center justify-between">
-                  <span>✅ Location detected successfully: <strong>${farmContext.display_name}</strong> (±${Math.round(accuracy)}m).</span>
-                </div>
-              `;
-            }
-          }
+          await performOrbitalDive(lat, lon, accuracy, "gps");
         },
         async (err) => {
           console.warn("GPS Geolocation error:", err);
           let errorExplanation = "";
-
-          // 5. Friendly error messages
           if (err.code === err.PERMISSION_DENIED || err.code === 1) {
             errorExplanation = `
               <div class="space-y-1">
                 <div class="font-bold flex items-center gap-1.5 text-rose-900">
                   <span>🚫</span> <span>Location permission was denied.</span>
                 </div>
-                <p class="text-rose-800">To enable location: click the 🔒 lock / tune icon in your browser address bar → site permissions → allow <strong>Location</strong>, then click Retry.</p>
+                <p class="text-rose-800">To enable location: click the 🔒 lock icon in browser address bar → site permissions → allow <strong>Location</strong>, then click Retry.</p>
               </div>
             `;
           } else if (err.code === err.TIMEOUT || err.code === 3) {
@@ -2398,7 +2540,6 @@ function bindLocationStepListeners() {
             `;
           }
 
-          // 6. Fallback: estimate approximate location from IP
           if (statusEl) {
             statusEl.innerHTML = `
               <div class="p-3.5 bg-amber-50 border border-amber-300 text-amber-900 rounded-xl text-xs space-y-2">
@@ -2420,22 +2561,7 @@ function bindLocationStepListeners() {
             if (resp.ok) {
               const ip = await resp.json();
               if (ip.lat && ip.lon) {
-                await updateFarmPosition(ip.lat, ip.lon, 2500, "network");
-                if (statusEl) {
-                  statusEl.innerHTML = `
-                    <div class="p-3.5 bg-amber-50 border border-amber-300 text-amber-900 rounded-xl text-xs space-y-2">
-                      ${errorExplanation}
-                      <div class="p-2 bg-white rounded-lg border border-amber-200 flex items-center justify-between flex-wrap gap-2">
-                        <span>ℹ️ Location estimated: <strong>${farmContext.display_name}</strong> (approximate – based on network).</span>
-                        <button type="button" id="btn-retry-gps-fallback" class="px-3 py-1 bg-amber-100 hover:bg-amber-200 text-amber-950 font-bold rounded-lg transition cursor-pointer">
-                          🔄 Retry GPS
-                        </button>
-                      </div>
-                    </div>
-                  `;
-                  const retryBtn = document.getElementById("btn-retry-gps-fallback");
-                  if (retryBtn) retryBtn.onclick = triggerLocationDetection;
-                }
+                await performOrbitalDive(ip.lat, ip.lon, 2500, "network");
                 return;
               }
             }
@@ -2443,6 +2569,7 @@ function bindLocationStepListeners() {
             console.error("IP fallback failed:", ipErr);
           }
 
+          if (diveBanner) diveBanner.classList.add("hidden");
           if (statusEl) {
             statusEl.innerHTML = `
               <div class="p-3 bg-rose-50 border border-rose-200 text-rose-900 rounded-xl text-xs">
@@ -2454,7 +2581,6 @@ function bindLocationStepListeners() {
         { enableHighAccuracy: true, timeout: 10000, maximumAge: 30000 }
       );
     } else {
-      // 5. Unsupported browser message
       if (statusEl) {
         statusEl.innerHTML = `
           <div class="p-3 bg-amber-50 border border-amber-200 text-amber-900 rounded-xl text-xs">
@@ -2465,7 +2591,7 @@ function bindLocationStepListeners() {
       fetch("/api/ip-location")
         .then(r => r.json())
         .then(ip => {
-          if (ip.lat && ip.lon) updateFarmPosition(ip.lat, ip.lon, 2500, "network");
+          if (ip.lat && ip.lon) performOrbitalDive(ip.lat, ip.lon, 2500, "network");
         })
         .catch(() => {});
     }
@@ -2508,8 +2634,8 @@ function bindLocationStepListeners() {
             item.onclick = async () => {
               const lat = parseFloat(item.getAttribute("data-lat"));
               const lon = parseFloat(item.getAttribute("data-lon"));
-              await updateFarmPosition(lat, lon, 25.0, "search");
               resContainer.innerHTML = '';
+              await performOrbitalDive(lat, lon, 25.0, "search");
             };
           });
         }
@@ -2529,12 +2655,17 @@ function renderLocationDisplayCards() {
   const lonEl = document.getElementById("loc-display-lon");
   const accEl = document.getElementById("loc-display-acc");
   const locInput = document.getElementById("location");
+  const hudCoords = document.getElementById("earth-hud-coords");
 
   if (v) v.innerText = farmContext.village || "Bengaluru";
   if (s) s.innerText = (farmContext.district ? farmContext.district + ", " : "") + farmContext.state;
   if (latEl) latEl.innerText = `${farmContext.lat.toFixed(4)}° N`;
   if (lonEl) lonEl.innerText = `${farmContext.lon.toFixed(4)}° E`;
   if (accEl) accEl.innerText = `±${(farmContext.accuracy_meters || 20).toFixed(0)}m`;
+  if (hudCoords) hudCoords.innerText = `${farmContext.lat.toFixed(2)}°N, ${farmContext.lon.toFixed(2)}°E`;
+  if (earthGlobeInstance && !earthGlobeInstance.isZooming) {
+    earthGlobeInstance.updateBeaconPosition(farmContext.lat, farmContext.lon);
+  }
   if (locInput) {
     if (locInput.tagName === "INPUT" || locInput.tagName === "TEXTAREA") locInput.value = farmContext.display_name;
     else locInput.innerText = farmContext.display_name;
@@ -6549,7 +6680,7 @@ function renderComparisonTable(container, compData) {
 // ============================================================================
 // 14. Application Bootstrap & Service Worker Registration
 // ============================================================================
-document.addEventListener("DOMContentLoaded", () => {
+function bootstrapApp() {
   const appContainer = document.getElementById("app");
   if (appContainer) {
     renderDashboardShell(appContainer, currentLang);
@@ -6561,4 +6692,10 @@ document.addEventListener("DOMContentLoaded", () => {
       .then(reg => console.log("Service Worker registered successfully:", reg.scope))
       .catch(err => console.warn("Service Worker registration failed:", err));
   }
-});
+}
+
+if (document.readyState === "loading") {
+  document.addEventListener("DOMContentLoaded", bootstrapApp);
+} else {
+  bootstrapApp();
+}

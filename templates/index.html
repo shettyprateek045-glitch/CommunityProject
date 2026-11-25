@@ -43,6 +43,9 @@
   <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" integrity="sha256-p4NxAoJBhIIN+hmNHrzRCf9tD/miZyoHS5obTRR9BMY=" crossorigin="" />
   <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js" integrity="sha256-20nQCchB9co0qIjJZRGuk2/Z9VM+kNiyxNV1lvTlZBo=" crossorigin=""></script>
 
+  <!-- Three.js 3D WebGL Engine for Interactive 3D Earth Globe -->
+  <script src="/static/js/three.min.js"></script>
+
   <!-- FontAwesome Icons CDN -->
   <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.1/css/all.min.css" />
 
@@ -72,22 +75,19 @@
       transition-duration: 0.001ms !important;
       scroll-behavior: auto !important;
     }
+    .-z-10 {
+      z-index: -10 !important;
+    }
+    .z-10 {
+      z-index: 10 !important;
+    }
+    body {
+      background: linear-gradient(rgba(11, 21, 12, 0.72), rgba(11, 21, 12, 0.82)), url('/static/img/overview_farmer.jpg') center/cover no-repeat fixed;
+    }
   </style>
 </head>
-<body class="bg-transparent text-slate-800 min-h-screen font-sans flex flex-col antialiased relative">
-  <!-- Persistent Looping Background Video (YouTube 85kTHwJ1Ju8 with HTML5 Fallback) -->
-  <div id="persistent-bg-container" class="fixed inset-0 w-full h-full overflow-hidden pointer-events-none -z-10" style="background-color: #0b150c;">
-    <div id="bg-poster-fallback" class="absolute inset-0 w-full h-full bg-cover bg-center transition-opacity duration-700" style="background-image: url('/static/img/bg-poster.jpg'); opacity: 1;"></div>
-    <div id="yt-bg-wrapper" class="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 pointer-events-none transition-opacity duration-1000 opacity-0 overflow-hidden" style="width: 177.78vh; height: 56.25vw; min-width: 100vw; min-height: 100vh;">
-      <div id="yt-bg-player" class="w-full h-full pointer-events-none"></div>
-    </div>
-    <video id="html5-bg-fallback-video" autoplay muted loop playsinline poster="/static/img/bg-poster.jpg" class="hidden absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 min-w-full min-h-full w-auto h-auto object-cover transition-opacity duration-1000 opacity-0 pointer-events-none">
-      <source src="/static/videos/farmer_field.mp4" type="video/mp4">
-      <source src="/static/videos/farmer_field.webm" type="video/webm">
-    </video>
-    <div id="bg-gradient-overlay" class="absolute inset-0 bg-gradient-to-b from-black/55 via-black/45 to-black/60 backdrop-blur-[1px]"></div>
-  </div>
-  <script src="/static/js/bg-video.js"></script>
+<body class="text-slate-800 min-h-screen font-sans flex flex-col antialiased relative">
+  <div id="bg-gradient-overlay" class="fixed inset-0 pointer-events-none transition-all duration-700 -z-10"></div>
 
   <!-- Dynamic Mount Point for Pure TypeScript Application with Zero-CLS Skeleton Shell -->
   <div id="app" class="relative z-10">
@@ -122,6 +122,6 @@
   </div>
 
   <!-- Client Application Script (Pure TypeScript/JavaScript bundle) -->
-  <script type="module" src="/static/js/app.js?v=5.0"></script>
+  <script type="module" src="/static/js/app.js?v=5.2"></script>
 </body>
 </html>
