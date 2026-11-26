@@ -30,6 +30,7 @@ export class Earth3DGlobe {
     this.atmosphereMesh = null;
     this.beaconGroup = null;
     this.beaconRing = null;
+    this.beaconOuterRing = null;
     this.beaconCore = null;
     this.beaconBeam = null;
     this.stars = null;
@@ -39,7 +40,7 @@ export class Earth3DGlobe {
     this.isZooming = false;
     this.zoomProgress = 0;
     this.zoomStartTime = 0;
-    this.zoomDuration = 2200; // ms
+    this.zoomDuration = 2800; // ms
 
     // Target coordinates for dive
     this.targetLat = this.options.initialLat;
@@ -73,20 +74,34 @@ export class Earth3DGlobe {
     return { rotX, rotY };
   }
 
+  checkResize() {
+    if (!this.container || !this.renderer || !this.camera) return;
+    const w = this.container.clientWidth;
+    const h = this.container.clientHeight;
+    if (w > 0 && h > 0) {
+      const targetAspect = w / h;
+      if (Math.abs(this.camera.aspect - targetAspect) > 0.001) {
+        this.camera.aspect = targetAspect;
+        this.camera.updateProjectionMatrix();
+        this.renderer.setSize(w, h);
+      }
+    }
+  }
+
   init() {
     if (!this.container || typeof THREE === 'undefined') {
       console.warn('Earth3DGlobe: Three.js or container not ready.');
       return;
     }
 
-    const width = this.container.clientWidth || 600;
-    const height = this.container.clientHeight || 380;
+    const width = this.container.clientWidth || 800;
+    const height = this.container.clientHeight || 520;
 
     // 1. Scene setup
     this.scene = new THREE.Scene();
     this.scene.background = new THREE.Color(0x03060a);
 
-    // 2. Camera setup
+    // 2. Camera setup - perfectly spherical aspect ratio
     this.camera = new THREE.PerspectiveCamera(42, width / height, 0.1, 100);
     this.camera.position.set(0, 0, 3.1);
 
@@ -107,7 +122,7 @@ export class Earth3DGlobe {
     this.container.appendChild(this.renderer.domElement);
 
     // 4. Lighting (Warm Sunlight + Deep Blue Ambient Rim)
-    const ambientLight = new THREE.AmbientLight(0xffffff, 0.4);
+    const ambientLight = new THREE.AmbientLight(0xffffff, 0.65);
     this.scene.add(ambientLight);
 
     const sunLight = new THREE.DirectionalLight(0xfffaee, 2.4);
@@ -130,14 +145,14 @@ export class Earth3DGlobe {
     const cloudsMap = textureLoader.load(this.options.cloudsTextureUrl);
     const lightsMap = textureLoader.load(this.options.lightsTextureUrl);
 
-    // Earth Sphere Geometry
+    // Earth Sphere Geometry (Radius 1.0, 64x64 segments)
     const earthGeo = new THREE.SphereGeometry(1, 64, 64);
     const earthMat = new THREE.MeshPhongMaterial({
       color: 0x1d4ed8,
       map: dayMap,
       emissiveMap: lightsMap,
       emissive: new THREE.Color(0xffbf69),
-      emissiveIntensity: 0.9,
+      emissiveIntensity: 0.85,
       specular: new THREE.Color(0x224455),
       shininess: 22,
     });
@@ -191,8 +206,13 @@ export class Earth3DGlobe {
     this.targetRotX = -initRot.rotX * 0.85;
     this.scene.add(this.earthGroup);
 
-    // 8. Event Listeners
+    // 8. Event Listeners & Auto-Resizer
     this.bindEvents();
+
+    if (window.ResizeObserver && this.container) {
+      this.resizeObserver = new ResizeObserver(() => this.checkResize());
+      this.resizeObserver.observe(this.container);
+    }
 
     // 9. Start Render Loop
     this.animate();
@@ -248,36 +268,56 @@ export class Earth3DGlobe {
     }
 
     this.beaconGroup = new THREE.Group();
-    const pos = this.latLonToVector3(lat, lon, 1.012);
+    const pos = this.latLonToVector3(lat, lon, 1.015);
     this.beaconGroup.position.copy(pos);
 
     // Orient beacon to point straight up from sphere surface
     this.beaconGroup.lookAt(pos.clone().multiplyScalar(2));
 
-    // Core pulsing beacon sphere
-    const coreGeo = new THREE.SphereGeometry(0.018, 16, 16);
-    this.beaconCore = new THREE.MeshBasicMaterial({ color: 0xff3b30 });
+    // Core pulsing beacon sphere (Gold Head)
+    const coreGeo = new THREE.SphereGeometry(0.024, 16, 16);
+    this.beaconCore = new THREE.MeshBasicMaterial({ color: 0xffd700 });
     const coreMesh = new THREE.Mesh(coreGeo, this.beaconCore);
+    coreMesh.position.z = 0.04;
     this.beaconGroup.add(coreMesh);
 
-    // Concentric animated radar beacon ring
-    const ringGeo = new THREE.RingGeometry(0.025, 0.046, 32);
+    // Pin stem
+    const stemGeo = new THREE.CylinderGeometry(0.003, 0.001, 0.04, 8);
+    stemGeo.translate(0, 0.02, 0);
+    const stemMat = new THREE.MeshBasicMaterial({ color: 0x10b981 });
+    const stemMesh = new THREE.Mesh(stemGeo, stemMat);
+    stemMesh.rotation.x = Math.PI / 2;
+    this.beaconGroup.add(stemMesh);
+
+    // Inner concentric animated radar beacon ring (Emerald)
+    const ringGeo = new THREE.RingGeometry(0.022, 0.042, 32);
     const ringMat = new THREE.MeshBasicMaterial({
       color: 0x34d399,
       transparent: true,
-      opacity: 0.85,
+      opacity: 0.9,
       side: THREE.DoubleSide
     });
     this.beaconRing = new THREE.Mesh(ringGeo, ringMat);
     this.beaconGroup.add(this.beaconRing);
 
-    // Vertical orbital telemetry laser beam
-    const beamGeo = new THREE.CylinderGeometry(0.002, 0.005, 0.12, 16);
-    beamGeo.translate(0, 0.06, 0);
+    // Outer concentric animated radar beacon ring (Amber)
+    const outerRingGeo = new THREE.RingGeometry(0.045, 0.068, 32);
+    const outerRingMat = new THREE.MeshBasicMaterial({
+      color: 0xf59e0b,
+      transparent: true,
+      opacity: 0.7,
+      side: THREE.DoubleSide
+    });
+    this.beaconOuterRing = new THREE.Mesh(outerRingGeo, outerRingMat);
+    this.beaconGroup.add(this.beaconOuterRing);
+
+    // Vertical orbital telemetry laser beam (Cyan)
+    const beamGeo = new THREE.CylinderGeometry(0.002, 0.006, 0.18, 16);
+    beamGeo.translate(0, 0.09, 0);
     const beamMat = new THREE.MeshBasicMaterial({
       color: 0x38bdf8,
       transparent: true,
-      opacity: 0.65,
+      opacity: 0.75,
     });
     this.beaconBeam = new THREE.Mesh(beamGeo, beamMat);
     this.beaconBeam.rotation.x = Math.PI / 2;
@@ -293,10 +333,11 @@ export class Earth3DGlobe {
   }
 
   /**
-   * Cinematic orbital dive:
+   * Cinematic multi-phase orbital dive:
    * 1. Rotates Earth so target coordinate faces the camera directly.
-   * 2. Zooms camera from orbit (z=3.1) down towards sphere surface (z=1.05).
-   * 3. Triggers onComplete callback for seamless transition into 2D Leaflet map.
+   * 2. Zooms camera from orbit (z=3.1) down through atmosphere.
+   * 3. Plunges INSIDE the earth (z=0.94) with atmospheric warp & particle shake.
+   * 4. Re-emerges to close surface altitude (z=1.12) to reveal coordinates point.
    */
   zoomToLocation(lat, lon, onComplete) {
     this.targetLat = lat;
@@ -310,6 +351,7 @@ export class Earth3DGlobe {
     this.isZooming = true;
     this.zoomProgress = 0;
     this.zoomStartTime = performance.now();
+    this.zoomDuration = 2800; // 2.8s complete cinematic experience
     this.onZoomCompleteCallback = onComplete || this.options.onZoomComplete;
   }
 
@@ -384,14 +426,19 @@ export class Earth3DGlobe {
 
     const time = performance.now() * 0.001;
 
-    // Pulse beacon radar ring & laser beam
+    // Pulse dual concentric beacon radar rings & laser beam
     if (this.beaconRing && this.beaconRing.material) {
-      const s = 1.0 + Math.sin(time * 5.0) * 0.45;
+      const s = 1.0 + Math.sin(time * 5.5) * 0.45;
       this.beaconRing.scale.set(s, s, 1);
-      this.beaconRing.material.opacity = 0.5 + Math.cos(time * 5.0) * 0.4;
+      this.beaconRing.material.opacity = 0.55 + Math.cos(time * 5.5) * 0.4;
+    }
+    if (this.beaconOuterRing && this.beaconOuterRing.material) {
+      const s2 = 1.0 + Math.sin(time * 3.8 + 1.2) * 0.42;
+      this.beaconOuterRing.scale.set(s2, s2, 1);
+      this.beaconOuterRing.material.opacity = 0.4 + Math.cos(time * 3.8 + 1.2) * 0.35;
     }
     if (this.beaconBeam) {
-      this.beaconBeam.material.opacity = 0.4 + Math.sin(time * 6.0) * 0.3;
+      this.beaconBeam.material.opacity = 0.5 + Math.sin(time * 6.5) * 0.35;
     }
 
     // Gentle cloud drift
@@ -399,32 +446,47 @@ export class Earth3DGlobe {
       this.cloudMesh.rotation.y += 0.0006;
     }
 
-    // Handle Zoom Dive Animation
+    // Handle Zoom Dive Animation: Plunges INSIDE the Earth then settles at coordinates
     if (this.isZooming) {
       const elapsed = performance.now() - this.zoomStartTime;
       const t = Math.min(1, elapsed / this.zoomDuration);
 
-      // Smooth cubic in-out easing
-      const ease = t < 0.5 ? 4 * t * t * t : 1 - Math.pow(-2 * t + 2, 3) / 2;
-
-      // Smoothly rotate Earth so target coordinates face camera
+      // Smoothly rotate Earth so target coordinates face camera dead-center
       if (this.earthGroup && this.targetRotY !== undefined) {
         let deltaY = (this.targetRotY - this.earthGroup.rotation.y) % (Math.PI * 2);
         if (deltaY > Math.PI) deltaY -= Math.PI * 2;
         if (deltaY < -Math.PI) deltaY += Math.PI * 2;
 
-        this.earthGroup.rotation.y += deltaY * 0.14;
-        this.earthGroup.rotation.x += (this.targetRotX - this.earthGroup.rotation.x) * 0.14;
+        this.earthGroup.rotation.y += deltaY * 0.16;
+        this.earthGroup.rotation.x += (this.targetRotX - this.earthGroup.rotation.x) * 0.16;
       }
 
-      // Plunge camera towards the globe surface
-      const startZ = 3.1;
-      const endZ = 1.05;
-      this.camera.position.z = startZ - (startZ - endZ) * ease;
+      // Multi-phase camera trajectory:
+      // Phase 1 (0 -> 0.48): Orbital descent towards earth surface (3.1 -> 1.35)
+      // Phase 2 (0.48 -> 0.76): Hypersonic plunge INSIDE the earth (1.35 -> 0.93 - Earth radius is 1.0)
+      // Phase 3 (0.76 -> 1.0): Emerge smoothly from inside the earth to surface vantage point (0.93 -> 1.14)
+      let currentZ;
+      if (t < 0.48) {
+        const p1 = t / 0.48;
+        const ease1 = p1 * p1 * (3 - 2 * p1); // smoothstep
+        currentZ = 3.1 - (3.1 - 1.35) * ease1;
+      } else if (t < 0.76) {
+        const p2 = (t - 0.48) / (0.76 - 0.48);
+        const ease2 = Math.sin(p2 * Math.PI * 0.5);
+        // Pierces through sphere surface (1.0) down to 0.93 inside the Earth!
+        currentZ = 1.35 - (1.35 - 0.93) * ease2;
+      } else {
+        const p3 = (t - 0.76) / (1.0 - 0.76);
+        const ease3 = 1 - Math.pow(1 - p3, 2);
+        // Surfacing up to 1.14 directly facing location point
+        currentZ = 0.93 + (1.14 - 0.93) * ease3;
+      }
+      this.camera.position.z = currentZ;
 
-      // Atmospheric penetration atmospheric vibration
-      if (t > 0.6 && t < 0.94) {
-        const shake = (1 - t) * 0.008;
+      // Atmospheric & crust penetration vibration
+      if (t > 0.45 && t < 0.82) {
+        const intensity = Math.sin((t - 0.45) / 0.37 * Math.PI);
+        const shake = intensity * 0.012;
         this.camera.position.x = (Math.random() - 0.5) * shake;
         this.camera.position.y = (Math.random() - 0.5) * shake;
       } else {
@@ -432,9 +494,13 @@ export class Earth3DGlobe {
         this.camera.position.y = 0;
       }
 
-      // Soft cloud fade as camera penetrates cloud layer
-      if (this.cloudMesh && t > 0.65) {
-        this.cloudMesh.material.opacity = Math.max(0.12, 0.54 * (1 - (t - 0.65) * 2.8));
+      // Cloud penetration dissolve when passing through cloud layer
+      if (this.cloudMesh) {
+        if (t > 0.48 && t < 0.78) {
+          this.cloudMesh.material.opacity = Math.max(0.08, 0.55 * (1 - (t - 0.48) * 3.0));
+        } else if (t >= 0.78) {
+          this.cloudMesh.material.opacity = 0.45;
+        }
       }
 
       if (t >= 1) {
@@ -452,6 +518,9 @@ export class Earth3DGlobe {
         this.earthGroup.rotation.y += this.options.autoRotateSpeed;
       }
     }
+
+    // Dynamic aspect check prevents any stretching or oval distortion
+    this.checkResize();
 
     if (this.renderer && this.scene && this.camera) {
       this.renderer.render(this.scene, this.camera);

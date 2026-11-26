@@ -48,6 +48,22 @@ app.add_middleware(
     allow_headers=["*"],
 )
 
+# High-Speed GZip Compression Middleware (Compresses all text/HTML/JS/JSON responses)
+from fastapi.middleware.gzip import GZipMiddleware
+app.add_middleware(GZipMiddleware, minimum_size=500)
+
+# Aggressive Browser Caching for Instant Loading Speed
+@app.middleware("http")
+async def add_performance_cache_headers(request: Request, call_next):
+    response = await call_next(request)
+    path = request.url.path
+    if path.startswith("/static/"):
+        if any(path.endswith(ext) for ext in [".jpg", ".jpeg", ".png", ".webp", ".mp4", ".webm", ".woff", ".woff2", ".ttf"]):
+            response.headers["Cache-Control"] = "public, max-age=604800, immutable"
+        elif path.endswith(".js") or path.endswith(".css"):
+            response.headers["Cache-Control"] = "public, max-age=86400, stale-while-revalidate=86400"
+    return response
+
 # Mount static asset directory
 app.mount("/static", StaticFiles(directory="static"), name="static")
 

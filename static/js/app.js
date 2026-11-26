@@ -2255,42 +2255,43 @@ function renderLocationStepView(container) {
   const t = I18N[currentLang];
 
   container.innerHTML = `
-    <div class="bg-white rounded-3xl shadow-sm border border-slate-200 p-6 sm:p-8 space-y-6">
+    <!-- Transparent Glassmorphic Container for Step 1 -->
+    <div class="bg-black/55 backdrop-blur-2xl rounded-3xl shadow-2xl border border-white/20 p-6 sm:p-8 space-y-6 text-white">
       
       <!-- Clean Minimal Header with ONLY 2 Primary Actions -->
       <div class="flex flex-col lg:flex-row lg:items-center justify-between gap-4">
         <div class="flex items-center gap-3">
-          <div class="w-12 h-12 rounded-2xl bg-emerald-100 text-[#1b5e20] text-2xl flex items-center justify-center shadow-inner">
+          <div class="w-12 h-12 rounded-2xl bg-emerald-500/20 border border-emerald-400/30 text-emerald-300 text-2xl flex items-center justify-center shadow-inner">
             <i class="fa-solid fa-earth-americas"></i>
           </div>
           <div>
-            <h2 class="text-lg sm:text-xl font-bold text-slate-900">${t.card_current_loc}</h2>
-            <p class="text-xs text-slate-500">Interactive 3D Orbital Earth · Detect GPS or enter location manually</p>
+            <h2 class="text-lg sm:text-xl font-extrabold text-white tracking-tight">${t.card_current_loc}</h2>
+            <p class="text-xs text-emerald-200">Interactive 3D Orbital Earth · Continuous Orbit · Click to Dive into Field</p>
           </div>
         </div>
 
         <!-- The ONLY 2 controls: Detect My Location & Manually Enter Location -->
         <div class="flex flex-wrap items-center gap-3">
-          <button type="button" id="btn-use-browser-gps" class="px-5 py-3 rounded-2xl bg-gradient-to-r from-[#1b5e20] to-[#2e7d32] hover:from-[#2e7d32] hover:to-[#33691e] text-white text-xs font-bold flex items-center gap-2.5 shadow-lg transition transform hover:-translate-y-0.5 active:scale-[0.98] cursor-pointer">
+          <button type="button" id="btn-use-browser-gps" class="px-5 py-3 rounded-2xl bg-gradient-to-r from-[#1b5e20] to-[#2e7d32] hover:from-[#2e7d32] hover:to-[#33691e] text-white text-xs font-bold flex items-center gap-2.5 shadow-lg transition transform hover:-translate-y-0.5 active:scale-[0.98] cursor-pointer border border-emerald-400/40">
             <i class="fa-solid fa-location-crosshairs text-amber-300 text-sm animate-pulse"></i>
             <span>Detect My Location</span>
           </button>
 
-          <button type="button" id="btn-toggle-manual-input" class="px-5 py-3 rounded-2xl bg-slate-100 hover:bg-slate-200 text-slate-800 text-xs font-bold flex items-center gap-2 border border-slate-300 transition cursor-pointer">
-            <i class="fa-solid fa-keyboard text-emerald-700 text-sm"></i>
+          <button type="button" id="btn-toggle-manual-input" class="px-5 py-3 rounded-2xl bg-white/15 hover:bg-white/25 text-white text-xs font-bold flex items-center gap-2 border border-white/20 transition cursor-pointer backdrop-blur-md">
+            <i class="fa-solid fa-keyboard text-emerald-300 text-sm"></i>
             <span>Manually Enter Location</span>
           </button>
         </div>
       </div>
 
       <!-- Manual Entry Location Drawer (Toggles open when clicked) -->
-      <div id="manual-location-panel" class="hidden p-4 rounded-2xl bg-emerald-50/70 border border-emerald-200 space-y-2 transition-all">
-        <label class="block text-xs font-bold text-emerald-950 uppercase tracking-wider">
-          <i class="fa-solid fa-magnifying-glass-location text-emerald-700 mr-1"></i> Enter Village, Town, or District Manually
+      <div id="manual-location-panel" class="hidden p-4 rounded-2xl bg-black/60 backdrop-blur-xl border border-white/20 space-y-2 transition-all">
+        <label class="block text-xs font-bold text-emerald-300 uppercase tracking-wider">
+          <i class="fa-solid fa-magnifying-glass-location text-emerald-400 mr-1"></i> Enter Village, Town, or District Manually
         </label>
         <div class="flex gap-2">
-          <input type="text" id="input-search-place" class="w-full px-4 py-2.5 text-xs sm:text-sm border border-slate-300 rounded-xl bg-white focus:outline-none focus:ring-2 focus:ring-emerald-600 shadow-xs" placeholder="e.g. Dharwad, Mandya, Belagavi, Davanagere, Mysuru" />
-          <button type="button" id="btn-exec-search" class="px-5 bg-[#1b5e20] hover:bg-[#2e7d32] text-white text-xs font-bold rounded-xl transition cursor-pointer flex items-center gap-1.5 shrink-0">
+          <input type="text" id="input-search-place" class="w-full px-4 py-2.5 text-xs sm:text-sm border border-white/20 rounded-xl bg-black/40 text-white placeholder-white/40 focus:outline-none focus:ring-2 focus:ring-emerald-400 shadow-xs backdrop-blur-md" placeholder="e.g. Dharwad, Mandya, Belagavi, Davanagere, Mysuru" />
+          <button type="button" id="btn-exec-search" class="px-5 bg-[#1b5e20] hover:bg-[#2e7d32] text-white text-xs font-bold rounded-xl transition cursor-pointer flex items-center gap-1.5 shrink-0 border border-emerald-400/40">
             <i class="fa-solid fa-arrow-right"></i>
             <span>Find & Dive</span>
           </button>
@@ -2321,6 +2322,52 @@ function renderLocationStepView(container) {
             <span id="earth-dive-text">Aligning orbital trajectory to coordinates...</span>
           </div>
           <span class="text-[10px] text-emerald-300 font-mono bg-emerald-900/60 px-2.5 py-1 rounded-lg border border-emerald-400/40">HYPER-ZOOM</span>
+        </div>
+
+        <!-- Floating Location Points Card anchored on coordinates after dive inside earth -->
+        <div id="earth-location-points-card" class="hidden absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 z-30 pointer-events-auto max-w-sm w-[92%] p-5 rounded-3xl bg-slate-950/90 backdrop-blur-2xl border border-emerald-400/60 text-white shadow-2xl space-y-3.5 transition-all">
+          <div class="flex items-center justify-between border-b border-white/15 pb-2.5">
+            <div class="flex items-center gap-2">
+              <span class="relative flex h-3 w-3">
+                <span class="animate-ping absolute inline-flex h-full w-full rounded-full bg-emerald-400 opacity-75"></span>
+                <span class="relative inline-flex rounded-full h-3 w-3 bg-emerald-500"></span>
+              </span>
+              <span class="text-xs font-bold text-amber-300 uppercase tracking-wider">Location Points Locked</span>
+            </div>
+            <button type="button" id="btn-points-dismiss" class="text-white/60 hover:text-white p-1 rounded-lg hover:bg-white/10 transition cursor-pointer" title="Close callout">
+              <i class="fa-solid fa-xmark"></i>
+            </button>
+          </div>
+
+          <div class="grid grid-cols-2 gap-2 text-xs">
+            <div class="p-2.5 rounded-2xl bg-white/5 border border-white/10 space-y-0.5">
+              <span class="text-[10px] text-emerald-300 font-semibold uppercase tracking-wider">Latitude Point</span>
+              <div id="card-point-lat" class="font-mono font-bold text-white text-sm">--</div>
+            </div>
+            <div class="p-2.5 rounded-2xl bg-white/5 border border-white/10 space-y-0.5">
+              <span class="text-[10px] text-emerald-300 font-semibold uppercase tracking-wider">Longitude Point</span>
+              <div id="card-point-lon" class="font-mono font-bold text-white text-sm">--</div>
+            </div>
+          </div>
+
+          <div class="p-3 rounded-2xl bg-emerald-950/60 border border-emerald-500/30 text-xs space-y-1">
+            <div class="flex items-center justify-between text-white/70 text-[11px]">
+              <span class="font-medium">📍 Current Farm Field Point</span>
+              <span id="card-point-acc" class="text-amber-300 font-mono text-[10px]">Fix ±20m</span>
+            </div>
+            <div id="card-point-address" class="font-bold text-white truncate text-xs">--</div>
+          </div>
+
+          <div class="flex items-center gap-2 pt-1">
+            <button type="button" id="btn-points-proceed-weather" class="flex-1 py-2.5 px-3 rounded-xl bg-gradient-to-r from-[#1b5e20] to-[#2e7d32] hover:from-[#2e7d32] hover:to-[#33691e] text-white font-bold text-xs shadow-md transition flex items-center justify-center gap-1.5 cursor-pointer">
+              <span>Next: Weather & Soil</span>
+              <i class="fa-solid fa-arrow-right text-[10px]"></i>
+            </button>
+            <button type="button" id="btn-points-open-map" class="py-2.5 px-3 rounded-xl bg-white/15 hover:bg-white/25 text-white font-semibold text-xs border border-white/20 transition flex items-center gap-1.5 cursor-pointer">
+              <i class="fa-solid fa-map-location-dot text-amber-300"></i>
+              <span>2D Map</span>
+            </button>
+          </div>
         </div>
 
         <!-- Bottom Confirmed Location Pill Overlay -->
@@ -2444,19 +2491,50 @@ function bindLocationStepListeners() {
     const locCoords = document.getElementById("loc-display-coords");
     if (locCoords) locCoords.innerText = `(${lat.toFixed(4)}°N, ${lon.toFixed(4)}°E)`;
 
+    const pointsCard = document.getElementById("earth-location-points-card");
+    if (pointsCard) pointsCard.classList.add("hidden");
+
     if (diveBanner && diveText) {
       diveBanner.classList.remove("hidden");
-      diveText.innerHTML = `🚀 Locking coordinates! Diving from orbit into <strong>${farmContext.village || 'Farm Field'}</strong>...`;
+      diveText.innerHTML = `🚀 Plunging inside Earth towards coordinates <strong>${lat.toFixed(4)}°N, ${lon.toFixed(4)}°E</strong>...`;
     }
 
     if (earthGlobeInstance) {
       earthGlobeInstance.zoomToLocation(lat, lon, () => {
         if (diveBanner) diveBanner.classList.add("hidden");
 
+        // Present the Current Location Points Card directly on the 3D location
+        const card = document.getElementById("earth-location-points-card");
+        if (card) {
+          const latEl = document.getElementById("card-point-lat");
+          const lonEl = document.getElementById("card-point-lon");
+          const accEl = document.getElementById("card-point-acc");
+          const addrEl = document.getElementById("card-point-address");
+          if (latEl) latEl.innerText = `${lat.toFixed(4)}° N`;
+          if (lonEl) lonEl.innerText = `${lon.toFixed(4)}° E`;
+          if (accEl) accEl.innerText = `Fix ±${Math.round(accuracy)}m`;
+          if (addrEl) addrEl.innerText = `${farmContext.village || 'Bengaluru'}, ${farmContext.district || 'Karnataka'}`;
+          card.classList.remove("hidden");
+
+          const dismissBtn = document.getElementById("btn-points-dismiss");
+          if (dismissBtn) dismissBtn.onclick = () => card.classList.add("hidden");
+
+          const proceedBtn = document.getElementById("btn-points-proceed-weather");
+          if (proceedBtn) {
+            proceedBtn.onclick = () => {
+              currentStepIndex = 1;
+              renderDashboardShell(document.getElementById("dashboard-root"), currentLang);
+            };
+          }
+
+          const mapBtn = document.getElementById("btn-points-open-map");
+          if (mapBtn) mapBtn.onclick = show2DMap;
+        }
+
         if (statusEl) {
           statusEl.innerHTML = `
             <div class="p-3 bg-emerald-50 border border-emerald-200 text-emerald-900 rounded-2xl text-xs flex items-center justify-between flex-wrap gap-2 shadow-xs">
-              <span>✅ Descended from orbit to farm field: <strong>${farmContext.display_name}</strong> (±${Math.round(accuracy)}m).</span>
+              <span>✅ Descended inside Earth to location point: <strong>${farmContext.display_name}</strong> (±${Math.round(accuracy)}m).</span>
               <button type="button" id="btn-open-field-map-direct" class="px-3.5 py-1.5 rounded-xl bg-emerald-800 hover:bg-emerald-900 text-white font-semibold text-xs transition flex items-center gap-1.5 cursor-pointer">
                 <i class="fa-solid fa-map-location-dot text-amber-300"></i> Open 2D Field Map
               </button>
@@ -2588,9 +2666,9 @@ function bindLocationStepListeners() {
     btnGps.onclick = triggerLocationDetection;
   }
 
-  // Auto-detect on first visit if not restored from a confirmed run
-  if (farmContext.location_source === "initial") {
-    triggerLocationDetection();
+  // Idle state: Earth stays visible and auto-rotating in space until user clicks "Detect My Location"
+  if (earthGlobeInstance) {
+    earthGlobeInstance.resetOrbitalView();
   }
 
   const btnSearch = document.getElementById("btn-exec-search");
