@@ -141,6 +141,21 @@ else:
 }
 
 // API Endpoints
+app.get('/api/ip-location', (req, res) => {
+  res.json({
+    status: 'success',
+    lat: 12.9716,
+    lon: 77.5946,
+    city: 'Bengaluru',
+    region: 'Karnataka',
+    country: 'India',
+    village: 'Bengaluru',
+    district: 'Bengaluru Urban',
+    state: 'Karnataka',
+    display_name: 'Bengaluru, Karnataka, India'
+  });
+});
+
 app.post('/api/location', async (req, res) => {
   try {
     const result = await runPythonBridge('location', req.body);

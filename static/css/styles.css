@@ -1,6 +1,15 @@
-/* Simple overrides for the dashboard UI */
+/* ============================================================================
+   Farmer Decision Dashboard - Light Green & High-Contrast Typography Stylesheet
+   ============================================================================ */
+
 body {
   font-family: 'Inter', sans-serif;
+  background-color: #eefaf2 !important;
+  color: #064e3b !important;
+  font-size: 16px !important;
+  -webkit-font-smoothing: antialiased !important;
+  -moz-osx-font-smoothing: grayscale !important;
+  text-rendering: optimizeLegibility !important;
 }
 
 #app {
@@ -10,73 +19,203 @@ body {
   padding: 0;
 }
 
-.form-section {
-  background: white;
-  padding: 1.5rem;
-  border-radius: 0.5rem;
-  box-shadow: 0 2px 8px rgba(0,0,0,0.1);
-  margin-bottom: 1rem;
+/* Header, Stepper, and Footer Light Green Styling */
+header {
+  background: #e6f7ec !important;
+  border-bottom: 2px solid #86efac !important;
+  color: #064e3b !important;
+}
+header h1, header h2, header h3, header span, header a, header button {
+  color: #064e3b !important;
 }
 
-.form-section h2 {
-  margin-bottom: 0.75rem;
-  font-size: 1.25rem;
-  color: #2d3748; /* slate‑800 */
+.stepper-header, #stepper-bar-container, #stepper-bar {
+  background: #f0fdf4 !important;
 }
 
-.form-section input {
-  width: 100%;
-  padding: 0.5rem;
-  margin-bottom: 0.75rem;
-  border: 1px solid #cbd5e0; /* slate‑300 */
-  border-radius: 0.375rem;
+footer {
+  background: #e6f7ec !important;
+  border-top: 2px solid #86efac !important;
+  color: #064e3b !important;
 }
 
-.btn-primary {
-  background: #48bb78; /* green‑500 */
-  color: white;
-  padding: 0.5rem 1rem;
-  border: none;
-  border-radius: 0.375rem;
-  cursor: pointer;
-}
-
-.btn-primary:hover {
-  background: #38a169; /* green‑600 */
-}
-
-.farm-list {
-  margin-top: 1rem;
-}
-
-.farm-list table {
-  width: 100%;
-  border-collapse: collapse;
-}
-
-.farm-list th, .farm-list td {
-  padding: 0.5rem;
-  border: 1px solid #e2e8f0; /* slate‑200 */
-  text-align: left;
-}
-
-.logout-btn {
-  margin-top: 1rem;
-  background: #f56565; /* red‑500 */
-}
-
-/* Glassmorphism System for Maximum Readability over Video Background */
-body {
-  background-color: transparent !important;
-}
-
+/* ============================================================================
+   All Pages Light Green Theme Cards Across Steps 1 through 7
+   ============================================================================ */
 .glass-card,
-.step-panel > div {
-  background: rgba(255, 255, 255, 0.92) !important;
-  backdrop-filter: blur(12px) !important;
-  -webkit-backdrop-filter: blur(12px) !important;
-  border: 1px solid rgba(255, 255, 255, 0.6) !important;
+.step-panel,
+.step-panel > div,
+#panel-step-1 > div,
+#panel-step-2 > div,
+#panel-step-3 > div,
+#panel-step-4 > div,
+#panel-step-5 > div,
+#panel-step-6 > div,
+#panel-step-7 > div,
+.crop-card,
+#soilgrids-preview-card,
+#soil-report-box > div,
+#fertilizer-calc-results > div,
+#banner-weather-alerts-container,
+#banner-weather-alerts-container > div,
+.weather-alert-banner {
+  background: #ffffff !important;
+  border: 2px solid #86efac !important;
   border-radius: 1.5rem !important;
+  box-shadow: 0 10px 25px -5px rgba(5, 150, 105, 0.08), 0 8px 10px -6px rgba(5, 150, 105, 0.04) !important;
+  color: #064e3b !important;
+  backdrop-filter: none !important;
+  -webkit-backdrop-filter: none !important;
+  transition: all 0.25s ease !important;
+}
+
+.step-panel .bg-white:hover,
+.crop-card:hover {
+  border-color: #4ade80 !important;
+  box-shadow: 0 16px 30px -5px rgba(5, 150, 105, 0.14) !important;
+}
+
+/* Inner Sub-Cards & Metric Stat Boxes: Crisp White with Light Green Border */
+#panel-step-3 .bg-white,
+#panel-step-4 .bg-white,
+#panel-step-5 .bg-white,
+#panel-step-6 .bg-white,
+#panel-step-7 .bg-white,
+.step-panel .bg-white,
+.step-panel .bg-slate-50,
+.step-panel .bg-white\/10,
+.step-panel .bg-earth-50,
+.step-panel .grid > div:not(.crop-card) {
+  background: #ffffff !important;
+  border: 1.5px solid #bbf7d0 !important;
+  border-radius: 1rem !important;
+  box-shadow: 0 2px 6px rgba(5, 150, 105, 0.04) !important;
+}
+
+/* ============================================================================
+   ALL LETTERS CLEARLY VISIBLE: High-Contrast Dark Green & Black Typography
+   ============================================================================ */
+.step-panel, .step-panel * {
+  text-shadow: none !important;
+}
+
+/* Headings: Deep, bold, crisp Forest Black/Green */
+.step-panel h1, .step-panel h2, .step-panel h3, .step-panel h4, .step-panel h5, .step-panel h6,
+#panel-step-1 h1, #panel-step-2 h1, #panel-step-3 h1, #panel-step-4 h1, #panel-step-5 h1, #panel-step-6 h1, #panel-step-7 h1,
+#panel-step-1 h2, #panel-step-2 h2, #panel-step-3 h2, #panel-step-4 h2, #panel-step-5 h2, #panel-step-6 h2, #panel-step-7 h2,
+#panel-step-1 h3, #panel-step-2 h3, #panel-step-3 h3, #panel-step-4 h3, #panel-step-5 h3, #panel-step-6 h3, #panel-step-7 h3 {
+  color: #064e3b !important;
+  font-weight: 900 !important;
+  letter-spacing: -0.01em !important;
+}
+
+/* Labels: Big, bold, pitch dark green */
+label, .step-panel label {
+  font-size: 1.05rem !important;
+  font-weight: 800 !important;
+  letter-spacing: 0.01em !important;
+  color: #064e3b !important;
+  display: inline-block !important;
+  margin-bottom: 0.35rem !important;
+}
+
+/* Paragraphs & Descriptions: Deep Obsidian Slate */
+p, .step-panel p {
+  font-size: 1.02rem !important;
+  line-height: 1.65 !important;
+  color: #0f172a !important;
+  font-weight: 600 !important;
+}
+
+/* Spans, Lists, Table cells */
+.step-panel span:not(.step-btn span):not(button.bg-emerald-700 span):not(button.bg-emerald-800 span):not(#btn-step-next span):not(#btn-use-browser-gps span):not(#btn-run-fertilizer-calc span),
+.step-panel li, .step-panel td, .step-panel th,
+.step-panel div:not([class*="bg-emerald-700"]):not([class*="bg-emerald-800"]) {
+  color: #0f172a !important;
+  font-weight: 600 !important;
+}
+
+/* Metric numbers, bag counts, revenue figures */
+.step-panel strong {
+  color: #022c22 !important;
+  font-weight: 900 !important;
+}
+
+/* Override any faint or washed-out classes */
+.step-panel .text-slate-900,
+.step-panel .text-slate-800,
+.step-panel .text-slate-700,
+.step-panel .text-slate-600,
+.step-panel .text-slate-500,
+.step-panel .text-slate-400,
+.step-panel .text-sky-200,
+.step-panel .text-sky-300,
+.step-panel .text-purple-200,
+.step-panel .text-purple-300,
+.step-panel .text-emerald-200,
+.step-panel .text-emerald-100,
+.step-panel .text-amber-300 {
+  color: #064e3b !important;
+  font-weight: 700 !important;
+}
+
+/* ============================================================================
+   Form Inputs & Dropdowns: Pure White with Light Green Border & Dark Text
+   ============================================================================ */
+.step-panel input, .step-panel select, .step-panel textarea {
+  font-size: 1.05rem !important;
+  font-weight: 700 !important;
+  padding: 0.75rem 1rem !important;
+  background: #ffffff !important;
+  border: 2px solid #059669 !important;
+  color: #022c22 !important;
+  border-radius: 0.85rem !important;
+  box-shadow: 0 1px 3px 0 rgba(5, 150, 105, 0.08) !important;
+  text-shadow: none !important;
+}
+
+.step-panel select option {
+  background: #ffffff !important;
+  color: #022c22 !important;
+  font-weight: 700 !important;
+  padding: 0.5rem !important;
+}
+
+.step-panel input:focus, .step-panel select:focus, .step-panel textarea:focus {
+  border-color: #047857 !important;
+  box-shadow: 0 0 0 4px rgba(16, 185, 129, 0.25) !important;
+  outline: none !important;
+}
+
+.step-panel input::placeholder {
+  color: #4b5563 !important;
+  font-weight: 500 !important;
+}
+
+/* ============================================================================
+   Buttons: Prominent, High-Contrast & Legible
+   ============================================================================ */
+button.bg-emerald-700, button.bg-emerald-700 *,
+button.bg-emerald-800, button.bg-emerald-800 *,
+#btn-step-next, #btn-step-next *,
+#btn-use-browser-gps, #btn-use-browser-gps *,
+#btn-run-fertilizer-calc, #btn-run-fertilizer-calc *,
+.step-btn.bg-emerald-700, .step-btn.bg-emerald-700 * {
+  background-color: #047857 !important;
+  color: #ffffff !important;
+  font-weight: 900 !important;
+  text-shadow: 0 1px 2px rgba(0, 0, 0, 0.25) !important;
+}
+
+#btn-step-prev, #btn-retake-soil, #btn-schemes, #btn-history, #btn-open-leaf-scanner {
+  background: #ffffff !important;
+  border: 2px solid #86efac !important;
+  color: #064e3b !important;
+  font-weight: 800 !important;
+}
+
+#btn-step-prev:hover, #btn-retake-soil:hover {
+  background: #dcfce7 !important;
 }
 
 /* High-Contrast Modals, Panels & Drawers */
@@ -85,11 +224,10 @@ body {
 #modal-schemes > div,
 #modal-leaf-scanner > div,
 #panel-krishi-chat {
-  background: rgba(255, 255, 255, 0.97) !important;
-  backdrop-filter: blur(16px) !important;
-  -webkit-backdrop-filter: blur(16px) !important;
-  box-shadow: 0 25px 50px -12px rgba(0, 0, 0, 0.5) !important;
-  border: 1px solid rgba(255, 255, 255, 0.8) !important;
+  background: #ffffff !important;
+  box-shadow: 0 25px 50px -12px rgba(5, 150, 105, 0.25) !important;
+  border: 2px solid #86efac !important;
+  border-radius: 1.5rem !important;
 }
 
 #earth-3d-viewport canvas {

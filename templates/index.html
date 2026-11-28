@@ -5,10 +5,24 @@
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>Farmer Decision Dashboard | ರೈತ ನಿರ್ಧಾರ ಬೆಂಬಲ ವ್ಯವಸ್ಥೆ</title>
   
+  <!-- Immediate Service Worker & Cache Purge -->
+  <script>
+    if ('serviceWorker' in navigator) {
+      navigator.serviceWorker.getRegistrations().then(function(regs) {
+        for (var r of regs) { r.unregister(); }
+      });
+    }
+    if ('caches' in window) {
+      caches.keys().then(function(names) {
+        for (var n of names) { caches.delete(n); }
+      });
+    }
+  </script>
+
   <!-- High-Speed Preloads for Lightning-Fast Loading -->
   <link rel="preload" href="/static/js/three.min.js" as="script">
-  <link rel="modulepreload" href="/static/js/app.js?v=5.2">
-  <link rel="modulepreload" href="/static/js/earth3d.js">
+  <link rel="modulepreload" href="/static/js/app.js?v=50.0">
+  <link rel="modulepreload" href="/static/js/earth3d.js?v=50.0">
   <link rel="preload" href="/static/img/earth_day.jpg" as="image">
   <link rel="preload" href="/static/img/earth_clouds.jpg" as="image">
   <link rel="preload" href="/static/img/overview_farmer.jpg" as="image">
@@ -57,24 +71,56 @@
   <!-- Three.js 3D WebGL Engine for Interactive 3D Earth Globe -->
   <script src="/static/js/three.min.js"></script>
 
+  <!-- YouTube IFrame API for Background Video (1s to 2s clip for Step 5 and 6) -->
+  <script src="https://www.youtube.com/iframe_api"></script>
+
+  <!-- Preload User Uploaded Soil Background & NASA Earth Maps -->
+  <link rel="preload" href="/static/img/soil_uploaded_bg.jpg" as="image">
+
   <!-- FontAwesome Icons CDN -->
   <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.1/css/all.min.css" />
 
-  <!-- Custom Styles & PWA Manifest -->
-  <link rel="stylesheet" href="/static/css/styles.css" />
+  <!-- Custom Styles & PWA Manifest with Cache Buster -->
+  <link rel="stylesheet" href="/static/css/styles.css?v=50.0" />
   <link rel="manifest" href="/static/manifest.json" />
-  <meta name="theme-color" content="#1b5e20" />
+  <meta name="theme-color" content="#ffffff" />
   <meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate" />
   <meta http-equiv="Pragma" content="no-cache" />
   <meta http-equiv="Expires" content="0" />
 
-  <!-- Zero-CLS & Performance Mode Inline Critical CSS -->
+  <!-- Refreshing Light Green Theme & Ultra-High-Contrast Crisp Lettering -->
   <style>
     /* Prevent Cumulative Layout Shift (CLS) on Map and Stepper Containers */
     #farm-leaflet-map {
-      min-height: 340px;
+      min-height: 440px;
       aspect-ratio: 16 / 9;
-      background: #f1f5f9;
+      background: #eefaf2 !important;
+      border: 2px solid #86efac !important;
+      border-radius: 1rem !important;
+      overflow: hidden;
+    }
+    .leaflet-container {
+      background: #eefaf2 !important;
+      font-family: inherit !important;
+    }
+    .leaflet-popup-content-wrapper {
+      background: #ffffff !important;
+      color: #064e3b !important;
+      border: 2px solid #86efac !important;
+      border-radius: 14px !important;
+      box-shadow: 0 12px 30px rgba(5, 150, 105, 0.12) !important;
+    }
+    .leaflet-popup-tip {
+      background: #ffffff !important;
+    }
+    .leaflet-bar a {
+      background-color: #ffffff !important;
+      color: #064e3b !important;
+      border-bottom: 1px solid #86efac !important;
+    }
+    .leaflet-bar a:hover {
+      background-color: #dcfce7 !important;
+      color: #047857 !important;
     }
     .stepper-nav-bar {
       min-height: 52px;
@@ -92,47 +138,240 @@
     .z-10 {
       z-index: 10 !important;
     }
+
+    /* All Pages Light Green Theme */
     body {
-      background: linear-gradient(rgba(11, 21, 12, 0.72), rgba(11, 21, 12, 0.82)), url('/static/img/overview_farmer.jpg') center/cover no-repeat fixed;
+      background: #eefaf2 !important;
+      background-attachment: fixed !important;
+      color: #064e3b !important;
+      font-size: 16px !important;
+      -webkit-font-smoothing: antialiased !important;
+      -moz-osx-font-smoothing: grayscale !important;
+      text-rendering: optimizeLegibility !important;
+    }
+
+    /* Header, Stepper, and Footer Light Green Styling */
+    header {
+      background: #e6f7ec !important;
+      border-bottom: 2px solid #86efac !important;
+      color: #064e3b !important;
+    }
+    header h1, header h2, header h3 {
+      color: #064e3b !important;
+      font-weight: 900 !important;
+    }
+    .stepper-header, #stepper-bar-container {
+      background: #f0fdf4 !important;
+      border-bottom: 2px solid #86efac !important;
+    }
+    footer {
+      background: #e6f7ec !important;
+      border-top: 2px solid #86efac !important;
+      color: #064e3b !important;
+    }
+
+    /* Whatever was black is now changed to pure white cards */
+    .step-panel .bg-white,
+    .step-panel .bg-slate-50,
+    .step-panel .bg-slate-900,
+    .step-panel .bg-slate-950,
+    .step-panel .bg-emerald-50,
+    .step-panel .bg-amber-50,
+    .step-panel .bg-earth-50,
+    .step-panel .bg-black\/40,
+    .step-panel .bg-black\/50,
+    .step-panel .bg-black\/55,
+    .step-panel .bg-black\/60,
+    .step-panel .bg-black\/65,
+    .step-panel .bg-black\/70,
+    .step-panel .bg-black\/75,
+    .step-panel .bg-black\/80,
+    .step-panel .bg-black\/85,
+    .step-panel .bg-emerald-950\/70,
+    .step-panel .bg-emerald-950\/95,
+    .crop-card,
+    #soilgrids-preview-card,
+    #soil-report-box > div,
+    #fertilizer-calc-results > div,
+    #banner-weather-alerts-container,
+    #banner-weather-alerts-container > div,
+    .weather-alert-banner,
+    .bg-rose-50,
+    .bg-rose-100,
+    .bg-red-50,
+    .bg-blue-50 {
+      background: #ffffff !important;
+      border: 2px solid #86efac !important;
+      border-radius: 1.5rem !important;
+      box-shadow: 0 10px 25px -5px rgba(5, 150, 105, 0.08), 0 8px 10px -6px rgba(5, 150, 105, 0.04) !important;
+      color: #0f172a !important;
+      transition: all 0.25s ease !important;
+    }
+
+    .step-panel .bg-white:hover,
+    .crop-card:hover {
+      border-color: #4ade80 !important;
+      box-shadow: 0 16px 30px -5px rgba(5, 150, 105, 0.14) !important;
+    }
+
+    /* Inner Sub-Cards & Metric Stat Boxes: Crisp White with Light Green Outline */
+    .step-panel .bg-slate-50,
+    .step-panel .bg-white\/10,
+    .step-panel .grid > div:not(.crop-card) {
+      background: #ffffff !important;
+      border: 1.5px solid #bbf7d0 !important;
+      border-radius: 1rem !important;
+    }
+
+    /* ALL LETTERS CLEARLY VISIBLE: High-Contrast, Bold, Pitch-Dark Text */
+    .step-panel, .step-panel * {
+      text-shadow: none !important;
+    }
+
+    .step-panel h1, .step-panel h2, .step-panel h3, .step-panel h4, .step-panel h5, .step-panel h6 {
+      color: #064e3b !important;
+      font-weight: 900 !important;
+      letter-spacing: -0.01em !important;
+    }
+
+    .step-panel label {
+      font-size: 1.05rem !important;
+      font-weight: 800 !important;
+      letter-spacing: 0.01em !important;
+      color: #064e3b !important;
+      display: inline-block !important;
+      margin-bottom: 0.25rem !important;
+    }
+
+    .step-panel p {
+      font-size: 1.02rem !important;
+      line-height: 1.65 !important;
+      color: #0f172a !important;
+      font-weight: 600 !important;
+    }
+
+    .step-panel span:not(.step-btn span):not(button.bg-emerald-700 span):not(button.bg-emerald-800 span):not(#btn-step-next span):not(#btn-use-browser-gps span):not(#btn-run-fertilizer-calc span),
+    .step-panel li, .step-panel td, .step-panel th,
+    .step-panel div:not([class*="bg-emerald-700"]):not([class*="bg-emerald-800"]) {
+      color: #0f172a !important;
+      font-weight: 600 !important;
+    }
+
+    /* Deep Obsidian Emerald for Metrics & Numbers */
+    .step-panel strong {
+      color: #022c22 !important;
+      font-weight: 900 !important;
+    }
+
+    /* Override Faint / Washed Out Classes on Light Green */
+    .step-panel .text-slate-400,
+    .step-panel .text-slate-500,
+    .step-panel .text-slate-600,
+    .step-panel .text-sky-200,
+    .step-panel .text-sky-300,
+    .step-panel .text-purple-200,
+    .step-panel .text-purple-300,
+    .step-panel .text-emerald-200,
+    .step-panel .text-emerald-100,
+    .step-panel .text-amber-300 {
+      color: #064e3b !important;
+      font-weight: 700 !important;
+    }
+
+    /* Crisp Form Inputs with Bold Light Green Border & Pitch Dark Text */
+    .step-panel input, .step-panel select, .step-panel textarea {
+      font-size: 1.05rem !important;
+      font-weight: 700 !important;
+      padding: 0.75rem 1rem !important;
+      background: #ffffff !important;
+      border: 2px solid #059669 !important;
+      color: #022c22 !important;
+      border-radius: 0.85rem !important;
+      box-shadow: 0 1px 3px 0 rgba(5, 150, 105, 0.08) !important;
+    }
+    .step-panel input:focus, .step-panel select:focus, .step-panel textarea:focus {
+      border-color: #047857 !important;
+      box-shadow: 0 0 0 4px rgba(16, 185, 129, 0.25) !important;
+      outline: none !important;
+    }
+    .step-panel input::placeholder {
+      color: #4b5563 !important;
+      font-weight: 500 !important;
+    }
+
+    /* Primary Action Buttons: Solid Deep Emerald with Bright Crisp White Letters */
+    button.bg-emerald-700, button.bg-emerald-700 *,
+    button.bg-emerald-800, button.bg-emerald-800 *,
+    #btn-step-next, #btn-step-next *,
+    #btn-use-browser-gps, #btn-use-browser-gps *,
+    #btn-run-fertilizer-calc, #btn-run-fertilizer-calc *,
+    .step-btn.bg-emerald-700, .step-btn.bg-emerald-700 * {
+      color: #ffffff !important;
+      font-weight: 900 !important;
+      text-shadow: 0 1px 2px rgba(0, 0, 0, 0.25) !important;
+    }
+
+    /* Secondary Buttons: Crisp Light Green with Bold Emerald Letters */
+    #btn-step-prev, #btn-retake-soil, #btn-schemes, #btn-history, #btn-open-leaf-scanner {
+      background: #ffffff !important;
+      border: 2px solid #86efac !important;
+      color: #064e3b !important;
+      font-weight: 800 !important;
+    }
+    #btn-step-prev:hover, #btn-retake-soil:hover {
+      background: #dcfce7 !important;
     }
   </style>
 </head>
 <body class="text-slate-800 min-h-screen font-sans flex flex-col antialiased relative">
-  <div id="bg-gradient-overlay" class="fixed inset-0 pointer-events-none transition-all duration-700 -z-10"></div>
+  <!-- Dynamic Persistent Background Layer 1: Soil Photo Upload Background (Disabled - clean light green background used) -->
+  <div id="app-bg-soil-image" class="fixed inset-0 w-full h-full bg-cover bg-center transition-opacity duration-700 pointer-events-none -z-10 opacity-0 hidden" style="display: none !important;"></div>
+
+  <!-- Dynamic Persistent Background Layer 2: Light Green Gradient Container (Disabled) -->
+  <div id="app-bg-video-container" class="fixed inset-0 w-full h-full overflow-hidden pointer-events-none -z-10 transition-opacity duration-700 opacity-0 hidden" style="display: none !important;">
+    <div id="yt-step-bg-wrapper" class="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 pointer-events-none overflow-hidden" style="width: 177.78vh; height: 56.25vw; min-width: 100vw; min-height: 100vh;">
+      <div id="yt-step-bg-player" class="w-full h-full pointer-events-none"></div>
+    </div>
+    <video id="html5-step-bg-video" src="/static/videos/field_clip_1to2s.mp4" autoplay muted loop playsinline class="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 min-w-full min-h-full w-auto h-auto object-cover pointer-events-none">
+      <source src="/static/videos/field_clip_1to2s.mp4" type="video/mp4">
+    </video>
+  </div>
+
+  <!-- Background overlay set to 0 opacity so background photo & video are 100% clearly visible -->
+  <div id="bg-gradient-overlay" class="fixed inset-0 pointer-events-none transition-all duration-700 -z-10 opacity-0 hidden"></div>
 
   <!-- Dynamic Mount Point for Pure TypeScript Application with Zero-CLS Skeleton Shell -->
   <div id="app" class="relative z-10">
-    <!-- Inline Skeleton Header: Renders in 0ms before JS runs to eliminate CLS and boost FDS -->
-    <header class="bg-[#1b5e20] text-white shadow-md sticky top-0 z-40 h-16">
+    <!-- Inline Skeleton Header: Refreshing Light Green Theme -->
+    <header class="bg-[#e6f7ec] text-[#064e3b] shadow-xs sticky top-0 z-40 h-16 border-b-2 border-emerald-300" style="background: #e6f7ec !important; border-bottom: 2px solid #86efac !important;">
       <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 h-16 flex items-center justify-between">
         <div class="flex items-center space-x-3">
-          <div class="w-10 h-10 rounded-full bg-[#2e7d32] flex items-center justify-center text-amber-300 text-xl shadow-inner">
+          <div class="w-10 h-10 rounded-full flex items-center justify-center text-white text-xl shadow-sm bg-emerald-700">
             <i class="fa-solid fa-seedling"></i>
           </div>
           <div>
-            <h1 class="text-base sm:text-lg font-bold tracking-tight text-white flex items-center gap-2">
+            <h1 class="text-base sm:text-xl font-black tracking-tight text-[#064e3b] flex items-center gap-2">
               <span>Farmer Decision Dashboard</span>
             </h1>
-            <p class="text-[11px] text-emerald-200 hidden sm:block">AI Precision Agriculture • Weather • Economics</p>
+            <p class="text-xs text-[#064e3b] font-bold hidden sm:block">AI Precision Agriculture • Weather • Economics</p>
           </div>
         </div>
         <div class="flex items-center space-x-2">
-          <div class="h-8 w-24 bg-emerald-900/60 rounded-lg animate-pulse"></div>
+          <div class="h-8 w-24 bg-white/70 rounded-lg animate-pulse border border-emerald-300"></div>
         </div>
       </div>
     </header>
     <main class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-6 w-full flex-1">
-      <div class="h-12 bg-white rounded-2xl border border-slate-200 mb-6 animate-pulse"></div>
-      <div class="bg-white rounded-3xl p-8 border border-slate-200 shadow-sm min-h-[400px] flex items-center justify-center">
+      <div class="bg-white rounded-3xl p-8 border-2 border-[#86efac] shadow-sm min-h-[400px] flex items-center justify-center">
         <div class="text-center space-y-3">
           <div class="text-3xl text-emerald-700 animate-spin"><i class="fa-solid fa-circle-notch"></i></div>
-          <p class="text-xs text-slate-500 font-medium">Loading high-speed agronomic dashboard...</p>
+          <p class="text-sm text-[#064e3b] font-bold">Loading high-speed agronomic dashboard...</p>
         </div>
       </div>
     </main>
   </div>
 
   <!-- Client Application Script (Pure TypeScript/JavaScript bundle) -->
-  <script type="module" src="/static/js/app.js?v=5.2"></script>
+  <script type="module" src="/static/js/app.js?v=50.0"></script>
 </body>
 </html>

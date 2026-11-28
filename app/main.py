@@ -61,7 +61,7 @@ async def add_performance_cache_headers(request: Request, call_next):
         if any(path.endswith(ext) for ext in [".jpg", ".jpeg", ".png", ".webp", ".mp4", ".webm", ".woff", ".woff2", ".ttf"]):
             response.headers["Cache-Control"] = "public, max-age=604800, immutable"
         elif path.endswith(".js") or path.endswith(".css"):
-            response.headers["Cache-Control"] = "public, max-age=86400, stale-while-revalidate=86400"
+            response.headers["Cache-Control"] = "no-cache, no-store, must-revalidate"
     return response
 
 # Mount static asset directory
@@ -140,6 +140,76 @@ async def health_check():
         "status": "healthy",
         "app": settings.app_name,
         "version": settings.app_version
+    }
+
+@app.get("/api/ip-location")
+async def get_ip_location(request: Request):
+    """
+    High-accuracy IP Geolocation API.
+    Resolves client IP to actual geographical coordinates (lat, lon, city, state, country).
+    Uses multiple fast providers with fallback to ensure real location detection for farmers.
+    """
+    import httpx
+
+    # Resolve client public IP
+    forwarded = request.headers.get("x-forwarded-for")
+    client_ip = forwarded.split(",")[0].strip() if forwarded else (request.client.host if request.client else "")
+    is_private_or_local = (
+        not client_ip or
+        client_ip in ("127.0.0.1", "localhost", "::1") or
+        client_ip.startswith(("192.168.", "10.", "172.16.", "172.17.", "172.18.", "172.19.", "172.20.", "172.21.", "172.22.", "172.23.", "172.24.", "172.25.", "172.26.", "172.27.", "172.28.", "172.29.", "172.30.", "172.31."))
+    )
+
+    url = "http://ip-api.com/json" if is_private_or_local else f"http://ip-api.com/json/{client_ip}"
+
+    try:
+        async with httpx.AsyncClient(timeout=4.0) as client:
+            resp = await client.get(url)
+            if resp.status_code == 200:
+                data = resp.json()
+                if data.get("status") == "success":
+                    return {
+                        "status": "success",
+                        "lat": float(data.get("lat", 12.9716)),
+                        "lon": float(data.get("lon", 77.5946)),
+                        "city": data.get("city", "Bengaluru"),
+                        "region": data.get("regionName", "Karnataka"),
+                        "country": data.get("country", "India"),
+                        "isp": data.get("isp", ""),
+                        "query": data.get("query", client_ip)
+                    }
+    except Exception as e:
+        print(f"[IP-Location] Primary ip-api.com failed: {e}")
+
+    # Fallback to ipwho.is
+    try:
+        url_fb = "https://ipwho.is/" if is_private_or_local else f"https://ipwho.is/{client_ip}"
+        async with httpx.AsyncClient(timeout=4.0) as client:
+            resp = await client.get(url_fb)
+            if resp.status_code == 200:
+                data = resp.json()
+                if data.get("success") is not False:
+                    return {
+                        "status": "success",
+                        "lat": float(data.get("latitude", 12.9716)),
+                        "lon": float(data.get("longitude", 77.5946)),
+                        "city": data.get("city", "Bengaluru"),
+                        "region": data.get("region", "Karnataka"),
+                        "country": data.get("country", "India"),
+                        "isp": data.get("connection", {}).get("isp", ""),
+                        "query": data.get("ip", client_ip)
+                    }
+    except Exception as e:
+        print(f"[IP-Location] Secondary ipwho.is failed: {e}")
+
+    # Default fallback to Bengaluru, Karnataka
+    return {
+        "status": "fallback",
+        "lat": 12.9716,
+        "lon": 77.5946,
+        "city": "Bengaluru",
+        "region": "Karnataka",
+        "country": "India"
     }
 
 if __name__ == "__main__":

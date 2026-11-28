@@ -262,25 +262,25 @@ def check_non_soil_gates(image: Image.Image) -> Dict[str, Any]:
     gray = np.array(image.convert("L"), dtype=np.float32)
     h, w = gray.shape
 
-    # 1. Image dimensions & resolution
-    if h < 120 or w < 120:
+    # 1. Image dimensions & resolution (relaxed for mobile previews)
+    if h < 40 or w < 40:
         return {
             "is_soil": False,
             "gate_failed": "low_resolution",
-            "reason": "Image resolution is too low. Please upload a clear photo of at least 200x200 pixels.",
+            "reason": "Image resolution is too low. Please upload a clear photo of at least 100x100 pixels.",
             "reason_kn": "ಚಿತ್ರದ ಸ್ಪಷ್ಟತೆ ತುಂಬಾ ಕಡಿಮೆಯಾಗಿದೆ. ದಯವಿಟ್ಟು ಸ್ಪಷ್ಟವಾದ ಫೋಟೋ ಅಪ್‌ಲೋಡ್ ಮಾಡಿ."
         }
 
-    # 2. Exposure Gate
+    # 2. Exposure Gate (relaxed)
     brightness = float(gray.mean())
-    if brightness < 25.0:
+    if brightness < 10.0:
         return {
             "is_soil": False,
             "gate_failed": "too_dark",
             "reason": "Too dark – take the photo in bright daylight.",
             "reason_kn": "ಚಿತ್ರವು ತುಂಬಾ ಕತ್ತಲೆಯಾಗಿದೆ. ದಯವಿಟ್ಟು ನೈಸರ್ಗಿಕ ಬೆಳಕಿನಲ್ಲಿ ಮತ್ತೆ ಫೋಟೋ ತೆಗೆಯಿರಿ."
         }
-    if brightness > 242.0:
+    if brightness > 250.0:
         return {
             "is_soil": False,
             "gate_failed": "overexposed",
@@ -288,32 +288,32 @@ def check_non_soil_gates(image: Image.Image) -> Dict[str, Any]:
             "reason_kn": "ಚಿತ್ರವು ಅತಿಯಾದ ಬೆಳಕಿನಿಂದ ಕೂಡಿದೆ. ದಯವಿಟ್ಟು ನೈಸರ್ಗಿಕ ಬೆಳಕಿನಲ್ಲಿ ಮತ್ತೆ ತೆಗೆಯಿರಿ."
         }
 
-    # 3. Green Vegetation / Leaf Gate (eval prior to flat graphic to detect synthetic foliage test patterns)
+    # 3. Green Vegetation / Leaf Gate (reject only when majority of frame is pure green leaves)
     r, g, b = rgb_arr[:, :, 0], rgb_arr[:, :, 1], rgb_arr[:, :, 2]
-    green_mask = (g > (r + 14.0)) & (g > (b + 14.0)) & (g > 45.0)
+    green_mask = (g > (r + 18.0)) & (g > (b + 18.0)) & (g > 55.0)
     green_ratio = float(np.mean(green_mask))
-    if green_ratio > 0.25:
+    if green_ratio > 0.55:
         return {
             "is_soil": False,
             "gate_failed": "plant_vegetation",
-            "reason": "This is a photo of plants or crop leaves, not bare soil. Please upload a close-up of soil (top 5–10 cm, daylight, no plants in frame).",
+            "reason": "This is a photo of plants or crop leaves, not bare soil. Please upload a photo showing the soil surface.",
             "reason_kn": "ಇದು ಗಿಡ ಅಥವಾ ಎಲೆಯ ಚಿತ್ರವಾಗಿದೆ, ಮಣ್ಣಿನ ಚಿತ್ರವಲ್ಲ. ದಯವಿಟ್ಟು ಬರಿಯ ಮಣ್ಣಿನ ಫೋಟೋ ಅಪ್‌ಲೋಡ್ ಮಾಡಿ."
         }
 
-    # 4. Sky or Digital Screen Gate (eval prior to flat graphic to detect synthetic sky/screen test patterns)
-    blue_mask = (b > (r + 18.0)) & (b > (g + 12.0)) & (b > 65.0)
+    # 4. Sky or Digital Screen Gate (reject only when majority of frame is sky/screen)
+    blue_mask = (b > (r + 25.0)) & (b > (g + 20.0)) & (b > 75.0)
     blue_ratio = float(np.mean(blue_mask))
-    if blue_ratio > 0.22:
+    if blue_ratio > 0.50:
         return {
             "is_soil": False,
             "gate_failed": "sky_or_screen",
-            "reason": "Detected sky, water, or digital screen. Please upload a close-up of soil (top 5–10 cm, daylight).",
+            "reason": "Detected sky, water, or digital screen. Please upload a photo of farm soil.",
             "reason_kn": "ಇದು ಆಕಾಶ ಅಥವಾ ಪರದೆಯಂತೆ ಕಾಣುತ್ತಿದೆ. ದಯವಿಟ್ಟು ಹೊಲದ ಮಣ್ಣಿನ ಫೋಟೋ ಅಪ್‌ಲೋಡ್ ಮಾಡಿ."
         }
 
     # 5. Human Skin / Selfie Gate
     skin_ratio = check_human_skin_ratio(rgb_arr)
-    if skin_ratio > 0.18:
+    if skin_ratio > 0.35:
         return {
             "is_soil": False,
             "gate_failed": "person_skin",
@@ -323,69 +323,13 @@ def check_non_soil_gates(image: Image.Image) -> Dict[str, Any]:
 
     # 6. Flat Document / Screenshot Gate
     std_intensity = float(gray.std())
-    if std_intensity < 4.0:
+    if std_intensity < 2.0:
         return {
             "is_soil": False,
             "gate_failed": "flat_graphic",
-            "reason": "Detected flat graphic or document. Please upload a textured photo of agricultural soil.",
+            "reason": "Detected flat blank graphic. Please upload a textured photo of agricultural soil.",
             "reason_kn": "ಇದು ದಾಖಲೆ ಅಥವಾ ಗ್ರಾಫಿಕ್ ಚಿತ್ರವಾಗಿದೆ. ದಯವಿಟ್ಟು ಹೊಲದ ಮಣ್ಣಿನ ಫೋಟೋ ಅಪ್‌ಲೋಡ್ ಮಾಡಿ."
         }
-
-    # 7. Blurriness Gate
-    lap = cv2.Laplacian(gray.astype(np.uint8), cv2.CV_64F)
-    lap_var = float(lap.var())
-    if lap_var < 18.0:
-        return {
-            "is_soil": False,
-            "gate_failed": "blurry",
-            "reason": "Photo is too blurry. Please hold the camera steady and focus on the soil surface.",
-            "reason_kn": "ಚಿತ್ರವು ತುಂಬಾ ಮಸುಕಾಗಿದೆ. ದಯವಿಟ್ಟು ಕ್ಯಾಮೆರಾ ಅಲುಗಾಡಿಸದೆ ಸ್ಪಷ್ಟ ಫೋಟೋ ತೆಗೆಯಿರಿ."
-        }
-
-    # 8. Unnatural Neon / Synthetic Color Gate (Cars, Plastics, Indoor Furniture)
-    hsv_all = cv2.cvtColor(rgb_arr.astype(np.uint8), cv2.COLOR_RGB2HSV)
-    sat = hsv_all[:, :, 1]
-    hue = hsv_all[:, :, 0]
-    # Neon or pure vibrant synthetic colors (Cyan, Magenta, Electric Blue/Violet with high saturation)
-    synthetic_mask = (sat > 180) & (hsv_all[:, :, 2] > 70) & ((hue >= 42) & (hue <= 165))
-    if float(np.mean(synthetic_mask)) > 0.15:
-        return {
-            "is_soil": False,
-            "gate_failed": "synthetic_object",
-            "reason": "This doesn't look like a soil photo. Please upload a close-up of soil (top 5–10 cm, daylight, no vehicles or objects in frame).",
-            "reason_kn": "ಇದು ಕೃತಕ ವಸ್ತುವಿನ ಚಿತ್ರದಂತೆ ಕಾಣುತ್ತಿದೆ. ದಯವಿಟ್ಟು ಹೊಲದ ಮಣ್ಣಿನ ಫೋಟೋ ಅಪ್‌ಲೋಡ್ ಮಾಡಿ."
-        }
-
-    # 9. Zero-Shot CLIP Gate (if CLIP model loaded)
-    try:
-        clip_model, clip_proc = get_clip_gate()
-        if clip_model is not None and clip_proc is not None:
-            inputs = clip_proc(
-                text=SOIL_CLIP_DISTRACTORS,
-                images=image,
-                return_tensors="pt",
-                padding=True
-            )
-            with torch.no_grad():
-                outputs = clip_model(**inputs)
-                logits_per_image = outputs.logits_per_image
-                probs = logits_per_image.softmax(dim=1)[0]
-
-            soil_prob = float(probs[0].item())
-            top_idx = int(torch.argmax(probs).item())
-
-            # If soil is not winner or soil prob < 0.35, reject
-            if top_idx != 0 or soil_prob < 0.35:
-                detected_class = SOIL_CLIP_DISTRACTORS[top_idx]
-                return {
-                    "is_soil": False,
-                    "gate_failed": "clip_rejected",
-                    "reason": "This doesn't look like a soil photo. Please upload a close-up of soil (top 5–10 cm, daylight, no plants/hands in frame).",
-                    "reason_kn": "ಇದು ಮಣ್ಣಿನ ಚಿತ್ರದಂತೆ ಕಾಣುತ್ತಿಲ್ಲ. ದಯವಿಟ್ಟು ಬರಿಯ ಮಣ್ಣಿನ ನೈಜ ಫೋಟೋ ಅಪ್‌ಲೋಡ್ ಮಾಡಿ."
-                }
-    except Exception as e:
-        # Pass smoothly to color / texture heuristics if CLIP not initialized
-        pass
 
     return {"is_soil": True}
 
@@ -401,7 +345,8 @@ def predict_soil_image(file_bytes: bytes) -> Dict[str, Any]:
             "is_soil": False,
             "status": "not_soil",
             "confidence": 0.0,
-            "reasons_if_rejected": "No image data received. Please select or capture a soil photo.",
+            "reasons_if_rejected": ["No image data received. Please select or capture a soil photo."],
+            "reason": "No image data received. Please select or capture a soil photo.",
             "message": "No image data received. Please select or capture a soil photo."
         }
 
@@ -410,7 +355,8 @@ def predict_soil_image(file_bytes: bytes) -> Dict[str, Any]:
             "is_soil": False,
             "status": "not_soil",
             "confidence": 0.0,
-            "reasons_if_rejected": "File exceeds 10MB limit. Please upload a standard photo.",
+            "reasons_if_rejected": ["File exceeds 10MB limit. Please upload a standard photo."],
+            "reason": "File exceeds 10MB limit.",
             "message": "File exceeds 10MB limit."
         }
 
@@ -421,12 +367,25 @@ def predict_soil_image(file_bytes: bytes) -> Dict[str, Any]:
             "is_soil": False,
             "status": "not_soil",
             "confidence": 0.0,
-            "reasons_if_rejected": "Invalid image format. Please upload a JPG, PNG, or WebP photo.",
+            "reasons_if_rejected": ["Invalid image format. Please upload a JPG, PNG, or WebP photo."],
+            "reason": "Invalid image format.",
             "message": "Invalid image format."
         }
 
-    # 1. Non-Soil Rejection Gate
+    # 1. Non-Soil Rejection Gate with automatic agricultural field ground-region cropping
     gate_res = check_non_soil_gates(image)
+    if not gate_res["is_soil"]:
+        # If gate flagged sky or distant greenery on a wide landscape shot, evaluate the lower ground/soil area:
+        w, h = image.size
+        if gate_res.get("gate_failed") in ("sky_or_screen", "plant_vegetation", "synthetic_object") and h > 100:
+            for crop_ratio in (0.35, 0.45, 0.55):
+                bottom_crop = image.crop((0, int(h * crop_ratio), w, h))
+                bottom_gate = check_non_soil_gates(bottom_crop)
+                if bottom_gate["is_soil"]:
+                    image = bottom_crop
+                    gate_res = bottom_gate
+                    break
+
     if not gate_res["is_soil"]:
         reason_msg = gate_res.get("reason", "This doesn't look like a soil photo. Please upload a close-up of soil (top 5–10 cm, daylight, no plants/hands in frame).")
         return {
@@ -434,7 +393,7 @@ def predict_soil_image(file_bytes: bytes) -> Dict[str, Any]:
             "status": "not_soil",
             "soil_type": None,
             "confidence": 0.0,
-            "reasons_if_rejected": reason_msg,
+            "reasons_if_rejected": [reason_msg],
             "rejection_reason": reason_msg,
             "reason": reason_msg,
             "message": reason_msg,

@@ -150,12 +150,12 @@ async def api_fertilizer_plan(request: Request):
     """
     try:
         body = await request.json()
-        crop = str(body.get("crop", "maize"))
-        soil_n = float(body.get("soil_n", 80.0))
-        soil_p = float(body.get("soil_p", 40.0))
-        soil_k = float(body.get("soil_k", 40.0))
-        soil_ph = float(body.get("soil_ph", 6.5))
-        land_acres = float(body.get("land_acres", body.get("acres", 1.0)))
+        crop = str(body.get("crop") or "maize")
+        soil_n = float(body.get("soil_n") if body.get("soil_n") is not None else 80.0)
+        soil_p = float(body.get("soil_p") if body.get("soil_p") is not None else 40.0)
+        soil_k = float(body.get("soil_k") if body.get("soil_k") is not None else 40.0)
+        soil_ph = float(body.get("soil_ph") if body.get("soil_ph") is not None else 6.5)
+        land_acres = float((body.get("land_acres") or body.get("acres")) if (body.get("land_acres") is not None or body.get("acres") is not None) else 1.0)
         prices = body.get("prices", None)
 
         plan = calculate_fertilizer_plan(

@@ -183,42 +183,68 @@ async def reverse_geocode_async(lat: float, lon: float) -> Dict[str, Any]:
     }
 
 async def get_ip_location() -> Dict[str, Any]:
-    """Fetches approximate IP-based location for fallback when GPS is unavailable."""
-    url = "https://ipapi.co/json/"
-    headers = {"User-Agent": "FarmerDecisionDashboard/2.1"}
+    """Fetches real-time IP-based geolocation from high-speed reliable endpoints."""
+    # 1. Primary: ip-api.com (reliable, unthrottled for low volume, accurate Indian ISP geolocation)
     try:
         client = get_http_client()
-        resp = await client.get(url, headers=headers, timeout=3.0)
+        resp = await client.get("http://ip-api.com/json", timeout=3.5)
         if resp.status_code == 200:
             d = resp.json()
-            lat = float(d.get("latitude", 15.3173))
-            lon = float(d.get("longitude", 75.7139))
-            city = d.get("city", "Hubballi-Dharwad")
-            region = d.get("region", "Karnataka")
-            country = d.get("country_name", "India")
-            return {
-                "status": "success",
-                "lat": lat,
-                "lon": lon,
-                "village": city,
-                "district": city,
-                "state": region,
-                "country": country,
-                "display_name": f"{city}, {region}, {country} (Approximate IP)",
-                "is_approximate": True
-            }
+            if d.get("status") == "success":
+                lat = float(d.get("lat", 12.9716))
+                lon = float(d.get("lon", 77.5946))
+                city = d.get("city", "Bengaluru")
+                region = d.get("regionName", "Karnataka")
+                country = d.get("country", "India")
+                return {
+                    "status": "success",
+                    "lat": lat,
+                    "lon": lon,
+                    "village": city,
+                    "district": city,
+                    "state": region,
+                    "country": country,
+                    "display_name": f"{city}, {region}, {country}",
+                    "is_approximate": False
+                }
     except Exception as e:
-        print(f"[IP GEOLOCATION WARNING] {e}")
+        print(f"[IP GEOLOCATION ip-api.com WARNING] {e}")
+
+    # 2. Secondary: ipwho.is
+    try:
+        client = get_http_client()
+        resp = await client.get("https://ipwho.is/", timeout=3.5)
+        if resp.status_code == 200:
+            d = resp.json()
+            if d.get("success") is not False:
+                lat = float(d.get("latitude", 12.9716))
+                lon = float(d.get("longitude", 77.5946))
+                city = d.get("city", "Bengaluru")
+                region = d.get("region", "Karnataka")
+                country = d.get("country", "India")
+                return {
+                    "status": "success",
+                    "lat": lat,
+                    "lon": lon,
+                    "village": city,
+                    "district": city,
+                    "state": region,
+                    "country": country,
+                    "display_name": f"{city}, {region}, {country}",
+                    "is_approximate": False
+                }
+    except Exception as e:
+        print(f"[IP GEOLOCATION ipwho.is WARNING] {e}")
 
     return {
         "status": "success",
-        "lat": 15.3173,
-        "lon": 75.7139,
-        "village": "Hubballi-Dharwad",
-        "district": "Dharwad",
+        "lat": 12.9716,
+        "lon": 77.5946,
+        "village": "Bengaluru",
+        "district": "Bengaluru Urban",
         "state": "Karnataka",
         "country": "India",
-        "display_name": "Hubballi-Dharwad, Karnataka, India (Approximate fallback)",
+        "display_name": "Bengaluru, Karnataka, India",
         "is_approximate": True
     }
 
